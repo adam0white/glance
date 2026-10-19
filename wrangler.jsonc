@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "glance",
+  "account_id": "a20259cba74e506296745f9c67c1f3bc",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "glance.adamwhite.work", "custom_domain": true }],
+  // Static assets only: no server code, no storage, no AI.
+  "assets": { "directory": "./dist", "not_found_handling": "none" }
+}

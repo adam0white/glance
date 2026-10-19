@@ -1,0 +1,422 @@
+/* Field Notebook tokens (human-framework docs/design-language.md). Only --rope is loud. */
+:root {
+  --paper: #f3ecdd;
+  --paper-2: #e9dfcb;
+  --ink: #23201b;
+  --ink-soft: #6e665a;
+  --rope: #c2412d;
+  --moss: #4f6b3a;
+  --sky: #3d5a73;
+  --text: "Literata", Georgia, serif;
+  --hand: "Caveat", "Bradley Hand", cursive;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1e1b16;
+    --paper-2: #29251e;
+    --ink: #e8dfcc;
+    --ink-soft: #9a9080;
+    --rope: #e2614a;
+    --moss: #8daa6e;
+    --sky: #7fa2c0;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1e1b16;
+  --paper-2: #29251e;
+  --ink: #e8dfcc;
+  --ink-soft: #9a9080;
+  --rope: #e2614a;
+  --moss: #8daa6e;
+  --sky: #7fa2c0;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--text);
+  font-size: 17px;
+  line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+a {
+  color: var(--ink);
+}
+button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  border-radius: 10px 12px 9px 11px;
+  padding: 10px 14px;
+  min-height: 48px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+button.primary {
+  border-color: var(--rope);
+  color: var(--rope);
+  font-weight: 600;
+}
+button:disabled {
+  opacity: 0.45;
+}
+.hand {
+  font-family: var(--hand);
+  font-size: 1.25em;
+  line-height: 1.15;
+}
+.soft {
+  color: var(--ink-soft);
+}
+.mark {
+  font-size: 14px;
+  text-decoration: none;
+  color: var(--ink-soft);
+}
+
+/* ---------- pages ---------- */
+.page {
+  padding: calc(16px + var(--safe-t)) 16px calc(24px + var(--safe-b));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.page h1 {
+  font-weight: 600;
+  font-size: 34px;
+  margin: 18px 0 0;
+}
+.page h2 {
+  font-weight: 600;
+  font-size: 22px;
+  margin: 6px 0 0;
+}
+.page p {
+  margin: 0;
+  max-width: 60ch;
+}
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+.footer {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 18px;
+  line-height: 1.7;
+}
+.footer a {
+  color: var(--ink-soft);
+}
+h3 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 6px 0 0;
+}
+
+/* ---------- the watch ---------- */
+.watch {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: calc(6px + var(--safe-t)) 12px calc(8px + var(--safe-b));
+  gap: 6px;
+}
+.top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+.top .grow {
+  flex: 1;
+}
+.top .clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.speed {
+  display: flex;
+  gap: 2px;
+}
+.speed button {
+  min-height: 34px;
+  min-width: 34px;
+  padding: 2px 6px;
+  font-size: 11px;
+  border-width: 1px;
+  opacity: 0.55;
+}
+.speed button.on {
+  opacity: 1;
+  border-color: var(--rope);
+  color: var(--rope);
+}
+.scene {
+  width: 100%;
+  display: block;
+  border-bottom: 1.5px solid var(--ink-soft);
+  touch-action: manipulation;
+}
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 6px;
+}
+.gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 4px 6px;
+  gap: 0;
+  min-height: 0;
+  opacity: var(--fade, 1);
+  background: var(--paper-2);
+}
+.gauge svg {
+  width: 54px;
+  height: 31px;
+  color: var(--ink);
+}
+.gauge .needle {
+  animation: tremble 0.9s ease-in-out infinite alternate;
+}
+@keyframes tremble {
+  from {
+    rotate: calc(-1 * var(--tremble, 0deg));
+  }
+  to {
+    rotate: var(--tremble, 0deg);
+  }
+}
+.gauge .lab {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.gauge .num {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.gauge .by {
+  font-size: 15px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.log {
+  font-size: 15px;
+  min-height: 7.5em;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.line .t {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  margin-right: 6px;
+}
+.line.n {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.line.r {
+  color: var(--sky);
+}
+.line .hand {
+  font-size: 1.2em;
+}
+.sheet {
+  margin-top: auto;
+  border-top: 1.5px solid var(--ink);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sheet .who {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sheet .who .soft {
+  font-size: 14px;
+  flex: 1;
+}
+.sheet .x {
+  min-height: 34px;
+  padding: 2px 10px;
+  font-size: 14px;
+}
+.crew {
+  display: flex;
+  gap: 6px;
+}
+.crew button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-size: 15px;
+  padding: 6px 10px;
+}
+.crew button .soft {
+  font-size: 13px;
+}
+.crew.small button {
+  min-height: 40px;
+  padding: 4px 8px;
+}
+.crew button.on {
+  border-color: var(--rope);
+}
+.hint {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.fore {
+  margin: 0;
+  color: var(--ink-soft);
+}
+.verbs {
+  display: grid;
+  gap: 6px;
+}
+.verbs.grid,
+.verbs.two {
+  grid-template-columns: 1fr 1fr;
+}
+.verbs.turns {
+  grid-template-columns: repeat(3, 1fr);
+}
+.verbs button {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 15px;
+}
+.verbs button .h {
+  font-size: 12px;
+  color: var(--ink-soft);
+  position: relative;
+}
+.verbs button .h.no {
+  color: var(--rope);
+}
+.verbs button > span {
+  position: relative;
+}
+.verbs button .fill {
+  position: absolute;
+  inset: 0;
+  background: var(--rope);
+  opacity: 0.18;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.verbs button.holding .fill {
+  transform: scaleX(1);
+  transition: transform 0.5s linear;
+}
+
+/* ---------- dawn ---------- */
+.chart {
+  width: 100%;
+  display: block;
+}
+.legend {
+  font-size: 13px;
+}
+.key {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  vertical-align: middle;
+  margin: 0 4px 0 8px;
+}
+.key.red {
+  border-top: 2px solid var(--rope);
+}
+.key.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+.houses {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.houses .soft {
+  margin: 0 4px 0 8px;
+}
+.house {
+  width: 16px;
+  height: 16px;
+}
+.house.flooded {
+  color: var(--sky);
+}
+.misses {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 15px;
+}
+.misses .t {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.caught {
+  color: var(--moss);
+  font-weight: 600;
+}
+.keeperline {
+  border-top: 1.5px solid var(--ink-soft);
+  padding-top: 8px;
+}
+.keeperline p {
+  margin: 2px 0 0;
+}
+.week {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 15px;
+}
+.w {
+  white-space: nowrap;
+}

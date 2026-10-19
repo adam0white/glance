@@ -1,0 +1,42 @@
+{
+  "name": "glance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Glance: a storm week on the radio to a small dam. Every reading is what a tired keeper saw.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/stamp-release.ts && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "measure": "node scripts/measure.ts",
+    "check": "npm run lint && npm run typecheck && npm test",
+    "deploy": "npm run check && npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "@adam0white/human-framework": "2.7.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "26.6.4",
+    "typescript": "7.0.2",
+    "vite": "8.3.2",
+    "vitest": "5.0.3",
+    "wrangler": "4.147.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20261001.1": true,
+    "fsevents": false
+  },
+  "overrides": {
+    "sharp": "0.35.5"
+  }
+}
