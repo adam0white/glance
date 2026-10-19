@@ -243,7 +243,7 @@ export function drawScene(canvas: HTMLCanvasElement, s: GameState, fx: SceneFx, 
   line(ctx, PLACES.gate.x - 8, CREST_Y - 4, 60, 52, 15, 1.4);
   line(ctx, 60, 52, PLACES.weir.x + 4, PLACES.weir.y, 16, 1.4);
   ctx.setLineDash([]);
-  ctx.fillText(plan.weir ? 'to the weir' : '', 20, 58);
+  ctx.fillText(plan.weir ? 'weir path' : '', 66, 46);
   if (plan.weir) {
     ctx.strokeStyle = ink;
     line(ctx, 4, 44, 26, 44, 17, 0.4);

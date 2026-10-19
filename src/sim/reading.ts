@@ -78,6 +78,13 @@ export function spoken(x: number): string {
   return `${DIGITS[a] ?? String(a)}-${DIGITS[b] ?? String(b)}`;
 }
 
+/** A weir figure in two places, digit by digit: 1.98 is "one point nine eight", 0.52 "nought point five two". */
+export function spokenFine(x: number): string {
+  const [a = '0', b = '00'] = Math.max(0, x).toFixed(2).split('.');
+  const say = (d: string) => DIGITS[Number(d)] ?? d;
+  return `${a.length > 1 ? a : say(a)} point ${[...b].map(say).join(' ')}`;
+}
+
 /** The words around a figure, by confidence. Deterministic pick by `k`. */
 export function hedge(id: KeeperId, conf: number, fig: string, k: number): string {
   const pick = (xs: string[]) => xs[Math.abs(k) % xs.length] as string;

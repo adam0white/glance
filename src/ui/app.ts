@@ -32,13 +32,13 @@ import {
 } from '../sim/dam.ts';
 import { KEEPERS, type KeeperId, NAMES } from '../sim/keepers.ts';
 import { spoken } from '../sim/reading.ts';
-import { TURNS } from '../sim/water.ts';
+import { CREST, LIP, TURNS } from '../sim/water.ts';
 import { drawDawn } from './dawn.ts';
 import { drawScene, SCENE_H, type SceneFx, sceneHit } from './scene.ts';
 
 const SAVE = 'glance-save-v1';
 /** Sim minutes per real second. */
-const SPEEDS = [0.8, 1.4, 3.5] as const;
+const SPEEDS = [0.8, 1.4, 2.4] as const;
 const SPEED_NAMES = ['slow', 'steady', 'fast'];
 const SLOWDOWN = 0.35;
 
@@ -138,6 +138,16 @@ function printed(r: Report | null, g: Gauge): string {
   return `step ${r.value}`;
 }
 
+/** The lip and crest marked on the level dial, so a figure past the lip shows as past it. */
+function dialTicks(): string {
+  const tick = (v: number, colour: string) => {
+    const a = ((-90 + ((v - 3) / 3.2) * 180) * Math.PI) / 180;
+    const p = (r: number) => `${(30 + r * Math.sin(a)).toFixed(1)} ${(31 - r * Math.cos(a)).toFixed(1)}`;
+    return `<path d="M${p(21)} L${p(28)}" stroke="${colour}" stroke-width="1.6"/>`;
+  };
+  return tick(LIP, 'var(--ink-soft)') + tick(CREST, 'var(--rope)');
+}
+
 function needleAngle(r: Report | null, g: Gauge): number {
   if (!r) return -90;
   const f =
@@ -224,8 +234,9 @@ function watch() {
   sheet = null;
   sheetKey = '';
   requestWake();
+  writeSave();
   app.innerHTML = `<div class="watch">
-    <div class="top"><a class="mark" href="https://human.adamwhite.work" aria-label="human framework">◇</a><span class="grow"></span><span id="night"></span><span class="clock" id="clock"></span><span class="speed" id="speed"></span></div>
+    <div class="top"><span class="grow"></span><span id="night"></span><span class="clock" id="clock"></span><span class="speed" id="speed"></span></div>
     <canvas id="scene" class="scene" style="height:${SCENE_H}px" aria-label="The dam, as reported"></canvas>
     <div class="board" id="board"></div>
     <div class="log" id="log" aria-live="polite"></div>
@@ -347,7 +358,7 @@ function drawBoard() {
       return `<button class="gauge" data-g="${g.id}" style="--fade:${fade.toFixed(2)};--tremble:${(doubt * 5).toFixed(1)}deg">
         <svg viewBox="0 0 60 34" aria-hidden="true"><path d="M5 31 A25 25 0 0 1 55 31" fill="none" stroke="currentColor" stroke-width="1.5"/>
         <g class="needle" style="transform-origin:30px 31px;transform:rotate(${ang.toFixed(1)}deg)"><line x1="30" y1="31" x2="30" y2="9" stroke="var(--rope)" stroke-width="2" stroke-linecap="round"/></g>
-        <circle cx="30" cy="31" r="2" fill="currentColor"/></svg>
+        ${g.id === 'level' ? dialTicks() : ''}<circle cx="30" cy="31" r="2" fill="currentColor"/></svg>
         <span class="lab">${g.label}</span>
         <span class="num">${printed(r, g.id)}</span>
         <span class="by hand">${r ? hand(`${who} ${clock(r.wrote)}`, r.who === 'nerys' ? 0 : 1 - r.clarity, r.at) : 'not read'}</span>
@@ -439,7 +450,13 @@ function drawSheet() {
     const w = document.getElementById('warn') as HTMLButtonElement | null;
     if (w)
       bindHold(w, (insist) => {
-        if (!insist || !s) return;
+        if (!insist) {
+          const h = w.querySelector('.h');
+          if (h) h.textContent = 'keep your finger on it: the warden knocks doors';
+          w.classList.add('nudge');
+          return;
+        }
+        if (!s) return;
         queueInput(s, { kind: 'warn' });
         writeSave();
         openSheet(null);
@@ -466,11 +483,11 @@ function drawSheet() {
     const hs = opts.map((t) => hint(s as GameState, who, 'gate', t));
     const next = hint(s, who, 'gate', Math.min(TURNS, reported + 1));
     head = `<b>Gate</b><span class="soft">${NAMES[who]} turns it by hand</span>`;
-    body = `${next.forecast ? `<p class="fore hand">“${esc(next.forecast)}”</p>` : ''}
+    body = `${next.forecast ? `<p class="fore"><span class="soft">${NAMES[who]}, on the round after:</span> <span class="hand">“${esc(next.forecast)}”</span></p>` : ''}
       <div class="verbs turns">${hs
         .map(
           (h) =>
-            `<button data-job="gate" data-t="${h.target}"><span class="fill"></span><span>${h.target === 0 ? 'shut' : `${h.target}`}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)}</span></button>`,
+            `<button data-job="gate" data-t="${h.target}"><span class="fill"></span><span>${h.target === 0 ? 'shut' : `${h.target}`}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)} · ~${h.minutes}m</span></button>`,
         )
         .join(
           '',
@@ -481,7 +498,7 @@ function drawSheet() {
     const hi = hint(s, who, job, undefined, true);
     head = `<b>${job === 'level' ? 'Level' : 'Weir'}</b><span class="soft">${job === 'level' ? 'the staff gauge on the dam face' : 'the weir board, a long walk upstream'}</span>`;
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
-      ${h.forecast ? `<p class="fore hand">“${esc(h.forecast)}”</p>` : ''}
+      ${h.forecast ? `<p class="fore"><span class="soft">${NAMES[who]}, on the round after:</span> <span class="hand">“${esc(h.forecast)}”</span></p>` : ''}
       <p class="hint">${lastWords(s, sheet.gauge)}</p>`;
   } else {
     head = `<b>${NAMES[who]}</b><span class="soft">${whereWords(who)}</span>`;
@@ -520,7 +537,7 @@ function verbButtons(items: { h: Hint; label: string; insist: Hint | undefined }
   return `<div class="verbs ${grid ? 'grid' : 'one'}">${items
     .map(
       ({ h, label, insist }) =>
-        `<button data-job="${h.job}"><span class="fill"></span><span>${esc(label)}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)}${insist && insist.verdict !== h.verdict ? ` · held: ${esc(insist.short)}` : ''}</span></button>`,
+        `<button data-job="${h.job}"><span class="fill"></span><span>${esc(label)}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)}${h.minutes && h.job !== 'stove' && h.job !== 'nap' ? ` · ~${h.minutes} min` : ''}${insist && insist.verdict !== h.verdict ? ` · held: ${esc(insist.short)}` : ''}</span></button>`,
     )
     .join('')}</div>`;
 }
@@ -653,7 +670,7 @@ function dawn() {
     <canvas id="chart" class="chart" aria-label="The night's true level against his figures"></canvas>
     <p class="soft legend"><span class="key red"></span> what the water did <span class="key dot"></span> what ${planOf(s).keepers.length > 1 ? 'they' : 'he'} told you</p>
     <div class="houses"><span class="soft">Mill Lane</span>${houseRow(4, d.overtopped ? 'flooded' : d.mill)}<span class="soft">square</span>${houseRow(6, d.overtopped ? 'flooded' : d.square)}</div>
-    ${d.misses.length ? `<h3>Where the board was wrong</h3><ul class="misses">${d.misses.slice(0, 6).map(missLine).join('')}</ul><p class="soft">${caught ? `You caught ${count(caught)} of ${count(d.misses.length)}.` : 'You caught none of them.'}</p>` : '<p>Every figure tonight was near enough the truth.</p>'}
+    ${d.misses.length ? `<h3>Where the board was wrong</h3><ul class="misses">${d.misses.slice(0, 6).map(missLine).join('')}</ul><p class="soft">A figure counts as caught when you had it read again within twenty minutes, or lightning showed the wall. ${caught ? `You caught ${count(caught)} of ${count(d.misses.length)}.` : 'You caught none of them.'}</p>` : '<p>Every figure tonight was near enough the truth.</p>'}
     ${d.dozes.map((z) => `<p class="soft">${NAMES[z.who]} slept by the stove, ${clock(z.from)} to ${clock(z.to)}.</p>`).join('')}
     ${d.strain.map((id) => `<p class="soft">${NAMES[id]} hurt his shoulder on the wheel. He didn’t say.</p>`).join('')}
     ${d.lines
@@ -753,6 +770,7 @@ function releaseWake() {
   wake?.release().catch(() => {});
   wake = null;
 }
+window.addEventListener('pagehide', () => writeSave());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     writeSave();

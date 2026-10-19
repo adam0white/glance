@@ -18,6 +18,7 @@ import {
   type DecisionRecord,
   decide,
   finish,
+  forecastThresholds,
   injure,
   interrupt,
   type Outcome,
@@ -34,7 +35,16 @@ import {
   tick,
 } from '@adam0white/human-framework';
 import { ENGINEER, KEEPERS, type KeeperId, makeKeeper, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
-import { biasOf, type Clarity, clarityOf, confidenceOf, errorSd, hedge, spoken } from './reading.ts';
+import {
+  biasOf,
+  type Clarity,
+  clarityOf,
+  confidenceOf,
+  errorSd,
+  hedge,
+  spoken,
+  spokenFine,
+} from './reading.ts';
 import { DRAW, hashNormal, hashUnit } from './rng.ts';
 import {
   bridgeOf,
@@ -493,6 +503,14 @@ function handover(s: GameState, who: KeeperId, gauge: Gauge, truth: number): Rep
 const turnWords = (n: number) =>
   n === 0 ? 'nothing, shut' : n === 1 ? 'one turn' : `${spoken(n).split('-')[0]} turns`;
 
+/**
+ * Where a night keeper's forecast starts to bite (HF 2.8.0 `forecastAt`): sleepiness in the small hours sits at
+ * 0.6 to 0.85, near HF's day default comfortAt 0.8. Engineering assumption, tuned headlessly over six seeds:
+ * at 0.78 the measured policies fare as at the default; at 0.74 and below the keepers turn the wheel down through
+ * the trough and every policy but the oracle loses the dam (a cliff, not a slope; docs/hf-requests.md).
+ */
+export const NIGHT_FORECAST = { comfortAt: 0.78, spentAt: 0.97 };
+
 function rest(_s: GameState) {
   return [{ label: 'the next round', duration: 60, effort: 0.35 }];
 }
@@ -510,6 +528,7 @@ export function offersFor(s: GameState, id: KeeperId, target?: number): Affordan
       placeId: 'dam',
       advertises: { competence: 0.12 + 0.2 * (p.skills.gauges?.level ?? 0.4), esteem: 0.1 },
       followedBy: rest(s),
+      forecastAt: NIGHT_FORECAST,
       ...over,
     });
   list.push(
@@ -531,17 +550,20 @@ export function offersFor(s: GameState, id: KeeperId, target?: number): Affordan
         skill: { id: 'gauges', difficulty: 0.3 },
       }),
     );
+  // The wheel is offered only when the desk asks for a setting: a standing "open the gate" option made every
+  // other ask come back as "rather check the gate" (Priya's playtest, 2026-10-19).
   const gate = s.water.gate;
   const t = Math.max(0, Math.min(TURNS, target ?? Math.min(TURNS, gate + 1)));
   const turns = Math.abs(t - Math.round(gate));
-  list.push(
-    work('gate', {
-      label: t > gate ? 'open the gate' : t < gate ? 'close the gate' : 'check the gate',
-      duration: walkMinutes(k.place, 'gate') + Math.max(2, Math.ceil(turns / turnRate(s, k, p, false))),
-      effort: turns === 0 ? 0.2 : t > gate ? 0.78 : 0.65,
-      skill: { id: 'gate', difficulty: 0.5 },
-    }),
-  );
+  if (target !== undefined)
+    list.push(
+      work('gate', {
+        label: t > gate ? 'open the gate' : t < gate ? 'close the gate' : 'check the gate',
+        duration: walkMinutes(k.place, 'gate') + Math.max(2, Math.ceil(turns / turnRate(s, k, p, false))),
+        effort: turns === 0 ? 0.2 : t > gate ? 0.78 : 0.65,
+        skill: { id: 'gate', difficulty: 0.5 },
+      }),
+    );
   if (s.treeKnown && s.water.blocked)
     list.push(
       work('clear', {
@@ -590,6 +612,8 @@ export interface Hint {
   short: string;
   /** His own forecast for the work, in his words; '' when nothing follows. */
   forecast: string;
+  /** About how long the job takes him, walk included, rounded to five minutes (0 when not offered). */
+  minutes: number;
 }
 
 /** How he would likely answer, right now. Pure: no state change, no randomness. */
@@ -602,24 +626,31 @@ export function hint(s: GameState, id: KeeperId, job: Job, target?: number, insi
   k.pending = saved;
   const r = predict(p, offers, suggestion(job, insist));
   const aff = offers.find((o) => o.id === job);
-  const out: Hint = { job, verdict: r.verdict, says: r.says, short: shortOf(r), forecast: '' };
+  const out: Hint = {
+    job,
+    verdict: r.verdict,
+    says: r.says,
+    short: shortOf(r),
+    forecast: '',
+    minutes: aff ? Math.max(5, Math.round(aff.duration / 5) * 5) : 0,
+  };
   if (target !== undefined) out.target = target;
   if (aff?.followedBy) out.forecast = forecastWords(p, aff);
   return out;
 }
 
 /**
- * His forecast in words. HF's spans (`bodyForecast`) are the person's own simulation of his body as he feels it;
- * the game words them on its own scale, because HF's narration thresholds (comfortAt 0.8, spentAt 0.97) sit above
- * where a night keeper lives (docs/hf-requests.md).
+ * His forecast in words, from HF's spans (`bodyForecast`): his own simulation of his body as he feels it, judged
+ * against the offer's thresholds (`forecastThresholds`, set by `NIGHT_FORECAST`).
  */
 export function forecastWords(p: Person, aff: Affordance): string {
   const spans = bodyForecast(p, aff).spans.slice(1);
   if (spans.length === 0) return '';
   const worst = Math.max(...spans.map((x) => x.worst));
+  const at = forecastThresholds(aff);
   const dai = p.id === 'dai';
-  if (worst < 0.66) return dai ? 'Easy. I’ll have plenty for the next round.' : 'No problem, sir.';
-  if (worst < 0.8)
+  if (worst < at.comfortAt) return dai ? 'Easy. I’ll have plenty for the next round.' : 'No problem, sir.';
+  if (worst < (at.comfortAt + at.spentAt) / 2)
     return dai
       ? 'I can, but the next round will be slow.'
       : 'I can do it, sir. The next round might be slow.';
@@ -954,6 +985,15 @@ function flavour(s: GameState, id: KeeperId, r: SuggestionResolution): string {
   if (r.verdict === 'assented') return pick(LINES[id].assented);
   if (r.verdict === 'complied') return pick(LINES[id].complied);
   if (r.verdict === 'refused' && r.kind === 'cannot') return pick(LINES[id].cannot);
+  // "After I sit by the stove" from a man already by the stove reads as a loop: say what he means.
+  if (r.verdict === 'deferred' && r.counterOffer?.label === 'sit by the stove')
+    return id === 'dai'
+      ? pick([
+          'Not yet. Let me get the cold out of my hands.',
+          'Give me a minute by the stove first.',
+          'In a bit. Kettle’s nearly on.',
+        ])
+      : pick(['Can I just warm up a minute, sir?', 'Two minutes, sir. I’m frozen.']);
   return r.says;
 }
 
@@ -1194,8 +1234,7 @@ function deliverHeld(s: GameState) {
 
 export function reportWords(_s: GameState, r: Report): string {
   const who = r.who as KeeperId;
-  const fig =
-    r.gauge === 'level' ? spoken(r.value) : `nought point ${spoken(r.value * 10).replace('-', ' ')}`;
+  const fig = r.gauge === 'level' ? spoken(r.value) : spokenFine(r.value);
   const k = r.at + KEEPERS.indexOf(who) * 7;
   const lead = r.gauge === 'weir' ? (who === 'dai' ? 'Weir’s ' : 'Weir board, ') : '';
   const yawn = r.clarity < 0.35 && k % 3 === 0 ? (who === 'dai' ? '(a long yawn) ' : '') : '';
@@ -1265,6 +1304,28 @@ function aboutYou(s: GameState, k: KeeperState, overtopped: boolean): string {
     : pick(['Good night, sir. I mean, good morning.', 'I think I’m getting the hang of the wheel.']);
 }
 
+/**
+ * HF's review line in his own words. The review itself (did he keep his promise to stay awake) is HF's; the
+ * wording of a broken watch varies by night, because the same sentence every dawn read as a template.
+ */
+function ownWatchLine(s: GameState, id: KeeperId, line: string): string {
+  if (!/didn't keep my watch/i.test(line)) return line.replace(/^Today/, 'Tonight');
+  const dai = [
+    'I dropped off by the stove. I know I did.',
+    'Shut my eyes for a minute. It was longer than a minute.',
+    'Thirty years I never slept on watch. Now look.',
+    'I nodded off. Don’t put that in the book.',
+    'Slept in the chair. My dad would have had words.',
+  ];
+  const callum = [
+    'I fell asleep, sir. I’m sorry. It won’t happen again.',
+    'I only sat down for a second.',
+    'I was out like a light. The baby had me up all day.',
+  ];
+  const xs = id === 'dai' ? dai : callum;
+  return xs[(s.night + s.seed) % xs.length] ?? line;
+}
+
 function houseFate(firstAt: number | null, warnedAt: number | null): 'dry' | 'saved' | 'flooded' {
   if (firstAt === null) return 'dry';
   return warnedAt !== null && warnedAt <= firstAt - 25 ? 'saved' : 'flooded';
@@ -1332,7 +1393,7 @@ function closeNight(s: GameState, overtopped: boolean) {
       .filter((k) => k.on)
       .map((k) => ({
         id: k.id,
-        line: (reviewLine(personOf(s, k.id)) ?? '').replace(/^Today/, 'Tonight'),
+        line: ownWatchLine(s, k.id, reviewLine(personOf(s, k.id)) ?? ''),
         aboutYou: aboutYou(s, k, overtopped),
       })),
   };

@@ -140,7 +140,7 @@ h3 {
 .watch {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  height: 100dvh;
   padding: calc(6px + var(--safe-t)) 12px calc(8px + var(--safe-b));
   gap: 6px;
 }
@@ -227,7 +227,11 @@ h3 {
 }
 .log {
   font-size: 15px;
-  min-height: 7.5em;
+  flex: 1 1 0;
+  min-height: 4.5em;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 1.6em);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.6em);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -250,7 +254,7 @@ h3 {
   font-size: 1.2em;
 }
 .sheet {
-  margin-top: auto;
+  flex: none;
   border-top: 1.5px solid var(--ink);
   padding-top: 8px;
   display: flex;
@@ -419,4 +423,8 @@ h3 {
 }
 .w {
   white-space: nowrap;
+}
+
+.verbs button.nudge .h {
+  color: var(--rope);
 }
