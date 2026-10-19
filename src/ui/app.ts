@@ -34,6 +34,7 @@ import { KEEPERS, type KeeperId, NAMES } from '../sim/keepers.ts';
 import { spoken } from '../sim/reading.ts';
 import { CREST, LIP, TURNS } from '../sim/water.ts';
 import { drawDawn } from './dawn.ts';
+import { lab } from './lab.ts';
 import { drawScene, SCENE_H, type SceneFx, sceneHit } from './scene.ts';
 
 const SAVE = 'glance-save-v1';
@@ -171,6 +172,7 @@ export function start() {
 
 function title() {
   cancelAnimationFrame(raf);
+  lab.screen('title');
   const save = readSave();
   app.innerHTML = `<div class="page">
     ${markLink}
@@ -234,6 +236,7 @@ function enter() {
 
 function watch() {
   if (!s) return;
+  lab.screen(`night ${s.night}: watch`);
   sheet = null;
   sheetKey = '';
   requestWake();
@@ -707,6 +710,8 @@ function dawn() {
   const d = s.dawns.at(-1) as Dawn;
   const next = PLANS[d.night] ?? null;
   const caught = d.misses.filter((m) => m.caught).length;
+  lab.screen(`night ${d.night}: dawn`);
+  lab.milestone(`night ${d.night} done`);
   app.innerHTML = `<div class="page dawn">
     ${markLink}
     <h2>${PLANS[d.night - 1]?.title ?? ''}, first light</h2>
@@ -727,6 +732,7 @@ function dawn() {
       ${s.phase === 'dawn' && next ? `<button class="primary" id="next">${esc(next.title)} night</button>` : ''}
       ${s.phase === 'end' ? '<button class="primary" id="end">The week</button>' : ''}
       <button id="export">Export this run (playtest)</button>
+      <button id="send">Send this run to the notebook</button>
       <button id="menu">Title page</button>
     </div>
     ${footer()}
@@ -741,6 +747,7 @@ function dawn() {
   });
   document.getElementById('end')?.addEventListener('click', ending);
   document.getElementById('export')?.addEventListener('click', download);
+  document.getElementById('send')?.addEventListener('click', sendRun);
   document.getElementById('menu')?.addEventListener('click', title);
   window.scrollTo(0, 0);
 }
@@ -750,6 +757,8 @@ function dawn() {
 function ending() {
   if (!s) return;
   cancelAnimationFrame(raf);
+  lab.screen('ending');
+  lab.milestone('ending reached');
   const ds = s.dawns;
   const held = ds.every((d) => !d.overtopped);
   const flooded = ds.filter((d) => d.overtopped || d.mill === 'flooded').length;
@@ -775,6 +784,7 @@ function ending() {
     <div class="actions">
       <button class="primary" id="again">Another week</button>
       <button id="export">Export this run (playtest)</button>
+      <button id="send">Send this run to the notebook</button>
       <button id="back">Back to the last dawn</button>
     </div>
     ${footer()}
@@ -785,8 +795,13 @@ function ending() {
     enter();
   });
   document.getElementById('export')?.addEventListener('click', download);
+  document.getElementById('send')?.addEventListener('click', sendRun);
   document.getElementById('back')?.addEventListener('click', dawn);
   window.scrollTo(0, 0);
+}
+
+function sendRun() {
+  lab.openSendDialog({ getRun: () => (s ? exportRun(s, FRAMEWORK_VERSION) : {}) });
 }
 
 function download() {
