@@ -49,9 +49,11 @@ The dam overtopping ends the week (the dawn page still comes). Achievement is th
 ## Deferred (target: after the owner's first playtest)
 - Standing orders for the radio drop-outs ("if it passes four-five, give her a turn").
 - A second week, other dams, a recruited third keeper.
-- Keep both readings on the board when two keepers disagree (Tomás, Priya). Target: owner's first playtest.
+- Keep both readings on the board when two keepers disagree (Tomás, Priya). The gauge now shows the previous figure and who read it; a fuller side-by-side is the target for the owner's first playtest.
 - Flag a reading as doubted and have the dawn score it (Tomás). Target: owner's first playtest.
 - Carry the water level and the keepers' tiredness from one night to the next (Tomás). Target: second week.
 - A per-keeper bias readout beyond the margin note (Priya). Target: second week; it may undercut the core loop, so decide with the owner.
 - A weather forecast and a what-if replay of the night (Priya). Target: second week.
 - Doze hazard and quantity estimates from HF (docs/hf-requests.md items 2 and 3). Target: HF engine 2.10.
+- Dai's low bias is uniform before three as well as after (Gwen: "half a metre low every time is not tiredness"). Decide with the owner whether it should grow only in the trough. Target: owner's first playtest.
+- The written time slips up to 30 minutes when a keeper is tired. Two playtesters read it as a bug, not a tell. Decide whether to keep, explain at dawn, or drop. Target: owner's first playtest.

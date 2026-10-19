@@ -178,6 +178,7 @@ function title() {
     <p class="soft">a storm week on the night desk</p>
     <p>The river authority, the night desk. Up the valley, one old dam above a town, and on it a keeper with a torch and a radio.</p>
     <p>Every figure on your board is what he saw.</p>
+    <p class="soft">The night runs on its own while the desk is open; the arrows at the top set its pace. Shut the page and it waits for you.</p>
     <div class="actions">
       ${save ? '<button class="primary" id="cont">Back to the desk</button>' : ''}
       <button class="${save ? '' : 'primary'}" id="new">${save ? 'Start the week again' : 'Take the night desk'}</button>
@@ -189,6 +190,8 @@ function title() {
   document.getElementById('cont')?.addEventListener('click', () => {
     if (!save) return;
     s = replay(save.seed, save.inputs, save.minute);
+    // Back at the desk: the clock starts at its slowest, so nothing runs on before you have looked.
+    speed = 0;
     enter();
   });
   document.getElementById('new')?.addEventListener('click', () => {
@@ -308,7 +311,7 @@ function frame(t: number) {
       drawBoard();
       drawLog();
       drawSheet();
-      if (s.minute % 10 === 0) writeSave();
+      writeSave();
     }
     const canvas = document.getElementById('scene') as HTMLCanvasElement | null;
     if (canvas) drawScene(canvas, s, fx, t);
@@ -362,10 +365,24 @@ function drawBoard() {
         <span class="lab">${g.label}</span>
         <span class="num">${printed(r, g.id)}</span>
         <span class="by hand">${r ? hand(`${who} ${clock(r.wrote)}`, r.who === 'nerys' ? 0 : 1 - r.clarity, r.at) : 'not read'}</span>
+        ${wasLine(r, g.id)}
       </button>`;
     })
     .join('');
   setHtml(el, html);
+}
+
+/** The figure before this one, as a desk keeps it beside the new one: two men's readings side by side. */
+function wasLine(r: Report | null, g: Gauge): string {
+  if (!s || !r || g === 'gate') return '';
+  const prev = s.reports
+    .filter((x) => x.gauge === g && x !== r && x.at >= watchFrom(s?.night ?? 1) && x.at <= r.at)
+    .at(-1);
+  if (!prev) return '';
+  // Same man: "was". Another man: his name, so a disagreement shows as two names.
+  const lead = prev.who === r.who ? 'was' : prev.who === 'nerys' ? 'Nerys' : NAMES[prev.who as KeeperId];
+  const fig = g === 'level' ? prev.value.toFixed(1) : printed(prev, g).replace(' m', '');
+  return `<span class="was soft">${lead} ${fig}, ${clock(prev.wrote)}</span>`;
 }
 
 function sayClass(x: Said): string {
@@ -409,6 +426,21 @@ function drawSheet() {
   const el = document.getElementById('sheet');
   if (!el || el.querySelector('.holding')) return;
   if (!sheet) {
+    // Keep the buttons and change only their words, so a tap is never lost to a rebuild.
+    const crew = el.querySelector('.crew');
+    const ids = planOf(s).keepers;
+    if (
+      crew &&
+      crew.querySelectorAll('[data-k]').length === ids.length &&
+      el.dataset.h?.startsWith('<div class="crew">')
+    ) {
+      for (const id of ids) {
+        const span = crew.querySelector(`[data-k="${id}"] .soft`);
+        const words = whereWords(id);
+        if (span && span.textContent !== words) span.textContent = words;
+      }
+      return;
+    }
     const html = `<div class="crew">${planOf(s)
       .keepers.map(
         (id) =>
@@ -634,7 +666,10 @@ function houseRow(n: number, fate: Dawn['mill']): string {
 }
 
 function fateWords(d: Dawn): string {
-  if (d.overtopped) return 'Water came over the crest of the dam.';
+  if (d.overtopped) {
+    const at = d.series.at(-1)?.m;
+    return `Water came over the crest of the dam${at === undefined ? '' : ` at ${clock(at)}`}. The record stops there.`;
+  }
   const parts: string[] = [];
   parts.push(
     d.mill === 'dry'
@@ -717,7 +752,7 @@ function ending() {
   cancelAnimationFrame(raf);
   const ds = s.dawns;
   const held = ds.every((d) => !d.overtopped);
-  const flooded = ds.filter((d) => d.mill === 'flooded').length;
+  const flooded = ds.filter((d) => d.overtopped || d.mill === 'flooded').length;
   const misses = ds.reduce((a, d) => a + d.misses.length, 0);
   const caught = ds.reduce((a, d) => a + d.misses.filter((m) => m.caught).length, 0);
   const verdict = !held
@@ -732,7 +767,7 @@ function ending() {
     <ul class="week">${ds
       .map(
         (d) =>
-          `<li><b>${PLANS[d.night - 1]?.title}</b> ${d.overtopped ? 'overtopped' : d.spilled ? 'spilled' : 'held'} · Mill Lane ${d.mill} · caught ${d.misses.filter((m) => m.caught).length} of ${d.misses.length}</li>`,
+          `<li><b>${PLANS[d.night - 1]?.title}</b> ${d.overtopped ? 'overtopped' : d.spilled ? 'spilled' : 'held'} · Mill Lane ${d.overtopped ? 'flooded' : d.mill} · caught ${d.misses.filter((m) => m.caught).length} of ${d.misses.length}</li>`,
       )
       .join('')}</ul>
     <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong figures before they cost you.` : ''}</p>

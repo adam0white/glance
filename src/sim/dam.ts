@@ -668,7 +668,9 @@ export function hint(s: GameState, id: KeeperId, job: Job, target?: number, insi
     minutes: aff ? Math.max(5, Math.round(aff.duration / 5) * 5) : 0,
   };
   if (target !== undefined) out.target = target;
-  if (aff?.followedBy) out.forecast = forecastWords(p, aff);
+  // A sleeping man forecasts nothing.
+  const asleep = p.activity?.affordanceId === 'doze' || p.activity?.affordanceId === 'nap';
+  if (aff?.followedBy && !asleep) out.forecast = forecastWords(p, aff);
   return out;
 }
 
@@ -697,6 +699,8 @@ function shortOf(r: SuggestionResolution): string {
     case 'complied':
       return 'if I must';
     case 'deferred':
+      // The stove is where he already is: "after I sit by the stove" read as a loop.
+      if (/sit by the stove/.test(r.counterOffer?.label ?? '')) return 'in a bit, once I’m warm';
       return r.counterOffer?.label ? `after I ${r.counterOffer.label.replace(/^after I /, '')}` : 'not now';
     case 'modified':
       return r.counterOffer?.label
@@ -939,7 +943,8 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
   }
   if (a && (a.affordanceId === 'doze' || a.affordanceId === 'nap') && s.minute >= a.endsAt) a = null;
   // Dozing off by the stove: a host roll from true sleepiness (he does not choose it).
-  if (a && a.affordanceId === 'stove' && !k.pending) {
+  const walking = k.job !== null && s.minute < k.job.startedAt + k.job.walk;
+  if (a && a.affordanceId === 'stove' && !k.pending && !walking) {
     const sl = readPerson(p).body.sleepiness;
     const q = Math.floor(s.minute / 15);
     if (sl > 0.84 && hashUnit(s.seed, DRAW.doze, s.night, q, KEEPERS.indexOf(k.id)) < (sl - 0.84) * 2.2) {
@@ -955,6 +960,8 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
         });
         const rec = decide(p, [doze], {});
         if (begin(p, doze, rec)) {
+          // He sleeps where he sat down: the hut.
+          if (k.job) k.place = k.job.to;
           k.job = null;
           k.dozes.push({ from: s.minute, to: s.minute + len });
           return;
@@ -1017,7 +1024,7 @@ const LINES: Record<KeeperId, Record<'assented' | 'complied' | 'cannot', string[
   dai: {
     assented: ['Aye.', 'Right you are.', 'Going now.', 'Aye, I’ll look.', 'On my way.', 'Fair enough.'],
     complied: ['If you say so.', 'You’re the desk.', 'Aye. If that’s what you want.', 'Your call.'],
-    cannot: ['I can’t. Arms are gone. Give me twenty.', 'Not yet. I’ve nothing left in me. Twenty minutes.'],
+    cannot: ['I can’t. I’m done in. Give me twenty.', 'Not yet. I’ve nothing left in me. Twenty minutes.'],
   },
   callum: {
     assented: ['On it, sir.', 'Going, sir.', 'Right away.', 'Yes! On it.', 'I’ll go now.'],
@@ -1034,7 +1041,7 @@ function flavour(s: GameState, id: KeeperId, r: SuggestionResolution): string {
   if (r.verdict === 'complied') return pick(LINES[id].complied);
   if (r.verdict === 'refused' && r.kind === 'cannot') return pick(LINES[id].cannot);
   // "After I sit by the stove" from a man already by the stove reads as a loop: say what he means.
-  if (r.verdict === 'deferred' && r.counterOffer?.label === 'sit by the stove')
+  if (r.verdict === 'deferred' && /sit by the stove/.test(r.counterOffer?.label ?? ''))
     return id === 'dai'
       ? pick([
           'Not yet. Let me get the cold out of my hands.',
@@ -1338,6 +1345,13 @@ function aboutYou(s: GameState, k: KeeperState, overtopped: boolean): string {
       : 'I did everything you said, sir. Everything.';
   if (n.complied === 1)
     return dai ? 'You leaned on me once. Once is enough.' : 'You had to tell me twice once. Sorry, sir.';
+  // Drawing her down before the storm is the whole job, and a keeper says so.
+  const from = watchFrom(s.night);
+  const early = s.series.some((x) => x.m >= from && x.m - from < planOf(s).storm.peakAt - 120 && x.gate >= 2);
+  if (early && n.turns > 0)
+    return dai
+      ? 'You let her down before it came. That’s the job. Morgan did that.'
+      : 'Mr Pugh said opening early was right, sir. He said it to me, not to you.';
   if (n.naps > 0 && dai) return 'You sent me to sleep on watch. Thirty years nobody did that.';
   if (n.naps > 0) return 'Thank you for the sleep, sir. I didn’t say, but I needed it.';
   if (n.asked === 0)

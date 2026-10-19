@@ -182,8 +182,10 @@ export function drawScene(canvas: HTMLCanvasElement, s: GameState, fx: SceneFx, 
   ctx.setLineDash([]);
   ctx.fillStyle = soft;
   ctx.font = '11px Literata, serif';
-  ctx.fillText('lip', DAM_FACE - 36, yOf(5.0) - 3);
-  ctx.fillText('crest', DAM_FACE - 38, CREST_Y + 11);
+  ctx.textAlign = 'right';
+  ctx.fillText('lip 5.0', DAM_FACE - 3, yOf(5.0) - 3);
+  ctx.fillText('crest 6.0', DAM_FACE - 3, CREST_Y + 11);
+  ctx.textAlign = 'left';
   // The '79 mark on the wall.
   ctx.strokeStyle = rope;
   ctx.lineWidth = 1.4;
