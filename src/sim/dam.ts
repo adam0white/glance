@@ -226,6 +226,12 @@ export const PLANS: NightPlan[] = [
     firstFlash: 34,
     beats: [
       { at: 95, who: 'dai', text: 'Kettle’s on. Shout if you want me.' },
+      { at: 140, who: 'dai', text: 'Coming down heavier up here now.' },
+      {
+        at: 190,
+        who: 'dai',
+        text: 'You’re the new one, then. Where’s Morgan gone? Twelve years on that desk.',
+      },
       { at: 250, who: 'radio', text: 'Met Office: heavy rain over the hills until first light.' },
     ],
   },
@@ -245,7 +251,17 @@ export const PLANS: NightPlan[] = [
         who: 'nerys',
         text: 'Bridge Inn. You’re the new one at the authority? Ring if you need eyes on the river, love.',
       },
+      {
+        at: 120,
+        who: 'dai',
+        text: 'Morgan used to ring at one for the level whether I’d said it or not. Habit.',
+      },
       { at: 200, who: 'dai', text: 'Ground’s full. Whatever falls now comes straight down.' },
+      {
+        at: 285,
+        who: 'nerys',
+        text: 'Bridge Inn again. The cellar’s weeping, which it does when she’s up. Just so you know.',
+      },
     ],
   },
   {
@@ -261,7 +277,9 @@ export const PLANS: NightPlan[] = [
     beats: [
       { at: 3, who: 'callum', text: 'Callum here, sir. Ready for anything.' },
       { at: 6, who: 'dai', text: 'He’ll learn.' },
+      { at: 90, who: 'dai', text: 'Lad’s got the wheel the wrong way round in his head. I’ll not say.' },
       { at: 150, who: 'callum', text: 'Sorry, sir. The baby’s teething. I’m fine.', if: 'callum' },
+      { at: 260, who: 'callum', text: 'Is it always like this, sir? Mr Pugh doesn’t say much.' },
     ],
   },
   {
@@ -280,7 +298,10 @@ export const PLANS: NightPlan[] = [
       [395, 410],
     ],
     tree: 175,
-    beats: [{ at: 125, who: 'radio', text: 'Wind’s getting up on the ridge. The line crackles.' }],
+    beats: [
+      { at: 125, who: 'radio', text: 'Wind’s getting up on the ridge. The line crackles.' },
+      { at: 300, who: 'dai', text: 'Line’s back. Did you hear any of that? Never mind.' },
+    ],
   },
   {
     title: 'Friday',
@@ -298,6 +319,7 @@ export const PLANS: NightPlan[] = [
         who: 'dai',
         text: 'She was at the mark in seventy-nine. I was sixteen. My dad had this wheel.',
       },
+      { at: 150, who: 'nerys', text: 'River’s talking tonight. I’ve moved the chairs upstairs.' },
       { at: 240, who: 'callum', text: 'Sir, my wife rang. She says the lane’s full of water. Our lane.' },
     ],
   },
@@ -307,6 +329,15 @@ const nightStart = (night: number) => (night - 1) * 1440;
 export const watchFrom = (night: number) => nightStart(night) + WATCH_FROM;
 export const watchTo = (night: number) => watchFrom(night) + WATCH_MINUTES;
 export const planOf = (s: GameState) => PLANS[s.night - 1] as NightPlan;
+
+/** A keeper's scripted line is heard only when he is on, awake and the radio carries; the narrator, radio and inn always speak. */
+function beatHeard(s: GameState, beat: NightPlan['beats'][number]): boolean {
+  if (beat.if && !keeperOf(s, beat.if).on) return false;
+  if (beat.who !== 'dai' && beat.who !== 'callum') return true;
+  if (!keeperOf(s, beat.who).on || s.radioOut) return false;
+  const a = personOf(s, beat.who).activity?.affordanceId;
+  return a !== 'doze' && a !== 'nap' && a !== 'sleep';
+}
 
 const WALK: Record<string, number> = {
   'hut-gate': 3,
@@ -445,6 +476,8 @@ function startNight(s: GameState, night: number) {
   s.radioOut = false;
   s.nerys.ringing = null;
   s.nerys.calls = 0;
+  // A day's sleep softens her, a little.
+  s.nerys.goodwill = Math.min(0.8, s.nerys.goodwill + 0.2);
   for (const k of s.keepers) {
     const p = personOf(s, k.id);
     k.on = plan.keepers.includes(k.id);
@@ -755,7 +788,13 @@ function ringInn(s: GameState) {
   const late = m > 90;
   s.nerys.calls += 1;
   if (s.nerys.goodwill < 0.2 || (late && s.nerys.goodwill < 0.35)) {
-    say(s, 'radio', 'The phone at the Bridge Inn rings out.', 'radio');
+    const why =
+      s.falseAlarms > 0 && s.nerys.calls <= 2
+        ? 'The phone at the Bridge Inn rings out. After the knocking for nothing, she has taken it off the hook.'
+        : s.nerys.calls <= 2
+          ? 'The phone at the Bridge Inn rings out. Lights off over the bar.'
+          : 'The phone at the Bridge Inn rings out.';
+    say(s, 'radio', why, 'radio');
     return;
   }
   if (late) s.nerys.goodwill -= 0.08;
@@ -764,7 +803,16 @@ function ringInn(s: GameState) {
   say(
     s,
     'nerys',
-    late ? 'Mm? What time is it… Hang on, I’ll look.' : 'Hang on, love, I’ll go and look.',
+    late
+      ? ([
+          'Mm? What time is it… Hang on, I’ll look.',
+          'You again. Hold on.',
+          'I was just dropping off. Hang on, love.',
+          'Right. I’ll put my coat on.',
+        ][Math.min(3, s.nerys.calls - 1)] ?? 'Hang on.')
+      : s.nerys.calls > 1
+        ? 'Again? Go on, I’ll look.'
+        : 'Hang on, love, I’ll go and look.',
     'answer',
   );
 }
@@ -837,7 +885,7 @@ export function step(s: GameState): void {
     if (!out) deliverHeld(s);
   }
   for (const beat of plan.beats)
-    if (beat.at === m && (!beat.if || keeperOf(s, beat.if).on))
+    if (beat.at === m && beatHeard(s, beat))
       say(s, beat.who, beat.text, beat.who === 'radio' ? 'radio' : 'answer');
   if (s.nerys.ringing !== null && s.minute >= s.nerys.ringing) innAnswers(s);
   // People.
@@ -1184,7 +1232,9 @@ function readGauge(s: GameState, who: KeeperId, gauge: Gauge, skipped: boolean):
     value = Math.floor((value + 0.0001) * 10) / 10;
   value = Math.max(0, value);
   let wrote = s.minute;
-  if (c.true < 0.38 && hashUnit(s.seed, DRAW.timeSlip, s.night, s.minute) < 0.4) wrote = s.minute - 30;
+  // A tired man writes the wrong time: a tell on the board, never before the shift began.
+  if (c.true < 0.38 && hashUnit(s.seed, DRAW.timeSlip, s.night, s.minute) < 0.4)
+    wrote = Math.max(watchFrom(s.night), s.minute - 30);
   const conf = confidenceOf(p, c);
   const r: Report = {
     at: s.minute,
@@ -1361,7 +1411,7 @@ function closeNight(s: GameState, overtopped: boolean) {
     );
     const flash = r.gauge === 'level' && s.flashes.some((f) => f.at > r.at && f.at <= r.at + 20);
     misses.push({
-      at: r.wrote,
+      at: r.at,
       who: r.who as KeeperId,
       gauge: r.gauge,
       said: r.value,
