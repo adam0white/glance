@@ -633,9 +633,11 @@ function shortOf(r: SuggestionResolution): string {
     case 'complied':
       return 'if I must';
     case 'deferred':
-      return r.counterOffer?.label ? `after I ${r.counterOffer.label}` : 'not now';
+      return r.counterOffer?.label ? `after I ${r.counterOffer.label.replace(/^after I /, '')}` : 'not now';
     case 'modified':
-      return r.counterOffer?.label ? `rather ${r.counterOffer.label}` : 'something else';
+      return r.counterOffer?.label
+        ? `rather ${r.counterOffer.label.replace(/^after I /, '')}`
+        : 'something else';
     case 'refused':
       return r.kind === 'cannot' ? "can't" : 'no';
     default:
@@ -1232,7 +1234,11 @@ function say(s: GameState, who: Said['who'], text: string, kind: Said['kind']) {
 
 // ---------- dawn ----------
 
-function aboutYou(s: GameState, k: KeeperState): string {
+function aboutYou(s: GameState, k: KeeperState, overtopped: boolean): string {
+  if (overtopped)
+    return k.id === 'dai'
+      ? 'She went over. Thirty years on this dam and she went over.'
+      : 'I’m sorry, sir. I didn’t see it coming. Nobody told me.';
   const p = personOf(s, k.id);
   const dt = trustOf(p) - k.trustAtOpen;
   const n = k.night;
@@ -1324,7 +1330,11 @@ function closeNight(s: GameState, overtopped: boolean) {
     strain: s.keepers.filter((k) => k.strained && k.on).map((k) => k.id),
     lines: s.keepers
       .filter((k) => k.on)
-      .map((k) => ({ id: k.id, line: reviewLine(personOf(s, k.id)) ?? '', aboutYou: aboutYou(s, k) })),
+      .map((k) => ({
+        id: k.id,
+        line: (reviewLine(personOf(s, k.id)) ?? '').replace(/^Today/, 'Tonight'),
+        aboutYou: aboutYou(s, k, overtopped),
+      })),
   };
   s.dawns.push(dawn);
   s.phase = overtopped || night >= NIGHTS ? 'end' : 'dawn';

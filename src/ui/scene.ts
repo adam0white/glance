@@ -302,7 +302,7 @@ export function drawScene(canvas: HTMLCanvasElement, s: GameState, fx: SceneFx, 
 export function keeperPoint(s: GameState, id: KeeperId): Pt {
   const kp = keeperOf(s, id);
   const j = kp.job;
-  const off = id === 'callum' ? 10 : 0;
+  const off = id === 'callum' ? 20 : 0;
   if (!j) return { x: PLACES[kp.place].x + off, y: PLACES[kp.place].y };
   const t = j.walk === 0 ? 1 : Math.min(1, (s.minute - j.startedAt) / j.walk);
   const a = PLACES[j.from];
@@ -354,7 +354,7 @@ function figure(
   }
   ctx.fillStyle = ink;
   ctx.font = '600 13px Caveat, cursive';
-  ctx.fillText(NAMES[id], x - 8, y + 12);
+  ctx.fillText(NAMES[id], id === 'callum' ? x - 4 : x - 10, y + 12);
 }
 
 export function sceneHit(s: GameState, x: number, y: number, cw: number): KeeperId | 'inn' | 'dam' | null {

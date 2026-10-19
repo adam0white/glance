@@ -305,8 +305,7 @@ function frame(t: number) {
   if (s.phase !== 'watch') {
     writeSave();
     releaseWake();
-    if (s.phase === 'dawn') dawn();
-    else ending();
+    dawn();
     return;
   }
   raf = requestAnimationFrame(frame);
@@ -653,7 +652,7 @@ function dawn() {
     <p>${esc(fateWords(d))}</p>
     <canvas id="chart" class="chart" aria-label="The night's true level against his figures"></canvas>
     <p class="soft legend"><span class="key red"></span> what the water did <span class="key dot"></span> what ${planOf(s).keepers.length > 1 ? 'they' : 'he'} told you</p>
-    <div class="houses"><span class="soft">Mill Lane</span>${houseRow(4, d.mill)}<span class="soft">square</span>${houseRow(6, d.square)}</div>
+    <div class="houses"><span class="soft">Mill Lane</span>${houseRow(4, d.overtopped ? 'flooded' : d.mill)}<span class="soft">square</span>${houseRow(6, d.overtopped ? 'flooded' : d.square)}</div>
     ${d.misses.length ? `<h3>Where the board was wrong</h3><ul class="misses">${d.misses.slice(0, 6).map(missLine).join('')}</ul><p class="soft">${caught ? `You caught ${count(caught)} of ${count(d.misses.length)}.` : 'You caught none of them.'}</p>` : '<p>Every figure tonight was near enough the truth.</p>'}
     ${d.dozes.map((z) => `<p class="soft">${NAMES[z.who]} slept by the stove, ${clock(z.from)} to ${clock(z.to)}.</p>`).join('')}
     ${d.strain.map((id) => `<p class="soft">${NAMES[id]} hurt his shoulder on the wheel. He didn’t say.</p>`).join('')}
@@ -768,7 +767,7 @@ document.addEventListener('visibilitychange', () => {
 export const _debug = {
   step: (n: number) => {
     for (let i = 0; i < n && s && s.phase === 'watch'; i++) step(s);
-    if (s) enter();
+    if (s) s.phase === 'watch' ? enter() : dawn();
   },
   get state() {
     return s;
