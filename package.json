@@ -23,20 +23,20 @@
   "dependencies": {
     "@adam0white/human-framework": "2.8.0",
     "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.1.2/adam0white-lab-client-0.1.2.tgz",
-    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.1.0/adam0white-lab-kit-0.1.0.tgz"
+    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.2.0/adam0white-lab-kit-0.2.0.tgz"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
-    "@types/node": "26.6.4",
-    "happy-dom": "21.0.3",
+    "@types/node": "26.6.5",
+    "happy-dom": "21.0.4",
     "typescript": "7.0.2",
-    "vite": "8.3.2",
-    "vitest": "5.0.3",
-    "wrangler": "4.147.0"
+    "vite": "8.3.4",
+    "vitest": "5.0.5",
+    "wrangler": "4.151.3"
   },
   "allowScripts": {
-    "esbuild@0.28.1": true,
-    "workerd@1.20261001.1": true,
+    "esbuild@0.28.2": true,
+    "workerd@1.20261019.1": true,
     "fsevents": false
   },
   "overrides": {
