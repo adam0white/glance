@@ -82,10 +82,13 @@ function readSave(): Save | null {
     return null;
   }
 }
+function saveNow() {
+  if (!s) throw new Error('No run to save');
+  localStorage.setItem(SAVE, JSON.stringify({ seed: s.seed, inputs: s.inputs, minute: s.minute }));
+}
 function writeSave() {
-  if (!s) return;
   try {
-    localStorage.setItem(SAVE, JSON.stringify({ seed: s.seed, inputs: s.inputs, minute: s.minute }));
+    saveNow();
   } catch {}
 }
 function clearSave() {
@@ -291,7 +294,7 @@ function watch() {
       lab,
       getRun: () => (s ? exportRun(s, FRAMEWORK_VERSION) : {}),
       filename: 'glance-playtest.json',
-      onSave: writeSave,
+      onSave: saveNow,
     }),
   );
   const sp = document.getElementById('speed') as HTMLElement;
@@ -303,6 +306,7 @@ function watch() {
     if (!b) return;
     speed = Number(b.dataset.i);
     drawTop();
+    drawSheet();
   });
   document.getElementById('board')?.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('[data-g]') as HTMLElement | null;
@@ -315,7 +319,7 @@ function watch() {
   canvas.addEventListener('click', (e) => {
     if (!s) return;
     const r = canvas.getBoundingClientRect();
-    const hit = sceneHit(s, e.clientX - r.left, e.clientY - r.top, r.width);
+    const hit = sceneHit(s, e.clientX - r.left, e.clientY - r.top, r.width, r.height);
     if (hit === 'inn') openSheet({ kind: 'inn' });
     else if (hit === 'dam') openSheet({ kind: 'gauge', gauge: 'level', who: freeKeeper(s) });
     else if (hit) openSheet({ kind: 'keeper', who: hit });
@@ -466,6 +470,8 @@ function drawLog() {
 // ---------- sheets ----------
 
 function openSheet(sh: Sheet) {
+  const same = JSON.stringify(sheet) === JSON.stringify(sh);
+  if (!same) document.querySelector<HTMLDetailsElement>('.sheet details')?.removeAttribute('open');
   sheet = sh;
   document.querySelector('.watch')?.classList.toggle('sheet-open', sheet !== null);
   document
@@ -528,7 +534,7 @@ function drawSheet() {
     return;
   }
   // Rebuild only when what it shows can change (each sim minute is enough).
-  const k = `${JSON.stringify(sheet)}|${s.minute}`;
+  const k = `${JSON.stringify(sheet)}|${s.minute}|${speed}`;
   if (sheetKey === k) return;
   sheetKey = k;
   if (sheet.kind === 'inn') {
@@ -576,14 +582,14 @@ function drawSheet() {
   let body = '';
   let head = '';
   if (sheet.kind === 'gauge' && sheet.gauge === 'gate') {
-    const g = Math.round(s.water.gate);
-    const reported = s.board.gate?.value ?? g;
+    const report = s.board.gate;
+    const reported = report?.value;
     const opts: number[] = [];
     for (let t = 0; t <= TURNS; t++) if (t !== reported) opts.push(t);
     const hs = opts.map((t) => hint(s as GameState, who, 'gate', t));
-    const next = hint(s, who, 'gate', Math.min(TURNS, reported + 1));
-    head = `<b>Gate</b><span class="soft">Last ${reported}/${TURNS} · ${clock(s.minute)}</span>`;
-    body = `${next.forecast ? `<details class="fore"><summary>${NAMES[who]}, on the round after</summary><span class="hand">“${esc(next.forecast)}”</span></details>` : ''}
+    const next = hint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
+    head = `<b>Gate</b><span class="soft">Now ${clock(s.minute)} · ${report ? `last gate ${reported}/${TURNS}, reported ${clock(report.wrote)}` : 'gate not read'}</span>`;
+    body = `<div class="inspection-speed soft">Inspection slowdown · ${SPEED_NAMES[speed]} selected</div>${next.forecast ? `<details class="fore"><summary>${NAMES[who]}, on the round after</summary><span class="hand">“${esc(next.forecast)}”</span></details>` : ''}
       <div class="verbs turns">${hs
         .map(
           (h) =>
@@ -615,8 +621,11 @@ function drawSheet() {
       true,
     );
   }
+  const forecastOpen = el.querySelector<HTMLDetailsElement>('details.fore')?.open ?? false;
   if (!setHtml(el, `<div class="who">${head}<button class="x" id="x">close</button></div>${crewRow}${body}`))
     return;
+  const forecast = el.querySelector<HTMLDetailsElement>('details.fore');
+  if (forecast) forecast.open = forecastOpen;
   document.getElementById('x')?.addEventListener('click', () => openSheet(null));
   el.querySelectorAll('.crew [data-k]').forEach((b) => {
     b.addEventListener('click', () => {

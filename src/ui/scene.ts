@@ -65,14 +65,17 @@ export interface SceneFx {
 export function drawScene(canvas: HTMLCanvasElement, s: GameState, fx: SceneFx, now: number) {
   const dpr = Math.min(3, window.devicePixelRatio || 1);
   const cw = canvas.clientWidth || W;
-  if (canvas.width !== Math.round(cw * dpr)) {
+  const ch = canvas.clientHeight || SCENE_H;
+  if (canvas.width !== Math.round(cw * dpr) || canvas.height !== Math.round(ch * dpr)) {
     canvas.width = Math.round(cw * dpr);
-    canvas.height = Math.round(SCENE_H * dpr);
+    canvas.height = Math.round(ch * dpr);
   }
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const k = cw / W;
-  ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
+  const k = Math.min(cw / W, ch / SCENE_H);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.setTransform(dpr * k, 0, 0, dpr * k, (dpr * (cw - W * k)) / 2, 0);
   const ink = css('--ink');
   const soft = css('--ink-soft');
   const rope = css('--rope');
@@ -359,10 +362,17 @@ function figure(
   ctx.fillText(NAMES[id], id === 'callum' ? x - 4 : x - 10, y + 12);
 }
 
-export function sceneHit(s: GameState, x: number, y: number, cw: number): KeeperId | 'inn' | 'dam' | null {
-  const k = cw / W;
-  const sx = x / k;
+export function sceneHit(
+  s: GameState,
+  x: number,
+  y: number,
+  cw: number,
+  ch = SCENE_H,
+): KeeperId | 'inn' | 'dam' | null {
+  const k = Math.min(cw / W, ch / SCENE_H);
+  const sx = (x - (cw - W * k) / 2) / k;
   const sy = y / k;
+  if (sx < 0 || sx > W || sy < 0 || sy > SCENE_H) return null;
   for (const id of KEEPERS) {
     if (!keeperOf(s, id).on) continue;
     const pt = keeperPoint(s, id);

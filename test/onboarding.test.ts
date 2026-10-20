@@ -154,3 +154,63 @@ describe('the first page of a new week', () => {
     expect(document.querySelector('h2')?.textContent).toBe('The week is over');
   });
 });
+
+describe('clarity follow-up', () => {
+  it('reports explicit save failure and lets the player retry', async () => {
+    await boot();
+    click('new');
+    (
+      Array.from(document.querySelectorAll('button')).find(
+        (b) => b.textContent === 'Game menu',
+      ) as HTMLElement
+    ).click();
+    const set = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('Full', 'QuotaExceededError');
+    });
+    const save = Array.from(document.querySelectorAll('dialog button')).find(
+      (b) => b.textContent === 'Save',
+    ) as HTMLElement;
+    save.click();
+    await vi.waitFor(() =>
+      expect(document.querySelector('dialog [role="status"]')?.textContent).toContain(
+        'try Download this run',
+      ),
+    );
+    expect(document.querySelector('.watch')).not.toBeNull();
+    set.mockRestore();
+    save.click();
+    await vi.waitFor(() =>
+      expect(document.querySelector('dialog [role="status"]')?.textContent).toBe('Saved.'),
+    );
+    expect(JSON.parse(localStorage.getItem('glance-save-v1') ?? '{}').minute).toBe(1320);
+  });
+
+  it('separates a stale gate report from the current clock and shows inspection speed', async () => {
+    const debug = await boot();
+    click('new');
+    debug.step(24);
+    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
+    expect(document.querySelector('.sheet .who')?.textContent).toContain('Now 22:24');
+    expect(document.querySelector('.sheet .who')?.textContent).toContain('reported 22:00');
+    expect(document.querySelector('.sheet')?.textContent).toContain('Inspection slowdown · steady selected');
+  });
+
+  it('keeps the forecast expanded across a running-clock minute, but resets for a new sheet', async () => {
+    let frame: FrameRequestCallback = () => {};
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frame = callback;
+      return 1;
+    });
+    const debug = await boot();
+    click('new');
+    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
+    (document.querySelector('.sheet details') as HTMLDetailsElement).open = true;
+    const from = performance.now();
+    for (let n = 1; n <= 16; n++) frame(from + n * 250);
+    expect(state(debug).minute).toBeGreaterThan(1320);
+    expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(true);
+    click('x');
+    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
+    expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(false);
+  });
+});

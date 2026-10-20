@@ -463,8 +463,18 @@ h3 {
   font-size: 15px;
   flex: none;
 }
-.sheet .fore {
+.sheet .fore,
+.inspection-speed {
   font-size: 15px;
+}
+.sheet summary {
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.top,
+.board {
+  flex: none;
 }
 .sheet .who {
   align-items: center;
@@ -483,7 +493,8 @@ h3 {
 
 .scene {
   height: 236px;
-  flex: none;
+  min-height: 0;
+  flex: 0 1 236px;
 }
 .watch.sheet-open .scene {
   display: none;
@@ -510,6 +521,8 @@ h3 {
   gap: 4px;
 }
 .watch.sheet-open .sheet {
+  flex: 0 1 auto;
+  min-height: 0;
   max-height: calc(100dvh - 100px - var(--safe-t) - var(--safe-b));
   overflow-y: auto;
 }
@@ -538,7 +551,7 @@ dialog::backdrop {
   margin: 0;
 }
 @media (max-height: 700px) {
-  /* The gate sheet repeats the clock and setting; the concern retains the last level. */
+  /* The gate sheet repeats the clock, speed and setting; the concern retains the last level. */
   .watch.gate-open .top,
   .watch.gate-open .board {
     display: none;
