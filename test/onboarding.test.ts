@@ -49,40 +49,53 @@ afterEach(() => {
 });
 
 describe('the first page of a new week', () => {
-  it('keeps the sample report open beyond ten seconds without advancing or changing the run', async () => {
+  it('offers the first reading directly after a short goal without advancing the run', async () => {
+    const debug = await boot();
+    const titleWords = document.querySelector('#goal')?.textContent?.trim().split(/\s+/).length;
+    expect(titleWords).toBeLessThanOrEqual(20);
+    click('new');
+    expect(document.querySelector('.opener')).toBeNull();
+    expect(document.querySelector('[data-job="level"]')).not.toBeNull();
+    expect(state(debug).inputs).toHaveLength(0);
+    expect(state(debug).minute).toBe(1320);
+  });
+
+  it('keeps the old rules and sample report reachable on request', async () => {
     const debug = await boot();
     click('new');
-    expect(document.querySelector('.opener #chart')).not.toBeNull();
-    expect(document.querySelector('.opener .houses')).not.toBeNull();
     const before = fingerprint(state(debug));
-    await vi.advanceTimersByTimeAsync(12_000);
-    expect(document.querySelector('.opener')).not.toBeNull();
-    expect(fingerprint(state(debug))).toBe(before);
-    expect(debug.state?.dawns).toHaveLength(0);
-    click('begin');
-    expect(document.querySelector('.watch')).not.toBeNull();
+    click('help');
+    expect(document.querySelector('#about #chart')).not.toBeNull();
+    expect(document.querySelector('#about')?.textContent).toContain('More gate turns');
+    click('close-about');
+    expect(document.querySelector('[data-job="level"]')).not.toBeNull();
     expect(fingerprint(state(debug))).toBe(before);
   });
 
-  it('allows an immediate keyboard dismissal without queuing a game action', async () => {
+  it('names a pending reading and replaces it with an expected report time', async () => {
     const debug = await boot();
     click('new');
-    expect(document.querySelector('.opener')).not.toBeNull();
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    expect(document.querySelector('.watch')).not.toBeNull();
-    expect(debug.state?.inputs).toHaveLength(0);
+    const request = document.querySelector('[data-job="level"]') as HTMLElement;
+    request.dispatchEvent(new Event('pointerdown'));
+    request.dispatchEvent(new Event('pointerup'));
+    expect(document.querySelector('#concern')?.textContent).toContain('level request');
+    expect(document.querySelector('#concern')?.textContent).toContain('waiting for an answer');
+    debug.step(1);
+    expect(document.querySelector('#concern')?.textContent).toMatch(/Dai.*level.*expected ~22:/);
+    debug.step(20);
+    expect(document.querySelector('#concern')?.textContent).not.toContain('waiting for an answer');
+    expect(document.querySelector('#threshold')?.textContent).toContain('Last level');
   });
 
-  it('lets keyboard readers scroll through the report without dismissing it', async () => {
+  it('keeps all gate choices and their rule together, with selection separate from attention', async () => {
     await boot();
     click('new');
-    for (const key of ['ArrowDown', 'PageDown', 'End', ' ', 'Tab']) {
-      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
-      document.dispatchEvent(event);
-      expect(event.defaultPrevented).toBe(false);
-      expect(document.querySelector('.opener')).not.toBeNull();
-    }
-    click('begin');
+    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
+    expect(document.querySelector('.watch.sheet-open')).not.toBeNull();
+    expect(document.querySelectorAll('.turns [data-job="gate"]')).toHaveLength(6);
+    expect(document.querySelector('.sheet .hint')?.textContent).toContain('Hold a button');
+    expect(document.querySelector('#concern.attention')).not.toBeNull();
+    expect(document.querySelector('#speed [aria-pressed="true"]')).not.toBeNull();
   });
 
   it('skips the opener when returning to a saved desk', async () => {
@@ -104,10 +117,9 @@ describe('the first page of a new week', () => {
     expect(fingerprint(state(debug))).toBe(fingerprint(run));
   });
 
-  it('makes an early ending explicit on the last dawn and opens the sample again for another week', async () => {
+  it('makes an early ending explicit on the last dawn and offers the first reading again for another week', async () => {
     const debug = await boot();
     click('new');
-    click('begin');
     state(debug).water.overtopped = true;
     debug.step(1);
     expect(debug.state?.phase).toBe('end');
@@ -115,8 +127,7 @@ describe('the first page of a new week', () => {
     click('end');
     expect(document.querySelector('h2')?.textContent).toBe('The week is over');
     click('again');
-    expect(document.querySelector('.opener #chart')).not.toBeNull();
-    click('begin');
+    expect(document.querySelector('[data-job="level"]')).not.toBeNull();
   });
 
   it('marks completion after the last night and offers no further night', async () => {

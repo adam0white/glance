@@ -3,7 +3,9 @@
  * queues inputs; it never changes the sim directly. Real time drives sim minutes, continuously, slowing while a
  * sheet is open (tactical slowdown, no pause).
  */
+
 import { FRAMEWORK_VERSION } from '@adam0white/human-framework';
+import { notebookMenu } from '@adam0white/lab-kit';
 import {
   clock,
   type Export,
@@ -27,15 +29,17 @@ import {
   reportWords,
   type Said,
   step,
+  walkMinutes,
   watchFrom,
 } from '../sim/dam.ts';
 import { KEEPERS, type KeeperId, NAMES } from '../sim/keepers.ts';
 import { CREST, LIP, TURNS } from '../sim/water.ts';
+import { concernLines, thresholdWords } from './concern.ts';
 import { drawDawn } from './dawn.ts';
 import { lab } from './lab.ts';
 import { SAMPLE_DAWN } from './opener.ts';
 import { reportBody } from './report.ts';
-import { drawScene, SCENE_H, type SceneFx, sceneHit } from './scene.ts';
+import { drawScene, type SceneFx, sceneHit } from './scene.ts';
 
 const SAVE = 'glance-save-v1';
 /** Sim minutes per real second. */
@@ -177,13 +181,11 @@ function title() {
   app.innerHTML = `<div class="page">
     ${markLink}
     <h1>The Glance</h1>
-    <p class="soft">a storm week on the night desk</p>
-    <p>The river authority, the night desk. Up the valley, one old dam above a town, and on it a keeper with a torch and a radio.</p>
-    <p>Every figure on your board is what he saw.</p>
-    <p class="soft">The night runs on its own while the desk is open; the arrows at the top set its pace. Shut the page and it waits for you.</p>
+    <p id="goal">Keep the dam below its crest and the town dry, or warned in time.</p>
     <div class="actions">
       ${save ? '<button class="primary" id="cont">Back to the desk</button>' : ''}
       <button class="${save ? '' : 'primary'}" id="new">${save ? 'Start the week again' : 'Take the night desk'}</button>
+      <button id="help">About the desk</button>
       <button id="load">Load a playtest run</button>
       <input type="file" id="file" accept="application/json" hidden />
     </div>
@@ -199,6 +201,7 @@ function title() {
   document.getElementById('new')?.addEventListener('click', () => {
     beginWeek();
   });
+  document.getElementById('help')?.addEventListener('click', showAbout);
   const file = document.getElementById('file') as HTMLInputElement;
   document.getElementById('load')?.addEventListener('click', () => file.click());
   file.addEventListener('change', async () => {
@@ -222,38 +225,38 @@ function title() {
   });
 }
 
-/** A sample, never a simulated dawn: the new run waits untouched until dismissed. */
+/** The first request is available immediately; no input is queued until the player asks. */
 function beginWeek() {
   cancelAnimationFrame(raf);
   clearSave();
   s = newGame(Date.now() >>> 0);
-  lab.screen('before the first watch');
-  app.innerHTML = `<div class="page dawn opener">
-    ${markLink}
-    <h2>Before the first watch</h2>
-    <p>Keep the dam below its crest and the town dry, or warned in time. Your watch ends at dawn after Friday night, or sooner if water comes over the crest.</p>
+  enter();
+  openSheet({ kind: 'gauge', gauge: 'level', who: 'dai' });
+  window.scrollTo(0, 0);
+}
+
+/** Optional background and example, outside the simulation and input log. */
+function showAbout() {
+  document.getElementById('about')?.remove();
+  const dialog = document.createElement('dialog');
+  dialog.id = 'about';
+  dialog.setAttribute('aria-labelledby', 'about-title');
+  dialog.innerHTML = `<div class="page dawn">
+    <button id="close-about">Back to the desk</button>
+    <h2 id="about-title">About the desk</h2>
+    <p>The river authority, the night desk. Up the valley, one old dam above a town, and on it a keeper with a torch and a radio. Every figure on your board is what he saw.</p>
+    <p>The night runs on its own while the desk is open; the arrows at the top set its pace. Shut the page and it waits for you.</p>
+    <p>Your watch ends at dawn after Friday night, or sooner if water comes over the crest.</p>
     <p>The level is water held behind the dam. The weir upstream shows water coming in. More gate turns open it wider: the dam level falls, but the river through town rises later.</p>
     <p>Tap a gauge to send a keeper. Let him rest between jobs. From Tuesday, ring the Bridge Inn to check the river and warn the lane if needed.</p>
     <p class="soft">A sample report, not your night. This is a good morning:</p>
     ${reportBody(SAMPLE_DAWN, false, true)}
-    <button class="primary" id="begin">Take the night desk</button>
-    <p class="hint">Take your time. Tap the button or press Enter when you’re ready.</p>
   </div>`;
-  drawDawn(document.getElementById('chart') as HTMLCanvasElement, SAMPLE_DAWN);
-  const dismiss = () => {
-    document.removeEventListener('keydown', onKey);
-    enter();
-    window.scrollTo(0, 0);
-  };
-  const onKey = (e: KeyboardEvent) => {
-    // Keep scrolling, Tab navigation and browser shortcuts available. Ignore held keys.
-    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || !['Enter', 'Escape'].includes(e.key)) return;
-    e.preventDefault();
-    dismiss();
-  };
-  document.getElementById('begin')?.addEventListener('click', dismiss, { once: true });
-  document.addEventListener('keydown', onKey);
-  window.scrollTo(0, 0);
+  app.append(dialog);
+  drawDawn(dialog.querySelector('#chart') as HTMLCanvasElement, SAMPLE_DAWN);
+  dialog.querySelector('#close-about')?.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  dialog.showModal();
 }
 
 function enter() {
@@ -275,11 +278,22 @@ function watch() {
   writeSave();
   app.innerHTML = `<div class="watch">
     <div class="top"><span class="grow"></span><span id="night"></span><span class="clock" id="clock"></span><span class="speed" id="speed"></span></div>
-    <canvas id="scene" class="scene" style="height:${SCENE_H}px" aria-label="The dam, as reported"></canvas>
+    <canvas id="scene" class="scene" aria-label="The dam, as reported"></canvas>
     <div class="board" id="board"></div>
+    <div id="concern" class="attention" aria-live="polite"></div>
     <div class="log" id="log" aria-live="polite"></div>
     <div class="sheet" id="sheet"></div>
+    <div class="desk-tools" id="tools"><button id="help">About the desk</button></div>
   </div>`;
+  document.getElementById('help')?.addEventListener('click', showAbout);
+  document.getElementById('tools')?.prepend(
+    notebookMenu({
+      lab,
+      getRun: () => (s ? exportRun(s, FRAMEWORK_VERSION) : {}),
+      filename: 'glance-playtest.json',
+      onSave: writeSave,
+    }),
+  );
   const sp = document.getElementById('speed') as HTMLElement;
   sp.innerHTML = SPEED_NAMES.map(
     (n, i) => `<button data-i="${i}" aria-label="${n}">${['▸', '▸▸', '▸▸▸'][i]}</button>`,
@@ -377,6 +391,7 @@ function drawTop() {
   if (c) c.textContent = clock(s.minute);
   document.querySelectorAll('#speed button').forEach((b, i) => {
     b.classList.toggle('on', i === speed);
+    b.setAttribute('aria-pressed', String(i === speed));
   });
 }
 
@@ -452,12 +467,30 @@ function drawLog() {
 
 function openSheet(sh: Sheet) {
   sheet = sh;
+  document.querySelector('.watch')?.classList.toggle('sheet-open', sheet !== null);
+  document
+    .querySelector('.watch')
+    ?.classList.toggle('gate-open', sheet?.kind === 'gauge' && sheet.gauge === 'gate');
+  drawConcern();
   sheetKey = '';
   drawSheet();
 }
 
+function drawConcern() {
+  if (!s) return;
+  const el = document.getElementById('concern');
+  if (el)
+    setHtml(
+      el,
+      `${concernLines(s)
+        .map((line) => `<div>${esc(line)}</div>`)
+        .join('')}<div id="threshold" class="soft">${esc(thresholdWords(s))}</div>`,
+    );
+}
+
 function drawSheet() {
   if (!s) return;
+  drawConcern();
   const el = document.getElementById('sheet');
   if (!el || el.querySelector('.holding')) return;
   if (!sheet) {
@@ -484,7 +517,7 @@ function drawSheet() {
       .join(
         '',
       )}${planOf(s).inn ? '<button data-inn="1"><b>Bridge Inn</b><span class="soft">Nerys</span></button>' : ''}</div>
-      <p class="hint">Tap a gauge to have it read. Tap a keeper to talk to him.</p>`;
+      `;
     if (!setHtml(el, html)) return;
     el.querySelectorAll('[data-k]').forEach((b) => {
       b.addEventListener('click', () =>
@@ -549,8 +582,8 @@ function drawSheet() {
     for (let t = 0; t <= TURNS; t++) if (t !== reported) opts.push(t);
     const hs = opts.map((t) => hint(s as GameState, who, 'gate', t));
     const next = hint(s, who, 'gate', Math.min(TURNS, reported + 1));
-    head = `<b>Gate</b><span class="soft">${NAMES[who]} turns it by hand</span>`;
-    body = `${next.forecast ? `<p class="fore"><span class="soft">${NAMES[who]}, on the round after:</span> <span class="hand">“${esc(next.forecast)}”</span></p>` : ''}
+    head = `<b>Gate</b><span class="soft">Last ${reported}/${TURNS} · ${clock(s.minute)}</span>`;
+    body = `${next.forecast ? `<details class="fore"><summary>${NAMES[who]}, on the round after</summary><span class="hand">“${esc(next.forecast)}”</span></details>` : ''}
       <div class="verbs turns">${hs
         .map(
           (h) =>
@@ -558,15 +591,16 @@ function drawSheet() {
         )
         .join(
           '',
-        )}</div><p class="hint">Turns open, out of ${TURNS}. ${seen.hold ? '' : 'Hold a button to insist.'}</p>`;
+        )}</div><p class="hint">0–${TURNS} turns open. More turns lower the dam; the town river rises later. ${seen.hold ? '' : 'Hold a button to insist.'}</p>`;
   } else if (sheet.kind === 'gauge') {
     const job: Job = sheet.gauge === 'weir' ? 'weir' : 'level';
     const h = hint(s, who, job);
     const hi = hint(s, who, job, undefined, true);
-    head = `<b>${job === 'level' ? 'Level' : 'Weir'}</b><span class="soft">${job === 'level' ? 'the staff gauge on the dam face' : 'the weir board, a long walk upstream'}</span>`;
+    head = `<b>${job === 'level' ? 'Level' : 'Weir'}</b><span class="soft">${job === 'level' ? 'water held behind the dam' : 'the weir board, a long walk upstream'}</span>`;
+    const firstReading = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
-      ${h.forecast ? `<p class="fore"><span class="soft">${NAMES[who]}, on the round after:</span> <span class="hand">“${esc(h.forecast)}”</span></p>` : ''}
-      <p class="hint">${lastWords(s, sheet.gauge)}</p>`;
+      ${h.forecast && !firstReading ? `<p class="fore"><span class="soft">${NAMES[who]}, on the round after:</span> <span class="hand">“${esc(h.forecast)}”</span></p>` : ''}
+      <p class="hint">${firstReading ? 'Every figure is what a keeper saw.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
     head = `<b>${NAMES[who]}</b><span class="soft">${whereWords(who)}</span>`;
     const jobs: { job: Job; label: string }[] = [
@@ -624,7 +658,9 @@ function whereWords(id: KeeperId): string {
   if (a === 'doze' || a === 'nap') return a === 'nap' ? 'asleep, as you said' : 'not answering';
   const j = k.job;
   if (j) {
-    const walking = s.minute < j.startedAt + j.walk;
+    const reading = j.job === 'level' || j.job === 'weir';
+    const walking =
+      s.minute < j.startedAt + (reading ? walkMinutes(j.from, j.job === 'level' ? 'staff' : 'weir') : j.walk);
     const where = {
       level: 'the staff gauge',
       weir: 'the weir',
@@ -633,7 +669,6 @@ function whereWords(id: KeeperId): string {
       nap: 'the hut',
       clear: 'the screen',
     }[j.job];
-    if (j.skip) return 'in the hut';
     return walking ? `walking to ${where}` : j.job === 'stove' ? 'by the stove' : `at ${where}`;
   }
   return { hut: 'in the hut', gate: 'at the wheel', staff: 'on the dam face', weir: 'at the weir' }[k.place];

@@ -77,6 +77,11 @@ button.primary {
   color: var(--rope);
   font-weight: 600;
 }
+:where(.desk-tools) button {
+  font-size: 15px;
+  min-height: 44px;
+  padding: 6px 10px;
+}
 button:disabled {
   opacity: 0.45;
 }
@@ -163,8 +168,8 @@ h3 {
   gap: 2px;
 }
 .speed button {
-  min-height: 34px;
-  min-width: 34px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 2px 6px;
   font-size: 11px;
   border-width: 1px;
@@ -172,8 +177,11 @@ h3 {
 }
 .speed button.on {
   opacity: 1;
-  border-color: var(--rope);
-  color: var(--rope);
+  border-color: var(--ink);
+  color: var(--ink);
+  outline: 1px solid var(--ink);
+  outline-offset: -4px;
+  font-weight: 600;
 }
 .scene {
   width: 100%;
@@ -183,7 +191,7 @@ h3 {
 }
 .board {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
   gap: 6px;
 }
 .gauge {
@@ -264,6 +272,8 @@ h3 {
 }
 .sheet {
   flex: none;
+  margin-top: auto;
+  padding-bottom: 2px;
   border-top: 1.5px solid var(--ink);
   padding-top: 8px;
   display: flex;
@@ -277,13 +287,14 @@ h3 {
   flex-wrap: wrap;
 }
 .sheet .who .soft {
-  font-size: 14px;
+  font-size: 15px;
   flex: 1;
 }
 .sheet .x {
-  min-height: 34px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 2px 10px;
-  font-size: 14px;
+  font-size: 15px;
 }
 .crew {
   display: flex;
@@ -298,17 +309,20 @@ h3 {
   padding: 6px 10px;
 }
 .crew button .soft {
-  font-size: 13px;
+  font-size: 15px;
 }
 .crew.small button {
-  min-height: 40px;
+  min-height: 44px;
   padding: 4px 8px;
 }
 .crew button.on {
-  border-color: var(--rope);
+  border-color: var(--ink);
+  outline: 1px solid var(--ink);
+  outline-offset: -4px;
+  font-weight: 600;
 }
 .hint {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--ink-soft);
   margin: 0;
 }
@@ -338,7 +352,7 @@ h3 {
   font-size: 15px;
 }
 .verbs button .h {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--ink-soft);
   position: relative;
 }
@@ -441,4 +455,92 @@ h3 {
 
 .verbs button.nudge .h {
   color: var(--rope);
+}
+
+.attention {
+  border-left: 3px solid var(--rope);
+  padding-left: 8px;
+  font-size: 15px;
+  flex: none;
+}
+.sheet .fore {
+  font-size: 15px;
+}
+.sheet .who {
+  align-items: center;
+}
+.sheet .who b {
+  flex: none;
+}
+.sheet .who .soft {
+  min-width: 0;
+}
+.desk-tools {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.scene {
+  height: 236px;
+  flex: none;
+}
+.watch.sheet-open .scene {
+  display: none;
+}
+.watch.sheet-open .log {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: 4.2em;
+  overflow-y: auto;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+.watch.sheet-open .log .line:not(:last-child) {
+  display: none;
+}
+.watch.gate-open .board svg,
+.watch.gate-open .board .was {
+  display: none;
+}
+.watch.gate-open {
+  gap: 4px;
+}
+.watch.gate-open .sheet {
+  gap: 4px;
+}
+.watch.sheet-open .sheet {
+  max-height: calc(100dvh - 100px - var(--safe-t) - var(--safe-b));
+  overflow-y: auto;
+}
+dialog {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  max-width: min(460px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 12px;
+}
+dialog::backdrop {
+  background: #0008;
+}
+#about .page {
+  padding: 0;
+}
+
+.lk-notebook[open] {
+  display: grid;
+  gap: 10px;
+}
+.lk-notebook h2,
+.lk-notebook p {
+  margin: 0;
+}
+@media (max-height: 700px) {
+  /* The gate sheet repeats the clock and setting; the concern retains the last level. */
+  .watch.gate-open .top,
+  .watch.gate-open .board {
+    display: none;
+  }
 }
