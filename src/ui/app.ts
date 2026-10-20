@@ -6,7 +6,6 @@
 import { FRAMEWORK_VERSION } from '@adam0white/human-framework';
 import {
   clock,
-  type Dawn,
   type Export,
   exportRun,
   fingerprint,
@@ -31,10 +30,11 @@ import {
   watchFrom,
 } from '../sim/dam.ts';
 import { KEEPERS, type KeeperId, NAMES } from '../sim/keepers.ts';
-import { spoken } from '../sim/reading.ts';
 import { CREST, LIP, TURNS } from '../sim/water.ts';
 import { drawDawn } from './dawn.ts';
 import { lab } from './lab.ts';
+import { SAMPLE_DAWN } from './opener.ts';
+import { reportBody } from './report.ts';
 import { drawScene, SCENE_H, type SceneFx, sceneHit } from './scene.ts';
 
 const SAVE = 'glance-save-v1';
@@ -197,9 +197,7 @@ function title() {
     enter();
   });
   document.getElementById('new')?.addEventListener('click', () => {
-    clearSave();
-    s = newGame((Date.now() ^ (Math.random() * 1e9)) >>> 0);
-    enter();
+    beginWeek();
   });
   const file = document.getElementById('file') as HTMLInputElement;
   document.getElementById('load')?.addEventListener('click', () => file.click());
@@ -222,6 +220,40 @@ function title() {
       alert('That file is not a run from The Glance.');
     }
   });
+}
+
+/** A sample, never a simulated dawn: the new run waits untouched until dismissed. */
+function beginWeek() {
+  cancelAnimationFrame(raf);
+  clearSave();
+  s = newGame(Date.now() >>> 0);
+  lab.screen('before the first watch');
+  app.innerHTML = `<div class="page dawn opener">
+    ${markLink}
+    <h2>Before the first watch</h2>
+    <p>Keep the dam below its crest and the town dry, or warned in time. Your watch ends at dawn after Friday night, or sooner if water comes over the crest.</p>
+    <p>The level is water held behind the dam. The weir upstream shows water coming in. More gate turns open it wider: the dam level falls, but the river through town rises later.</p>
+    <p>Tap a gauge to send a keeper. Let him rest between jobs. From Tuesday, ring the Bridge Inn to check the river and warn the lane if needed.</p>
+    <p class="soft">A sample report, not your night. This is a good morning:</p>
+    ${reportBody(SAMPLE_DAWN, false, true)}
+    <button class="primary" id="begin">Take the night desk</button>
+    <p class="hint">Take your time. Tap the button or press Enter when you’re ready.</p>
+  </div>`;
+  drawDawn(document.getElementById('chart') as HTMLCanvasElement, SAMPLE_DAWN);
+  const dismiss = () => {
+    document.removeEventListener('keydown', onKey);
+    enter();
+    window.scrollTo(0, 0);
+  };
+  const onKey = (e: KeyboardEvent) => {
+    // Keep scrolling, Tab navigation and browser shortcuts available. Ignore held keys.
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || !['Enter', 'Escape'].includes(e.key)) return;
+    e.preventDefault();
+    dismiss();
+  };
+  document.getElementById('begin')?.addEventListener('click', dismiss, { once: true });
+  document.addEventListener('keydown', onKey);
+  window.scrollTo(0, 0);
 }
 
 function enter() {
@@ -646,91 +678,21 @@ function ask(who: KeeperId, job: Job, target: number | undefined, insist: boolea
 
 // ---------- dawn ----------
 
-const CAUSE: Record<string, string> = {
-  fresh: 'A plain misread',
-  sleepy: 'He was short of sleep, and further behind than he felt',
-  trough: 'The small hours, when the body is at its lowest',
-  spent: 'He was spent from the wheel',
-  weather: 'Rain in his face and a weak torch',
-  afraid: 'He was frightened',
-  skipped: 'He never walked there; he gave you the last figure',
-  gossip: '',
-};
-
-const WORDS = ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-const count = (n: number) => WORDS[n] ?? String(n);
-
-function houseRow(n: number, fate: Dawn['mill']): string {
-  return Array.from(
-    { length: n },
-    (_, i) =>
-      `<svg class="house ${fate}" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 18 V9 L10 3 L17 9 V18 Z" fill="${fate === 'flooded' ? 'var(--sky)' : 'none'}" fill-opacity="${fate === 'flooded' ? 0.45 : 0}" stroke="currentColor" stroke-width="1.4"/>${fate === 'saved' ? `<line x1="4" y1="15" x2="16" y2="${15 + (i % 2)}" stroke="var(--sky)" stroke-width="1.4"/>` : ''}</svg>`,
-  ).join('');
-}
-
-function fateWords(d: Dawn): string {
-  if (d.overtopped) {
-    const at = d.series.at(-1)?.m;
-    return `Water came over the crest of the dam${at === undefined ? '' : ` at ${clock(at)}`}. The record stops there.`;
-  }
-  const parts: string[] = [];
-  parts.push(
-    d.mill === 'dry'
-      ? 'Mill Lane slept dry.'
-      : d.mill === 'saved'
-        ? 'Mill Lane took water, but they had their things upstairs.'
-        : 'Mill Lane flooded before anyone knocked.',
-  );
-  if (d.square !== 'dry')
-    parts.push(d.square === 'saved' ? 'The square went under; they were ready.' : 'The square went under.');
-  if (d.falseAlarm) parts.push('The warning was for nothing. The lane will remember.');
-  if (d.spilled && !d.overtopped) parts.push('The dam went over its lip and the spillway ran.');
-  return parts.join(' ');
-}
-
-/** Why he was off, in the desk's words; Callum errs high, so his tiredness reads differently. */
-function causeWords(m: Dawn['misses'][number]): string {
-  if (m.who === 'callum' && m.said > m.truth)
-    return m.cause === 'afraid' || m.cause === 'sleepy' || m.cause === 'trough'
-      ? 'He was tired and frightened, and guessed high to be safe'
-      : (CAUSE[m.cause] ?? '');
-  return CAUSE[m.cause] ?? '';
-}
-
-function missLine(m: Dawn['misses'][number]): string {
-  const who = NAMES[m.who];
-  const f = m.gauge === 'level' ? spoken(m.said) : m.said.toFixed(2);
-  const t = m.gauge === 'level' ? spoken(m.truth) : m.truth.toFixed(2);
-  return `<li><span class="t">${clock(m.at)}</span> ${who} said <b>${f}</b> at the ${m.gauge === 'level' ? 'staff' : 'weir'}. It was ${t}. <span class="soft">${esc(causeWords(m))}.</span>${m.caught ? ' <span class="caught">You caught it.</span>' : ''}</li>`;
-}
-
 function dawn() {
   if (!s) return;
   cancelAnimationFrame(raf);
-  const d = s.dawns.at(-1) as Dawn;
+  const d = s.dawns.at(-1);
+  if (!d) return;
   const next = PLANS[d.night] ?? null;
-  const caught = d.misses.filter((m) => m.caught).length;
   lab.screen(`night ${d.night}: dawn`);
   lab.milestone(`night ${d.night} done`);
   app.innerHTML = `<div class="page dawn">
     ${markLink}
-    <h2>${PLANS[d.night - 1]?.title ?? ''}, first light</h2>
-    <p>${esc(fateWords(d))}</p>
-    <canvas id="chart" class="chart" aria-label="The night's true level against his figures"></canvas>
-    <p class="soft legend"><span class="key red"></span> what the water did <span class="key dot"></span> what ${planOf(s).keepers.length > 1 ? 'they' : 'he'} told you</p>
-    <div class="houses"><span class="soft">Mill Lane</span>${houseRow(4, d.overtopped ? 'flooded' : d.mill)}<span class="soft">square</span>${houseRow(6, d.overtopped ? 'flooded' : d.square)}</div>
-    ${d.misses.length ? `<h3>Where the board was wrong</h3><ul class="misses">${d.misses.slice(0, 6).map(missLine).join('')}</ul><p class="soft">A figure counts as caught when you had it read again within twenty minutes, or lightning showed the wall. ${caught ? `You caught ${count(caught)} of ${count(d.misses.length)}.` : 'You caught none of them.'}</p>` : '<p>Every figure tonight was near enough the truth.</p>'}
-    ${d.dozes.map((z) => `<p class="soft">${NAMES[z.who]} fell asleep on watch, ${clock(z.from)} to ${clock(z.to)}.</p>`).join('')}
-    ${d.strain.map((id) => `<p class="soft">${NAMES[id]} hurt his shoulder on the wheel. He didn’t say.</p>`).join('')}
-    ${d.lines
-      .map(
-        (l) =>
-          `<div class="keeperline"><b>${NAMES[l.id]}</b>${l.line ? `<p class="hand">${esc(l.line)}</p>` : ''}<p class="hand">${esc(l.aboutYou)}</p></div>`,
-      )
-      .join('')}
+    ${s.phase === 'end' ? `<p class="week-end" role="status">${d.overtopped ? 'The week ends here. Water came over the crest.' : 'First light after Friday night. The week is over; your watch is done.'}</p>` : ''}
+    ${reportBody(d, planOf(s).keepers.length > 1)}
     <div class="actions">
       ${s.phase === 'dawn' && next ? `<button class="primary" id="next">${esc(next.title)} night</button>` : ''}
-      ${s.phase === 'end' ? '<button class="primary" id="end">The week</button>' : ''}
+      ${s.phase === 'end' ? '<button class="primary" id="end">Read the week’s outcome</button>' : ''}
       <button id="export">Export this run (playtest)</button>
       <button id="send">Send this run to the notebook</button>
       <button id="menu">Title page</button>
@@ -771,7 +733,7 @@ function ending() {
       : `The dam held all week. Mill Lane flooded ${flooded === 1 ? 'once' : `${flooded} times`} without warning.`;
   app.innerHTML = `<div class="page dawn">
     ${markLink}
-    <h2>The week</h2>
+    <h2>The week is over</h2>
     <p>${esc(verdict)}</p>
     <ul class="week">${ds
       .map(
@@ -790,9 +752,7 @@ function ending() {
     ${footer()}
   </div>`;
   document.getElementById('again')?.addEventListener('click', () => {
-    clearSave();
-    s = newGame((Date.now() ^ (Math.random() * 1e9)) >>> 0);
-    enter();
+    beginWeek();
   });
   document.getElementById('export')?.addEventListener('click', download);
   document.getElementById('send')?.addEventListener('click', sendRun);

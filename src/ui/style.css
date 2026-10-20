@@ -362,6 +362,11 @@ h3 {
 }
 
 /* ---------- dawn ---------- */
+.week-end {
+  border-block: 2px solid var(--rope);
+  padding-block: 12px;
+  font-weight: 600;
+}
 .chart {
   width: 100%;
   display: block;
