@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@adam0white/human-framework": "2.8.0",
-    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.1.1/adam0white-lab-client-0.1.1.tgz"
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.1.2/adam0white-lab-client-0.1.2.tgz"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
