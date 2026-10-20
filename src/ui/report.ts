@@ -61,7 +61,7 @@ function missLine(m: Dawn['misses'][number]): string {
   const who = NAMES[m.who];
   const f = m.gauge === 'level' ? spoken(m.said) : m.said.toFixed(2);
   const t = m.gauge === 'level' ? spoken(m.truth) : m.truth.toFixed(2);
-  return `<li><span class="t">${clock(m.at)}</span> ${who} said <b>${f}</b> at the ${m.gauge === 'level' ? 'staff' : 'weir'}. It was ${t}. <span class="soft">${esc(causeWords(m))}.</span>${m.caught ? ' <span class="caught">You caught it.</span>' : ''}</li>`;
+  return `<li><span class="t">actual read ${clock(m.at)}</span> ${who} said <b>${f}</b> at the ${m.gauge === 'level' ? 'staff' : 'weir'}. It was ${t}. <span class="soft">${esc(causeWords(m))}.</span>${m.caught ? ' <span class="caught">You caught it.</span>' : ''}</li>`;
 }
 
 export function reportBody(d: Dawn, crew: boolean, sample = false): string {
@@ -69,7 +69,7 @@ export function reportBody(d: Dawn, crew: boolean, sample = false): string {
   return `    <h2>${sample ? 'A sample morning' : `${PLANS[d.night - 1]?.title ?? ''}, first light`}</h2>
     <p>${esc(fateWords(d))}</p>
     <canvas id="chart" class="chart" aria-label="${sample ? 'Sample night: opening the gate lowered the dam level; the river rose later. The water stayed below the crest and the town stayed dry.' : "The night's true level against his figures"}"></canvas>
-    <p class="soft legend"><span class="key red"></span> what the water did <span class="key dot"></span> what ${crew ? 'they' : 'he'} told you</p>
+    <p class="soft legend"><span class="key red"></span> what the water did <span class="key dot"></span> what ${crew ? 'they' : 'he'} told you, at the actual reading time</p>
     <div class="houses"><span class="soft">Mill Lane</span>${houseRow(4, d.overtopped ? 'flooded' : d.mill)}<span class="soft">square</span>${houseRow(6, d.overtopped ? 'flooded' : d.square)}</div>
     ${d.misses.length ? `<h3>Where the board was wrong</h3><ul class="misses">${d.misses.slice(0, 6).map(missLine).join('')}</ul><p class="soft">A figure counts as caught when you had it read again within twenty minutes, or lightning showed the wall. ${caught ? `You caught ${count(caught)} of ${count(d.misses.length)}.` : 'You caught none of them.'}</p>` : '<p>Every figure tonight was near enough the truth.</p>'}
     ${d.dozes.map((z) => `<p class="soft">${NAMES[z.who]} fell asleep on watch, ${clock(z.from)} to ${clock(z.to)}.</p>`).join('')}

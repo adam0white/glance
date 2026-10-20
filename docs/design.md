@@ -56,4 +56,4 @@ The dam overtopping ends the week (the dawn page still comes). Achievement is th
 - A weather forecast and a what-if replay of the night (Priya). Target: second week.
 - Doze hazard and quantity estimates from HF (docs/hf-requests.md items 2 and 3). Target: HF engine 2.10.
 - Dai's low bias is uniform before three as well as after (Gwen: "half a metre low every time is not tiredness"). Decide with the owner whether it should grow only in the trough. Target: owner's first playtest.
-- The written time slips up to 30 minutes when a keeper is tired. Two playtesters read it as a bug, not a tell. Decide whether to keep, explain at dawn, or drop. Target: owner's first playtest.
+- Resolved 2026-10-20 (F-228): written reading times retain the keeper's slips, labeled “read HH:MM (as written)” across the live board, drawing and sheets. Reading ages use that same written time. Radio arrivals say “reported HH:MM”; dawn explicitly reconstructs actual reading times. Simulation and export replay are unchanged. Owner accepts feel separately.

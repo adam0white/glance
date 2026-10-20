@@ -40,6 +40,7 @@ import { lab } from './lab.ts';
 import { SAMPLE_DAWN } from './opener.ts';
 import { reportBody } from './report.ts';
 import { drawScene, type SceneFx, sceneHit } from './scene.ts';
+import { readingTime } from './time.ts';
 
 const SAVE = 'glance-save-v1';
 /** Sim minutes per real second. */
@@ -251,6 +252,7 @@ function showAbout() {
     <p>The night runs on its own while the desk is open; the arrows at the top set its pace. Shut the page and it waits for you.</p>
     <p>Your watch ends at dawn after Friday night, or sooner if water comes over the crest.</p>
     <p>The level is water held behind the dam. The weir upstream shows water coming in. More gate turns open it wider: the dam level falls, but the river through town rises later.</p>
+    <p>On the live board, “read” is the reading time as written by the keeper. “Reported” is when the radio report reached your desk. Dawn reconstructs the actual reading times.</p>
     <p>Tap a gauge to send a keeper. Let him rest between jobs. From Tuesday, ring the Bridge Inn to check the river and warn the lane if needed.</p>
     <p class="soft">A sample report, not your night. This is a good morning:</p>
     ${reportBody(SAMPLE_DAWN, false, true)}
@@ -418,7 +420,7 @@ function drawBoard() {
         ${g.id === 'level' ? dialTicks() : ''}<circle cx="30" cy="31" r="2" fill="currentColor"/></svg>
         <span class="lab">${g.label}</span>
         <span class="num">${printed(r, g.id)}</span>
-        <span class="by hand">${r ? hand(`${who} ${clock(r.wrote)}`, r.who === 'nerys' ? 0 : 1 - r.clarity, r.at) : 'not read'}</span>
+        <span class="by hand">${r ? hand(`${who} · ${readingTime(r)}`, r.who === 'nerys' ? 0 : 1 - r.clarity, r.at) : 'not read'}</span>
         ${wasLine(r, g.id)}
       </button>`;
     })
@@ -428,15 +430,16 @@ function drawBoard() {
 
 /** The figure before this one, as a desk keeps it beside the new one: two men's readings side by side. */
 function wasLine(r: Report | null, g: Gauge): string {
-  if (!s || !r || g === 'gate') return '';
+  const empty = '<span class="was soft" aria-hidden="true"></span>';
+  if (!s || !r || g === 'gate') return empty;
   const prev = s.reports
     .filter((x) => x.gauge === g && x !== r && x.at >= watchFrom(s?.night ?? 1) && x.at <= r.at)
     .at(-1);
-  if (!prev) return '';
+  if (!prev) return empty;
   // Same man: "was". Another man: his name, so a disagreement shows as two names.
   const lead = prev.who === r.who ? 'was' : prev.who === 'nerys' ? 'Nerys' : NAMES[prev.who as KeeperId];
   const fig = g === 'level' ? prev.value.toFixed(1) : printed(prev, g).replace(' m', '');
-  return `<span class="was soft">${lead} ${fig}, ${clock(prev.wrote)}</span>`;
+  return `<span class="was soft">${lead} ${fig}, ${readingTime(prev)}</span>`;
 }
 
 function sayClass(x: Said): string {
@@ -462,7 +465,10 @@ function drawLog() {
           : undefined;
       const loose = r ? 1 - r.clarity : 0;
       const body = sayClass(x) === 'p' ? hand(x.text, loose, x.at) : esc(x.text);
-      return `<div class="line ${sayClass(x)}"><span class="t">${clock(x.at)}</span>${who ? `<b>${who}</b> ` : ''}<span class="${sayClass(x) === 'p' ? 'hand' : ''}">${body}</span></div>`;
+      // Tree notices can be stamped before delivery; only reading reports certify arrival here.
+      const readingArrival = x.kind === 'report' && !x.text.includes('tree');
+      const time = `${readingArrival ? 'reported ' : ''}${clock(x.at)}`;
+      return `<div class="line ${sayClass(x)}"><span class="t">${time}</span>${who ? `<b>${who}</b> ` : ''}<span class="${sayClass(x) === 'p' ? 'hand' : ''}">${body}</span></div>`;
     })
     .join('');
 }
@@ -588,7 +594,7 @@ function drawSheet() {
     for (let t = 0; t <= TURNS; t++) if (t !== reported) opts.push(t);
     const hs = opts.map((t) => hint(s as GameState, who, 'gate', t));
     const next = hint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
-    head = `<b>Gate</b><span class="soft">Now ${clock(s.minute)} · ${report ? `last gate ${reported}/${TURNS}, reported ${clock(report.wrote)}` : 'gate not read'}</span>`;
+    head = `<b>Gate</b><span class="soft">Now ${clock(s.minute)} · ${report ? `last gate ${reported}/${TURNS}, ${readingTime(report)}` : 'gate not read'}</span>`;
     body = `<div class="inspection-speed soft">Inspection slowdown · ${SPEED_NAMES[speed]} selected</div>${next.forecast ? `<details class="fore"><summary>${NAMES[who]}, on the round after</summary><span class="hand">“${esc(next.forecast)}”</span></details>` : ''}
       <div class="verbs turns">${hs
         .map(
@@ -656,8 +662,7 @@ function lastWords(st: GameState, g: Gauge): string {
   const r = st.board[g];
   if (!r) return 'Nobody has read it yet tonight.';
   const who = r.who === 'nerys' ? 'Nerys' : NAMES[r.who as KeeperId];
-  const ago = st.minute - r.at;
-  return `Last: ${who}, ${ago < 3 ? 'just now' : `${ago} minutes ago`}: “${esc(reportWords(st, r))}”`;
+  return `Last: ${who}, ${readingTime(r)}: “${esc(reportWords(st, r))}”`;
 }
 
 function whereWords(id: KeeperId): string {

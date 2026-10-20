@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { exportRun, fingerprint, type GameState, newGame, queueInput, step } from '../src/sim/dam.ts';
+import { SAMPLE_DAWN } from '../src/ui/opener.ts';
+import { reportBody } from '../src/ui/report.ts';
 
 // Notebook telemetry is external; keep the game and its DOM real.
 vi.mock('../src/ui/lab.ts', () => ({
@@ -156,6 +158,75 @@ describe('the first page of a new week', () => {
 });
 
 describe('clarity follow-up', () => {
+  it('distinguishes written reading times from radio arrival times, including old and delayed readings', async () => {
+    const debug = await boot();
+    click('new');
+    const run = state(debug);
+    const original = run.board.level;
+    if (!original) throw new Error('Missing opening reading');
+    run.minute = 1410;
+    run.inputs.push({ at: 1350, kind: 'ask', keeper: 'dai', job: 'level' });
+    const reading = { ...original, at: 1380, wrote: 1350, late: true };
+    run.reports.push(reading);
+    run.board.level = reading;
+    run.said.push({ at: 1400, who: 'dai', kind: 'report', text: 'Radio’s back. Three-nine.' });
+    debug.step(0);
+    const gauge = document.querySelector('[data-g="level"]');
+    expect(gauge?.querySelector('.by')?.textContent).toContain('read 22:30 (as written)');
+    expect(gauge?.querySelector('.was')?.textContent).toContain('read 22:00 (as written)');
+    expect(document.querySelector('#log .line:last-child .t')?.textContent).toBe('reported 23:20');
+    (gauge as HTMLElement).click();
+    expect(document.querySelector('.sheet .hint')?.textContent).toContain('read 22:30 (as written)');
+    expect(document.querySelector('#threshold')?.textContent).toContain('read 60 min ago (as written)');
+  });
+
+  it('does not label a tree notice as received while the radio is out', async () => {
+    const debug = await boot();
+    click('new');
+    const run = state(debug);
+    run.radioOut = true;
+    run.said.push({ at: run.minute, who: 'dai', kind: 'report', text: 'A tree on the screen.' });
+    debug.step(0);
+    expect(document.querySelector('#log .line:last-child .t')?.textContent).toBe('22:00');
+  });
+
+  it('labels dawn reconstruction with actual reading times', async () => {
+    await boot();
+    click('new');
+    click('help');
+    expect(document.querySelector('#about .legend')?.textContent).toContain('actual reading time');
+    expect(
+      reportBody(
+        {
+          ...SAMPLE_DAWN,
+          misses: [
+            { at: 1380, who: 'dai', gauge: 'level', said: 3.8, truth: 4.1, cause: 'sleepy', caught: false },
+          ],
+        },
+        false,
+      ),
+    ).toContain('actual read 23:00');
+  });
+
+  it('uses the same written reading label for gate details and every gauge', async () => {
+    const debug = await boot();
+    click('new');
+    const run = state(debug);
+    run.night = 3;
+    const opening = run.board.level;
+    if (!opening || !run.board.gate) throw new Error('Missing opening readings');
+    run.board.weir = { ...opening, gauge: 'weir' };
+    run.board.bridge = { ...opening, who: 'nerys', gauge: 'bridge' };
+    run.board.gate.wrote = 1290;
+    debug.step(0);
+    expect(document.querySelectorAll('.gauge .by')).toHaveLength(4);
+    for (const by of document.querySelectorAll('.gauge .by'))
+      expect(by.textContent).toMatch(/read \d\d:\d\d \(as written\)/);
+    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
+    expect(document.querySelector('.sheet .who')?.textContent).toContain('read 21:30 (as written)');
+    expect(document.querySelector('.sheet .who')?.textContent).not.toContain('reported 21:30');
+  });
+
   it('reports explicit save failure and lets the player retry', async () => {
     await boot();
     click('new');
@@ -191,7 +262,7 @@ describe('clarity follow-up', () => {
     debug.step(24);
     (document.querySelector('[data-g="gate"]') as HTMLElement).click();
     expect(document.querySelector('.sheet .who')?.textContent).toContain('Now 22:24');
-    expect(document.querySelector('.sheet .who')?.textContent).toContain('reported 22:00');
+    expect(document.querySelector('.sheet .who')?.textContent).toContain('read 22:00 (as written)');
     expect(document.querySelector('.sheet')?.textContent).toContain('Inspection slowdown · steady selected');
   });
 

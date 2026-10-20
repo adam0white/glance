@@ -7,6 +7,7 @@ import { readPerson } from '@adam0white/human-framework';
 import { clock, type GameState, keeperOf, type Place, personOf, planOf } from '../sim/dam.ts';
 import { KEEPERS, type KeeperId, NAMES, WATCH_FROM } from '../sim/keepers.ts';
 import { rainAt } from '../sim/water.ts';
+import { readingTime } from './time.ts';
 
 export const SCENE_H = 236;
 const W = 360;
@@ -141,8 +142,8 @@ export function drawScene(canvas: HTMLCanvasElement, s: GameState, fx: SceneFx, 
     ctx.globalAlpha = 1;
     ctx.fillStyle = ink;
     ctx.font = '600 15px Caveat, cursive';
-    const label = `${rep.value.toFixed(1)} m · ${clock(rep.wrote)} · ${NAMES[rep.who as KeeperId] ?? ''}`;
-    ctx.fillText(label, 8, y - 6);
+    ctx.fillText(`${rep.value.toFixed(1)} m · ${NAMES[rep.who as KeeperId] ?? ''}`, 8, y - 22);
+    ctx.fillText(readingTime(rep), 8, y - 6);
   }
 
   // The flash: the true level, for an instant, then a pencil ghost for half an hour.

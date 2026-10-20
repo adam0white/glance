@@ -58,10 +58,10 @@ export function thresholdWords(s: GameState): string {
   const r = s.board.level;
   if (!r) return `Level not read · crest ${CREST.toFixed(1)} m.`;
   const observer = r.who === 'nerys' ? 'Nerys' : NAMES[r.who];
-  const age = Math.max(0, s.minute - r.at);
+  const age = Math.max(0, s.minute - r.wrote);
   const next =
     r.value < LIP
       ? `spillway lip ${LIP.toFixed(1)} m`
       : `${r.value >= CREST ? 'at or above ' : ''}crest ${CREST.toFixed(1)} m`;
-  return `Last level: ${r.value.toFixed(2)} m · ${observer}, ${age} min ago · ${next}.`;
+  return `Last level: ${r.value.toFixed(2)} m · ${observer}, read ${age} min ago (as written) · ${next}.`;
 }

@@ -116,6 +116,7 @@ describe('the desk concern', () => {
     if (!r) throw new Error('Missing opening report');
     r.value = 4.8;
     r.at = s.minute - 12;
+    r.wrote = r.at;
     expect(thresholdWords(s)).toMatch(/4\.80 m.*12 min.*lip 5\.0 m/);
     const words = thresholdWords(s);
     s.water.level = 6.2;
