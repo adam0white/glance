@@ -1,7 +1,7 @@
 /**
  * The Glance UI: DOM for the board, the radio log and the sheets; one canvas for the dam. The UI reads state and
  * queues inputs; it never changes the sim directly. Real time drives sim minutes, continuously, slowing while a
- * sheet is open (tactical slowdown, no pause).
+ * sheet is open. Game menus and notebook dialogs hold time.
  */
 
 import { FRAMEWORK_VERSION } from '@adam0white/human-framework';
@@ -347,7 +347,7 @@ function frame(t: number) {
   if (!s) return;
   const dt = Math.min(0.25, (t - last) / 1000);
   last = t;
-  if (s.phase === 'watch') {
+  if (s.phase === 'watch' && !document.querySelector('dialog[open], .hflab-veil')) {
     const base = SPEEDS[speed] ?? 1.4;
     const rate = sheet ? Math.min(base, SLOWDOWN) : base;
     carry += dt * rate;

@@ -285,3 +285,41 @@ describe('clarity follow-up', () => {
     expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(false);
   });
 });
+
+it('holds menu time without adding inputs, then resumes the selected Fast pace', async () => {
+  let next: FrameRequestCallback = () => {};
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    next = callback;
+    return 1;
+  });
+  vi.stubGlobal('cancelAnimationFrame', () => {});
+  const debug = await boot();
+  click('new');
+  click('x');
+  document.querySelector<HTMLButtonElement>('#speed [data-i="2"]')?.click();
+  let now = performance.now();
+  const pulse = () => {
+    now += 250;
+    next(now);
+  };
+  const inputs = JSON.stringify(state(debug).inputs);
+  const before = state(debug).minute;
+  document.querySelector<HTMLButtonElement>('#tools [aria-haspopup="dialog"]')?.click();
+  const menu = document.querySelector<HTMLDialogElement>('.lk-notebook');
+  expect(menu?.open).toBe(true);
+  for (let i = 0; i < 40; i++) pulse();
+  expect(state(debug).minute).toBe(before);
+  expect(JSON.stringify(state(debug).inputs)).toBe(inputs);
+  menu?.close();
+  for (let i = 0; i < 4; i++) pulse();
+  expect(state(debug).minute).toBe(before + 2);
+  expect(document.querySelector('#speed [aria-pressed="true"]')?.getAttribute('data-i')).toBe('2');
+  expect(JSON.stringify(state(debug).inputs)).toBe(inputs);
+  const veil = document.createElement('div');
+  veil.className = 'hflab-veil';
+  document.body.append(veil);
+  const held = state(debug).minute;
+  for (let i = 0; i < 40; i++) pulse();
+  expect(state(debug).minute).toBe(held);
+  veil.remove();
+});
