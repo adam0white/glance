@@ -97,7 +97,8 @@ describe('the first page of a new week', () => {
     expect(document.querySelectorAll('.turns [data-job="gate"]')).toHaveLength(6);
     expect(document.querySelector('.sheet .hint')?.textContent).toContain('Hold a button');
     expect(document.querySelector('#concern.attention')).not.toBeNull();
-    expect(document.querySelector('#speed [aria-pressed="true"]')).not.toBeNull();
+    expect(document.querySelector('#speed')).toBeNull();
+    expect(document.querySelector('#clock-rate')?.textContent).toContain('time waits');
   });
 
   it('skips the opener when returning to a saved desk', async () => {
@@ -263,10 +264,10 @@ describe('clarity follow-up', () => {
     (document.querySelector('[data-g="gate"]') as HTMLElement).click();
     expect(document.querySelector('.sheet .who')?.textContent).toContain('Now 22:24');
     expect(document.querySelector('.sheet .who')?.textContent).toContain('read 22:00 (as written)');
-    expect(document.querySelector('.sheet')?.textContent).toContain('Inspection slowdown · steady selected');
+    expect(document.querySelector('.sheet')?.textContent).toContain('Reading the desk · time waits');
   });
 
-  it('keeps the forecast expanded across a running-clock minute, but resets for a new sheet', async () => {
+  it('keeps the forecast expanded while inspection holds the clock, but resets for a new sheet', async () => {
     let frame: FrameRequestCallback = () => {};
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
       frame = callback;
@@ -278,7 +279,7 @@ describe('clarity follow-up', () => {
     (document.querySelector('.sheet details') as HTMLDetailsElement).open = true;
     const from = performance.now();
     for (let n = 1; n <= 16; n++) frame(from + n * 250);
-    expect(state(debug).minute).toBeGreaterThan(1320);
+    expect(state(debug).minute).toBe(1320);
     expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(true);
     click('x');
     (document.querySelector('[data-g="gate"]') as HTMLElement).click();
@@ -286,7 +287,7 @@ describe('clarity follow-up', () => {
   });
 });
 
-it('holds menu time without adding inputs, then resumes the selected Fast pace', async () => {
+it('holds menu time without adding inputs, then resumes automatic pacing', async () => {
   let next: FrameRequestCallback = () => {};
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     next = callback;
@@ -296,7 +297,6 @@ it('holds menu time without adding inputs, then resumes the selected Fast pace',
   const debug = await boot();
   click('new');
   click('x');
-  document.querySelector<HTMLButtonElement>('#speed [data-i="2"]')?.click();
   let now = performance.now();
   const pulse = () => {
     now += 250;
@@ -312,8 +312,10 @@ it('holds menu time without adding inputs, then resumes the selected Fast pace',
   expect(JSON.stringify(state(debug).inputs)).toBe(inputs);
   menu?.close();
   for (let i = 0; i < 4; i++) pulse();
-  expect(state(debug).minute).toBe(before + 2);
-  expect(document.querySelector('#speed [aria-pressed="true"]')?.getAttribute('data-i')).toBe('2');
+  expect(state(debug).minute).toBe(before);
+  for (let i = 0; i < 24; i++) pulse();
+  expect(state(debug).minute).toBeGreaterThan(before);
+  expect(document.querySelector('#speed')).toBeNull();
   expect(JSON.stringify(state(debug).inputs)).toBe(inputs);
   const veil = document.createElement('div');
   veil.className = 'hflab-veil';
@@ -324,36 +326,20 @@ it('holds menu time without adding inputs, then resumes the selected Fast pace',
   veil.remove();
 });
 
-it('keeps the tally off and outside run state; toggles immediately at a failed end', async () => {
+it('computes the final tally without a menu setting and reveals it only on request', async () => {
   const debug = await boot();
   click('new');
+  expect(document.querySelector('#see-tally')).toBeNull();
   const run = state(debug);
-  const before = fingerprint(run);
-  const menu = () => {
-    (
-      Array.from(document.querySelectorAll('button')).find(
-        (b) => b.textContent === 'Game menu',
-      ) as HTMLElement
-    ).click();
-    return document.querySelector<HTMLInputElement>('#keep-tally') as HTMLInputElement;
-  };
-  let checkbox = menu();
-  expect(checkbox.checked).toBe(false);
-  expect(checkbox.parentElement?.textContent).toContain('Keep a tally');
-  checkbox.click();
-  expect(document.querySelector('[aria-label="Closing tally"]')).toBeNull();
-  expect(fingerprint(run)).toBe(before);
-  document.querySelector<HTMLDialogElement>('.lk-notebook')?.close();
   run.phase = 'end';
   run.dawns = [{ ...structuredClone(SAMPLE_DAWN), overtopped: true }];
   debug.step(0);
+  const ended = JSON.stringify(run);
+  expect(document.querySelector('#tally-result')?.hasAttribute('hidden')).toBe(true);
   expect(document.querySelector('[aria-label="Closing tally"]')?.textContent).toContain('Closing tally:');
-  const ended = fingerprint(run);
-  checkbox = menu();
-  expect(checkbox.checked).toBe(true);
-  checkbox.click();
-  expect(document.querySelector('[aria-label="Closing tally"]')).toBeNull();
-  checkbox.click();
-  expect(document.querySelector('[aria-label="Closing tally"]')).not.toBeNull();
-  expect(fingerprint(run)).toBe(ended);
+  click('see-tally');
+  expect(document.querySelector('#tally-result')?.hasAttribute('hidden')).toBe(false);
+  expect(document.querySelector('#see-tally')?.getAttribute('aria-expanded')).toBe('true');
+  expect(document.querySelector('#keep-tally')).toBeNull();
+  expect(JSON.stringify(run)).toBe(ended);
 });

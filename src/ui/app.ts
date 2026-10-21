@@ -38,16 +38,13 @@ import { concernLines, thresholdWords } from './concern.ts';
 import { drawDawn } from './dawn.ts';
 import { lab } from './lab.ts';
 import { SAMPLE_DAWN } from './opener.ts';
+import { eventStamp, playback } from './playback.ts';
 import { reportBody } from './report.ts';
 import { drawScene, type SceneFx, sceneHit } from './scene.ts';
 import { tallyBody } from './tally.ts';
 import { readingTime } from './time.ts';
 
 const SAVE = 'glance-save-v1';
-/** Sim minutes per real second. */
-const SPEEDS = [0.8, 1.4, 2.4] as const;
-const SPEED_NAMES = ['slow', 'steady', 'fast'];
-const SLOWDOWN = 0.35;
 
 interface Save {
   seed: number;
@@ -63,9 +60,7 @@ type Sheet =
 
 const app = document.getElementById('app') as HTMLElement;
 let s: GameState | null = null;
-let speed = 1;
-// Session-only preference: never enters saves, exports or the simulation.
-let keepTally = false;
+let readUntil = 0;
 let sheet: Sheet = null;
 let sheetKey = '';
 let raf = 0;
@@ -192,7 +187,7 @@ function title() {
     <div class="actions">
       ${save ? '<button class="primary" id="cont">Back to the desk</button>' : ''}
       <button class="${save ? '' : 'primary'}" id="new">${save ? 'Start the week again' : 'Take the night desk'}</button>
-      <button id="help">About the desk</button>
+      <button id="help" class="info" aria-label="About the desk" popovertarget="about">i</button>
       <button id="load">Load a playtest run</button>
       <input type="file" id="file" accept="application/json" hidden />
     </div>
@@ -201,14 +196,14 @@ function title() {
   document.getElementById('cont')?.addEventListener('click', () => {
     if (!save) return;
     s = replay(save.seed, save.inputs, save.minute);
-    // Back at the desk: the clock starts at its slowest, so nothing runs on before you have looked.
-    speed = 0;
+    // Give a returning player time to read the desk.
+    readUntil = performance.now() + 6000;
     enter();
   });
   document.getElementById('new')?.addEventListener('click', () => {
     beginWeek();
   });
-  document.getElementById('help')?.addEventListener('click', showAbout);
+  showAbout();
   const file = document.getElementById('file') as HTMLInputElement;
   document.getElementById('load')?.addEventListener('click', () => file.click());
   file.addEventListener('change', async () => {
@@ -245,14 +240,15 @@ function beginWeek() {
 /** Optional background and example, outside the simulation and input log. */
 function showAbout() {
   document.getElementById('about')?.remove();
-  const dialog = document.createElement('dialog');
+  const dialog = document.createElement('div');
+  dialog.setAttribute('popover', 'auto');
   dialog.id = 'about';
   dialog.setAttribute('aria-labelledby', 'about-title');
   dialog.innerHTML = `<div class="page dawn">
-    <button id="close-about">Back to the desk</button>
+    <button id="close-about" popovertarget="about" popovertargetaction="hide">Back to the desk</button>
     <h2 id="about-title">About the desk</h2>
     <p>The river authority, the night desk. Up the valley, one old dam above a town, and on it a keeper with a torch and a radio. Every figure on your board is what he saw.</p>
-    <p>The night runs on its own while the desk is open; the arrows at the top set its pace. Shut the page and it waits for you.</p>
+    <p>The night moves briskly between radio reports and slows for new words. Opening an inspection or this information holds time. Shut the page and it waits for you.</p>
     <p>Your watch ends at dawn after Friday night, or sooner if water comes over the crest.</p>
     <p>The level is water held behind the dam. The weir upstream shows water coming in. More gate turns open it wider: the dam level falls, but the river through town rises later.</p>
     <p>On the live board, “read” is the reading time as written by the keeper. “Reported” is when the radio report reached your desk. Dawn reconstructs the actual reading times.</p>
@@ -261,10 +257,15 @@ function showAbout() {
     ${reportBody(SAMPLE_DAWN, false, true)}
   </div>`;
   app.append(dialog);
-  drawDawn(dialog.querySelector('#chart') as HTMLCanvasElement, SAMPLE_DAWN);
-  dialog.querySelector('#close-about')?.addEventListener('click', () => dialog.close());
-  dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  dialog.showModal();
+  dialog.addEventListener('toggle', (event) => {
+    if ((event as ToggleEvent).newState === 'open')
+      drawDawn(dialog.querySelector('#chart') as HTMLCanvasElement, SAMPLE_DAWN);
+    carry = 0;
+    last = performance.now();
+  });
+  dialog.querySelector('#close-about')?.addEventListener('click', () => {
+    if (typeof dialog.hidePopover === 'function') dialog.hidePopover();
+  });
 }
 
 function enter() {
@@ -275,35 +276,29 @@ function enter() {
   else ending();
 }
 
-/** Add the game's optional reckoning without changing the shared notebook kit. */
+/** The shared notebook menu contains run controls only. */
 function gameMenu(): HTMLButtonElement {
-  const button = notebookMenu({
+  return notebookMenu({
     lab,
     getRun: () => (s ? exportRun(s, FRAMEWORK_VERSION) : {}),
     filename: 'glance-playtest.json',
     onSave: saveNow,
   });
-  button.addEventListener('click', () => {
-    const dialog = document.querySelector('dialog.lk-notebook');
-    if (!dialog) return;
-    const label = document.createElement('label');
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.id = 'keep-tally';
-    checkbox.checked = keepTally;
-    label.append(checkbox, ' Keep a tally in the week’s closing log');
-    dialog.append(label);
-    checkbox.addEventListener('change', () => {
-      keepTally = checkbox.checked;
-      updateTally();
-    });
-  });
-  return button;
 }
 
 function updateTally() {
   const slot = document.getElementById('closing-tally');
-  if (slot) slot.innerHTML = s && keepTally ? tallyBody(s) : '';
+  if (!slot || !s || s.phase !== 'end') return;
+  const body = tallyBody(s);
+  slot.innerHTML = body
+    ? `<button id="see-tally" aria-expanded="false" aria-controls="tally-result">See tally</button><div id="tally-result" hidden>${body}</div>`
+    : '';
+  document.getElementById('see-tally')?.addEventListener('click', (event) => {
+    const result = document.getElementById('tally-result');
+    if (!result) return;
+    result.hidden = !result.hidden;
+    (event.currentTarget as HTMLElement).setAttribute('aria-expanded', String(!result.hidden));
+  });
 }
 
 // ---------- the watch ----------
@@ -315,28 +310,18 @@ function watch() {
   sheetKey = '';
   requestWake();
   writeSave();
+  readUntil = performance.now() + 6000;
   app.innerHTML = `<div class="watch">
-    <div class="top"><span class="grow"></span><span id="night"></span><span class="clock" id="clock"></span><span class="speed" id="speed"></span></div>
+    <div class="top"><span class="grow"></span><span id="night"></span><span class="clock" id="clock"></span><span id="clock-rate" role="status"></span></div>
     <canvas id="scene" class="scene" aria-label="The dam, as reported"></canvas>
     <div class="board" id="board"></div>
     <div id="concern" class="attention" aria-live="polite"></div>
     <div class="log" id="log" aria-live="polite"></div>
     <div class="sheet" id="sheet"></div>
-    <div class="desk-tools" id="tools"><button id="help">About the desk</button></div>
+    <div class="desk-tools" id="tools"><button id="help" class="info" aria-label="About the desk" popovertarget="about">i</button></div>
   </div>`;
-  document.getElementById('help')?.addEventListener('click', showAbout);
+  showAbout();
   document.getElementById('tools')?.prepend(gameMenu());
-  const sp = document.getElementById('speed') as HTMLElement;
-  sp.innerHTML = SPEED_NAMES.map(
-    (n, i) => `<button data-i="${i}" aria-label="${n}">${['▸', '▸▸', '▸▸▸'][i]}</button>`,
-  ).join('');
-  sp.addEventListener('click', (e) => {
-    const b = (e.target as HTMLElement).closest('button');
-    if (!b) return;
-    speed = Number(b.dataset.i);
-    drawTop();
-    drawSheet();
-  });
   document.getElementById('board')?.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('[data-g]') as HTMLElement | null;
     if (!b || !s) return;
@@ -372,17 +357,26 @@ function freeKeeper(st: GameState): KeeperId {
 
 function frame(t: number) {
   if (!s) return;
-  const dt = Math.min(0.25, (t - last) / 1000);
+  const elapsed = Math.max(0, t - last);
+  const dt = Math.min(0.25, elapsed / 1000);
+  const paused = !!document.querySelector('dialog[open], .hflab-veil, #about:popover-open');
+  if (paused && readUntil > last) readUntil += elapsed;
   last = t;
-  if (s.phase === 'watch' && !document.querySelector('dialog[open], .hflab-veil')) {
-    const base = SPEEDS[speed] ?? 1.4;
-    const rate = sheet ? Math.min(base, SLOWDOWN) : base;
+  if (s.phase === 'watch' && !paused) {
+    const { rate } = playback(sheet !== null, t < readUntil);
+    if (rate === 0) carry = 0;
     carry += dt * rate;
     let stepped = false;
     while (carry >= 1 && s.phase === 'watch') {
       carry -= 1;
+      const before = eventStamp(s);
       step(s);
       stepped = true;
+      if (eventStamp(s) !== before) {
+        readUntil = t + 6000;
+        carry = 0;
+        break;
+      }
     }
     if (s.flashes.length > seenFlashes) {
       seenFlashes = s.flashes.length;
@@ -422,10 +416,8 @@ function drawTop() {
   const c = document.getElementById('clock');
   if (n) n.textContent = `${planOf(s).title} night`;
   if (c) c.textContent = clock(s.minute);
-  document.querySelectorAll('#speed button').forEach((b, i) => {
-    b.classList.toggle('on', i === speed);
-    b.setAttribute('aria-pressed', String(i === speed));
-  });
+  const rate = document.getElementById('clock-rate');
+  if (rate) rate.textContent = playback(sheet !== null, performance.now() < readUntil).reason;
 }
 
 function drawBoard() {
@@ -512,7 +504,9 @@ function openSheet(sh: Sheet) {
     ?.classList.toggle('gate-open', sheet?.kind === 'gauge' && sheet.gauge === 'gate');
   drawConcern();
   sheetKey = '';
+  carry = 0;
   drawSheet();
+  drawTop();
 }
 
 function drawConcern() {
@@ -567,7 +561,7 @@ function drawSheet() {
     return;
   }
   // Rebuild only when what it shows can change (each sim minute is enough).
-  const k = `${JSON.stringify(sheet)}|${s.minute}|${speed}`;
+  const k = `${JSON.stringify(sheet)}|${s.minute}`;
   if (sheetKey === k) return;
   sheetKey = k;
   if (sheet.kind === 'inn') {
@@ -622,7 +616,7 @@ function drawSheet() {
     const hs = opts.map((t) => hint(s as GameState, who, 'gate', t));
     const next = hint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
     head = `<b>Gate</b><span class="soft">Now ${clock(s.minute)} · ${report ? `last gate ${reported}/${TURNS}, ${readingTime(report)}` : 'gate not read'}</span>`;
-    body = `<div class="inspection-speed soft">Inspection slowdown · ${SPEED_NAMES[speed]} selected</div>${next.forecast ? `<details class="fore"><summary>${NAMES[who]}, on the round after</summary><span class="hand">“${esc(next.forecast)}”</span></details>` : ''}
+    body = `<div class="inspection-speed soft">Reading the desk · time waits</div>${next.forecast ? `<details class="fore"><summary>${NAMES[who]}, on the round after</summary><span class="hand">“${esc(next.forecast)}”</span></details>` : ''}
       <div class="verbs turns">${hs
         .map(
           (h) =>

@@ -34,7 +34,7 @@ Between crises the player plans his next walk ahead of the rain, trades his rest
 The dam overtopping ends the week (the dawn page still comes). Achievement is the dawn overlay: your gate marks bracketing the true curve though his dots were off. "You read the man, not the gauge."
 
 ## Rules taken from the consults
-1. A night is 22:00 to 06:00, about six real minutes at steady speed; the clock slows while a radio card is open (tactical slowdown, no pause).
+1. A night is 22:00 to 06:00. Playback runs automatically: brisk quiet work, reading time for new radio words, and time held during an inspection or information popover. Each simulation minute still runs; the first new event ends a fast batch. There is no speed chooser.
 2. No meter for a person. State shows in words, handwriting, gait on the map and the dawn notes.
 3. Every error has a cause in the keeper's true state and a tell the player could have read; the dawn page names the cause.
 4. World randomness is keyed by seed, night and minute (pattern from The Pass), so one input never moves the storm.
@@ -57,3 +57,6 @@ The dam overtopping ends the week (the dawn page still comes). Achievement is th
 - Doze hazard and quantity estimates from HF (docs/hf-requests.md items 2 and 3). Target: HF engine 2.10.
 - Dai's low bias is uniform before three as well as after (Gwen: "half a metre low every time is not tiredness"). Decide with the owner whether it should grow only in the trough. Target: owner's first playtest.
 - Resolved 2026-10-20 (F-228): written reading times retain the keeper's slips, labeled “read HH:MM (as written)” across the live board, drawing and sheets. Reading ages use that same written time. Radio arrivals say “reported HH:MM”; dawn explicitly reconstructs actual reading times. Simulation and export replay are unchanged. Owner accepts feel separately.
+
+## Owner pacing update (2026-10-21)
+The desk uses automatic playback. New words, reports and flashes interrupt brisk time; an inspection waits for the player to close it or make a request. The information button opens native dismissible help with the existing sample report. The closing arithmetic is always computed and offered through “See tally” only at the end, without a start/menu preference. Simulation inputs, saves and replay rules are unchanged. Adam accepts feel.

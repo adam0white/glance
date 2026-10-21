@@ -563,3 +563,23 @@ dialog::backdrop {
     display: none;
   }
 }
+
+.info {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  font-style: italic;
+}
+#about {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  padding: 0;
+  border: 1px solid var(--ink-soft);
+  background: var(--paper);
+  color: var(--ink);
+}
+#clock-rate {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
