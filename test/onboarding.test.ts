@@ -323,3 +323,37 @@ it('holds menu time without adding inputs, then resumes the selected Fast pace',
   expect(state(debug).minute).toBe(held);
   veil.remove();
 });
+
+it('keeps the tally off and outside run state; toggles immediately at a failed end', async () => {
+  const debug = await boot();
+  click('new');
+  const run = state(debug);
+  const before = fingerprint(run);
+  const menu = () => {
+    (
+      Array.from(document.querySelectorAll('button')).find(
+        (b) => b.textContent === 'Game menu',
+      ) as HTMLElement
+    ).click();
+    return document.querySelector<HTMLInputElement>('#keep-tally') as HTMLInputElement;
+  };
+  let checkbox = menu();
+  expect(checkbox.checked).toBe(false);
+  expect(checkbox.parentElement?.textContent).toContain('Keep a tally');
+  checkbox.click();
+  expect(document.querySelector('[aria-label="Closing tally"]')).toBeNull();
+  expect(fingerprint(run)).toBe(before);
+  document.querySelector<HTMLDialogElement>('.lk-notebook')?.close();
+  run.phase = 'end';
+  run.dawns = [{ ...structuredClone(SAMPLE_DAWN), overtopped: true }];
+  debug.step(0);
+  expect(document.querySelector('[aria-label="Closing tally"]')?.textContent).toContain('Closing tally:');
+  const ended = fingerprint(run);
+  checkbox = menu();
+  expect(checkbox.checked).toBe(true);
+  checkbox.click();
+  expect(document.querySelector('[aria-label="Closing tally"]')).toBeNull();
+  checkbox.click();
+  expect(document.querySelector('[aria-label="Closing tally"]')).not.toBeNull();
+  expect(fingerprint(run)).toBe(ended);
+});

@@ -40,6 +40,7 @@ import { lab } from './lab.ts';
 import { SAMPLE_DAWN } from './opener.ts';
 import { reportBody } from './report.ts';
 import { drawScene, type SceneFx, sceneHit } from './scene.ts';
+import { tallyBody } from './tally.ts';
 import { readingTime } from './time.ts';
 
 const SAVE = 'glance-save-v1';
@@ -63,6 +64,8 @@ type Sheet =
 const app = document.getElementById('app') as HTMLElement;
 let s: GameState | null = null;
 let speed = 1;
+// Session-only preference: never enters saves, exports or the simulation.
+let keepTally = false;
 let sheet: Sheet = null;
 let sheetKey = '';
 let raf = 0;
@@ -272,6 +275,37 @@ function enter() {
   else ending();
 }
 
+/** Add the game's optional reckoning without changing the shared notebook kit. */
+function gameMenu(): HTMLButtonElement {
+  const button = notebookMenu({
+    lab,
+    getRun: () => (s ? exportRun(s, FRAMEWORK_VERSION) : {}),
+    filename: 'glance-playtest.json',
+    onSave: saveNow,
+  });
+  button.addEventListener('click', () => {
+    const dialog = document.querySelector('dialog.lk-notebook');
+    if (!dialog) return;
+    const label = document.createElement('label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = 'keep-tally';
+    checkbox.checked = keepTally;
+    label.append(checkbox, ' Keep a tally in the week’s closing log');
+    dialog.append(label);
+    checkbox.addEventListener('change', () => {
+      keepTally = checkbox.checked;
+      updateTally();
+    });
+  });
+  return button;
+}
+
+function updateTally() {
+  const slot = document.getElementById('closing-tally');
+  if (slot) slot.innerHTML = s && keepTally ? tallyBody(s) : '';
+}
+
 // ---------- the watch ----------
 
 function watch() {
@@ -291,14 +325,7 @@ function watch() {
     <div class="desk-tools" id="tools"><button id="help">About the desk</button></div>
   </div>`;
   document.getElementById('help')?.addEventListener('click', showAbout);
-  document.getElementById('tools')?.prepend(
-    notebookMenu({
-      lab,
-      getRun: () => (s ? exportRun(s, FRAMEWORK_VERSION) : {}),
-      filename: 'glance-playtest.json',
-      onSave: saveNow,
-    }),
-  );
+  document.getElementById('tools')?.prepend(gameMenu());
   const sp = document.getElementById('speed') as HTMLElement;
   sp.innerHTML = SPEED_NAMES.map(
     (n, i) => `<button data-i="${i}" aria-label="${n}">${['▸', '▸▸', '▸▸▸'][i]}</button>`,
@@ -739,6 +766,7 @@ function dawn() {
     ${markLink}
     ${s.phase === 'end' ? `<p class="week-end" role="status">${d.overtopped ? 'The week ends here. Water came over the crest.' : 'First light after Friday night. The week is over; your watch is done.'}</p>` : ''}
     ${reportBody(d, planOf(s).keepers.length > 1)}
+    <div id="closing-tally"></div>
     <div class="actions">
       ${s.phase === 'dawn' && next ? `<button class="primary" id="next">${esc(next.title)} night</button>` : ''}
       ${s.phase === 'end' ? '<button class="primary" id="end">Read the week’s outcome</button>' : ''}
@@ -748,6 +776,8 @@ function dawn() {
     </div>
     ${footer()}
   </div>`;
+  app.querySelector('.actions')?.append(gameMenu());
+  updateTally();
   const chart = document.getElementById('chart') as HTMLCanvasElement;
   drawDawn(chart, d);
   document.getElementById('next')?.addEventListener('click', () => {
@@ -783,6 +813,7 @@ function ending() {
   app.innerHTML = `<div class="page dawn">
     ${markLink}
     <h2>The week is over</h2>
+    <div id="closing-tally"></div>
     <p>${esc(verdict)}</p>
     <ul class="week">${ds
       .map(
@@ -800,6 +831,8 @@ function ending() {
     </div>
     ${footer()}
   </div>`;
+  app.querySelector('.actions')?.append(gameMenu());
+  updateTally();
   document.getElementById('again')?.addEventListener('click', () => {
     beginWeek();
   });
