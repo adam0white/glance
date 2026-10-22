@@ -5,7 +5,7 @@
  */
 
 import { FRAMEWORK_VERSION } from '@adam0white/human-framework';
-import { notebookMenu } from '@adam0white/lab-kit';
+import { notebookMenu, telemetryNotice } from '@adam0white/lab-kit';
 import {
   clock,
   type Export,
@@ -61,6 +61,9 @@ type Sheet =
   | { kind: 'inn' }
   | null;
 
+const notice = telemetryNotice();
+if (notice) document.body.append(notice);
+
 const app = document.getElementById('app') as HTMLElement;
 let s: GameState | null = null;
 let readUntil = 0;
@@ -74,6 +77,11 @@ const fx: SceneFx = { flashAt: -1e9 };
 let wake: { release(): Promise<void> } | null = null;
 const seen = { hold: false };
 
+lab.trackRun(() => (s ? exportRun(s, FRAMEWORK_VERSION) : null), {
+  runKey: () => s?.seed ?? 'title',
+  getLogs: () => s?.said.slice(-40).map((line) => line.text) ?? [],
+});
+
 // ---------- save ----------
 
 function readSave(): Save | null {
@@ -86,7 +94,9 @@ function readSave(): Save | null {
 }
 function saveNow() {
   if (!s) throw new Error('No run to save');
-  localStorage.setItem(SAVE, JSON.stringify({ seed: s.seed, inputs: s.inputs, minute: s.minute }));
+  const text = JSON.stringify({ seed: s.seed, inputs: s.inputs, minute: s.minute });
+  localStorage.setItem(SAVE, text);
+  lab.captureSave(JSON.parse(text));
 }
 function writeSave() {
   try {

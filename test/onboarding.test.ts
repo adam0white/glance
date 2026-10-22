@@ -6,7 +6,7 @@ import { reportBody } from '../src/ui/report.ts';
 
 // Notebook telemetry is external; keep the game and its DOM real.
 vi.mock('../src/ui/lab.ts', () => ({
-  lab: { screen() {}, milestone() {}, openSendDialog() {} },
+  lab: { screen() {}, milestone() {}, openSendDialog() {}, trackRun() {}, captureSave: vi.fn() },
 }));
 
 function click(id: string) {
@@ -37,6 +37,7 @@ async function importRun(run: ReturnType<typeof exportRun>) {
 
 beforeEach(() => {
   vi.resetModules();
+  vi.clearAllMocks();
   vi.useFakeTimers();
   localStorage.clear();
   document.body.innerHTML = '<div id="app"></div>';
@@ -236,6 +237,8 @@ describe('clarity follow-up', () => {
         (b) => b.textContent === 'Game menu',
       ) as HTMLElement
     ).click();
+    const { lab } = await import('../src/ui/lab.ts');
+    vi.mocked(lab.captureSave).mockClear();
     const set = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
       throw new DOMException('Full', 'QuotaExceededError');
     });
@@ -249,6 +252,7 @@ describe('clarity follow-up', () => {
       ),
     );
     expect(document.querySelector('.watch')).not.toBeNull();
+    expect(lab.captureSave).not.toHaveBeenCalled();
     set.mockRestore();
     save.click();
     await vi.waitFor(() =>
