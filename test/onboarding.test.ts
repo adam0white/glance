@@ -97,7 +97,7 @@ describe('the first page of a new week', () => {
     expect(document.querySelectorAll('.turns [data-job="gate"]')).toHaveLength(6);
     expect(document.querySelector('.sheet .hint')?.textContent).toContain('Hold a button');
     expect(document.querySelector('#concern.attention')).not.toBeNull();
-    expect(document.querySelector('#speed')).toBeNull();
+    expect(document.querySelectorAll('#speed button')).toHaveLength(3);
     expect(document.querySelector('#clock-rate')?.textContent).toContain('time waits');
   });
 
@@ -315,7 +315,7 @@ it('holds menu time without adding inputs, then resumes automatic pacing', async
   expect(state(debug).minute).toBe(before);
   for (let i = 0; i < 24; i++) pulse();
   expect(state(debug).minute).toBeGreaterThan(before);
-  expect(document.querySelector('#speed')).toBeNull();
+  expect(document.querySelectorAll('#speed button')).toHaveLength(3);
   expect(JSON.stringify(state(debug).inputs)).toBe(inputs);
   const veil = document.createElement('div');
   veil.className = 'hflab-veil';

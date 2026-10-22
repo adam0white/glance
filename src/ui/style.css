@@ -583,3 +583,7 @@ dialog::backdrop {
   font-size: 0.75rem;
   color: var(--ink-soft);
 }
+
+.top {
+  flex-wrap: wrap;
+}

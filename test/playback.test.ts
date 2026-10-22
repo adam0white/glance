@@ -6,7 +6,9 @@ it('waits for inspection, leaves reading time, and moves briskly through quiet w
   expect(playback(true, false).rate).toBe(0);
   expect(playback(true, true).rate).toBe(0);
   expect(playback(false, true).rate).toBeLessThan(1);
-  expect(playback(false, false).rate).toBe(8);
+  expect(playback(false, false).rate).toBe(1.4);
+  expect(playback(false, false, 2.4).rate).toBe(2.4);
+  expect(playback(true, false, 2.4).rate).toBe(0);
 });
 
 it('detects the first delivered event while preserving every simulation minute and replay', () => {

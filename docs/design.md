@@ -60,3 +60,7 @@ The dam overtopping ends the week (the dawn page still comes). Achievement is th
 
 ## Owner pacing update (2026-10-21)
 The desk uses automatic playback. New words, reports and flashes interrupt brisk time; an inspection waits for the player to close it or make a request. The information button opens native dismissible help with the existing sample report. The closing arithmetic is always computed and offered through “See tally” only at the end, without a start/menu preference. Simulation inputs, saves and replay rules are unchanged. Adam accepts feel.
+
+
+## Owner speed restoration (2026-10-22)
+The original speed choices are restored. Inspection, new-event reading time and menu protections remain. Simulation inputs, saves and replay rules are unchanged.
