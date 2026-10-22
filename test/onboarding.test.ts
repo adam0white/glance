@@ -4,9 +4,19 @@ import { exportRun, fingerprint, type GameState, newGame, queueInput, step } fro
 import { SAMPLE_DAWN } from '../src/ui/opener.ts';
 import { reportBody } from '../src/ui/report.ts';
 
-// Notebook telemetry is external; keep the game and its DOM real.
 vi.mock('../src/ui/lab.ts', () => ({
-  lab: { screen() {}, milestone() {}, openSendDialog() {}, trackRun() {}, captureSave: vi.fn() },
+  lab: {
+    screen() {},
+    milestone() {},
+    openSendDialog: vi.fn(),
+    trackRun() {},
+    captureSave: vi.fn(),
+    sendFeedback: vi.fn(async () => 'queued'),
+    sendRun: vi.fn(async () => 'queued'),
+    setEventsOff: vi.fn((off: boolean) => localStorage.setItem('hf-lab-recording-off', off ? '1' : '0')),
+    privacySignalOn: false,
+    privacyOverride: false,
+  },
 }));
 
 function click(id: string) {
@@ -14,25 +24,29 @@ function click(id: string) {
   expect(button, id).not.toBeNull();
   button?.click();
 }
-
 async function boot() {
   const app = await import('../src/ui/app.ts');
   app.start();
   return app._debug;
 }
-
 function state(debug: { state: GameState | null }): GameState {
   if (!debug.state) throw new Error('No game at the desk');
   return debug.state;
 }
-
+function chooseGauge(id: string) {
+  (document.querySelector(`[data-g="${id}"]`) as HTMLElement).click();
+}
+function tap(button: HTMLElement) {
+  button.dispatchEvent(new Event('pointerdown'));
+  button.dispatchEvent(new Event('pointerup'));
+}
 async function importRun(run: ReturnType<typeof exportRun>) {
+  click('other');
   const file = document.getElementById('file') as HTMLInputElement;
-  Object.defineProperty(file, 'files', {
-    value: [{ text: async () => JSON.stringify(run) }],
-  });
+  Object.defineProperty(file, 'files', { value: [{ text: async () => JSON.stringify(run) }] });
   file.dispatchEvent(new Event('change'));
-  await vi.waitFor(() => expect(document.getElementById('file')).toBeNull());
+  await vi.waitFor(() => expect(document.getElementById('load-result')?.textContent).toContain('matches'));
+  click('dialog-back');
 }
 
 beforeEach(() => {
@@ -42,130 +56,118 @@ beforeEach(() => {
   localStorage.clear();
   document.body.innerHTML = '<div id="app"></div>';
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
-  vi.stubGlobal('alert', () => {});
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', () => {});
 });
-
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-describe('the first page of a new week', () => {
-  it('offers the first reading directly after a short goal without advancing the run', async () => {
-    const debug = await boot();
-    const titleWords = document.querySelector('#goal')?.textContent?.trim().split(/\s+/).length;
-    expect(titleWords).toBeLessThanOrEqual(20);
-    click('new');
-    expect(document.querySelector('.opener')).toBeNull();
-    expect(document.querySelector('[data-job="level"]')).not.toBeNull();
-    expect(state(debug).inputs).toHaveLength(0);
-    expect(state(debug).minute).toBe(1320);
-  });
-
-  it('keeps the old rules and sample report reachable on request', async () => {
-    const debug = await boot();
-    click('new');
-    const before = fingerprint(state(debug));
-    click('help');
-    expect(document.querySelector('#about #chart')).not.toBeNull();
-    expect(document.querySelector('#about')?.textContent).toContain('More gate turns');
-    click('close-about');
-    expect(document.querySelector('[data-job="level"]')).not.toBeNull();
-    expect(fingerprint(state(debug))).toBe(before);
-  });
-
-  it('names a pending reading and replaces it with an expected report time', async () => {
-    const debug = await boot();
-    click('new');
-    const request = document.querySelector('[data-job="level"]') as HTMLElement;
-    request.dispatchEvent(new Event('pointerdown'));
-    request.dispatchEvent(new Event('pointerup'));
-    expect(document.querySelector('#concern')?.textContent).toContain('level request');
-    expect(document.querySelector('#concern')?.textContent).toContain('waiting for an answer');
-    debug.step(1);
-    expect(document.querySelector('#concern')?.textContent).toMatch(/Dai.*level.*expected ~22:/);
-    debug.step(20);
-    expect(document.querySelector('#concern')?.textContent).not.toContain('waiting for an answer');
-    expect(document.querySelector('#threshold')?.textContent).toContain('Last level');
-  });
-
-  it('keeps all gate choices and their rule together, with selection separate from attention', async () => {
+describe('title and first call', () => {
+  it('shows the sample and the week end, while keeping import in Other ways in', async () => {
     await boot();
-    click('new');
-    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
-    expect(document.querySelector('.watch.sheet-open')).not.toBeNull();
-    expect(document.querySelectorAll('.turns [data-job="gate"]')).toHaveLength(6);
-    expect(document.querySelector('.sheet .hint')?.textContent).toContain('Hold a button');
-    expect(document.querySelector('#concern.attention')).not.toBeNull();
-    expect(document.querySelectorAll('#speed button')).toHaveLength(3);
-    expect(document.querySelector('#clock-rate')?.textContent).toContain('time waits');
+    expect(document.querySelector('#sample-chart')).not.toBeNull();
+    expect(document.querySelector('#goal')?.textContent).toContain("Friday's first light");
+    expect(document.querySelector('#load')).toBeNull();
+    click('sample');
+    expect(document.querySelector('#sample-page .legend')?.textContent).toContain('actual reading time');
+    click('dialog-back');
+    click('other');
+    expect(document.querySelector('#load')).not.toBeNull();
   });
-
-  it('skips the opener when returning to a saved desk', async () => {
+  it('starts on the whole desk with no inspection or queued input', async () => {
+    const debug = await boot();
+    click('new');
+    expect(document.querySelector('.watch.sheet-open')).toBeNull();
+    expect(document.querySelector('#scene')).not.toBeNull();
+    expect(document.querySelectorAll('.gauge')).toHaveLength(2);
+    expect(document.querySelector('[data-g="level"] .by')?.textContent).toBe('not read');
+    expect(document.querySelector('.first-call')?.textContent).toContain(
+      'Nobody has read the level tonight.',
+    );
+    expect(state(debug).minute).toBe(1320);
+    expect(state(debug).inputs).toHaveLength(0);
+    tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
+    expect(state(debug).inputs.at(-1)).toMatchObject({
+      kind: 'ask',
+      keeper: 'dai',
+      job: 'level',
+      insist: false,
+    });
+    expect(document.querySelector('.first-call')).toBeNull();
+    expect(document.querySelector('#concern')?.textContent).toContain('◷');
+    debug.step(1);
+    expect(document.querySelector('#concern')?.textContent).toMatch(/Dai.*level ~22:/);
+  });
+  it('asks before discarding a saved week and resumes the old fingerprint', async () => {
+    const expected = newGame(7);
+    for (let i = 0; i < 20; i++) step(expected);
     localStorage.setItem('glance-save-v1', JSON.stringify({ seed: 7, inputs: [], minute: 1340 }));
     const debug = await boot();
+    click('new');
+    expect(document.getElementById('restart-confirm')?.hidden).toBe(false);
+    expect(JSON.parse(localStorage.getItem('glance-save-v1')!).minute).toBe(1340);
+    click('cancel-new');
     click('cont');
-    expect(document.querySelector('.watch')).not.toBeNull();
-    expect(document.querySelector('.opener')).toBeNull();
-    expect(debug.state?.minute).toBe(1340);
+    expect(fingerprint(state(debug))).toBe(fingerprint(expected));
   });
-
-  it('imports a replay directly without showing the opener or changing its fingerprint', async () => {
+  it('imports inline and resumes the same replay fingerprint without alert', async () => {
+    const alert = vi.fn();
+    vi.stubGlobal('alert', alert);
     const run = newGame(7);
-    for (let n = 0; n < 20; n++) step(run);
+    for (let i = 0; i < 20; i++) step(run);
     const debug = await boot();
     await importRun(exportRun(run, 'test'));
-    expect(document.querySelector('.watch')).not.toBeNull();
-    expect(document.querySelector('.opener')).toBeNull();
     expect(fingerprint(state(debug))).toBe(fingerprint(run));
-  });
-
-  it('makes an early ending explicit on the last dawn and offers the first reading again for another week', async () => {
-    const debug = await boot();
-    click('new');
-    state(debug).water.overtopped = true;
-    debug.step(1);
-    expect(debug.state?.phase).toBe('end');
-    expect(document.querySelector('[role="status"]')?.textContent).toContain('week ends');
-    click('end');
-    expect(document.querySelector('h2')?.textContent).toBe('The week is over');
-    click('again');
-    expect(document.querySelector('[data-job="level"]')).not.toBeNull();
-  });
-
-  it('marks completion after the last night and offers no further night', async () => {
-    const run = newGame(7);
-    // Keep the outlet open in this fixture so the test reaches the final dawn.
-    while (run.phase !== 'end') {
-      if (run.phase === 'dawn') queueInput(run, { kind: 'next' });
-      else {
-        run.water.gate = 4;
-        step(run);
-      }
-    }
-    expect(run.night).toBe(5);
-    expect(run.dawns.at(-1)?.overtopped).toBe(false);
-    localStorage.setItem('glance-save-v1', JSON.stringify({ seed: 7, inputs: [], minute: 1320 }));
-    const debug = await boot();
-    click('cont');
-    // Display the final dawn through the same path used by an arriving watch.
-    Object.assign(state(debug), run);
-    debug.step(0);
-    expect(document.querySelector('[role="status"]')?.textContent).toContain('after Friday night');
-    expect(document.getElementById('next')).toBeNull();
-    click('end');
-    expect(document.querySelector('h2')?.textContent).toBe('The week is over');
+    expect(alert).not.toHaveBeenCalled();
   });
 });
 
-describe('clarity follow-up', () => {
-  it('distinguishes written reading times from radio arrival times, including old and delayed readings', async () => {
+describe('desk sheets and reading labels', () => {
+  it('keeps the desk nodes when a sheet opens, and close adds no input', async () => {
+    const debug = await boot();
+    click('new');
+    const scene = document.querySelector('#scene');
+    const top = document.querySelector('.topbar');
+    chooseGauge('gate');
+    expect(document.querySelector('#scene')).toBe(scene);
+    expect(document.querySelector('.topbar')).toBe(top);
+    expect(document.querySelector('[data-g="gate"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelectorAll('.turns [data-job="gate"]')).toHaveLength(6);
+    expect(document.querySelector('#clock-rate')?.textContent).toBe('Time waits while you look');
+    expect(document.getElementById('skip-bar')?.hidden).toBe(true);
+    const before = state(debug).inputs.length;
+    click('x');
+    expect(state(debug).inputs).toHaveLength(before);
+    expect(document.getElementById('skip-bar')?.hidden).toBe(false);
+  });
+  it('preserves controls and forecast disclosure across minute and report updates', async () => {
+    const debug = await boot();
+    click('new');
+    chooseGauge('gate');
+    const buttons = [...document.querySelectorAll('.sheet [data-job]')];
+    const details = document.querySelector('.sheet details') as HTMLDetailsElement;
+    expect(details).not.toBeNull();
+    details.open = true;
+    debug.step(3);
+    state(debug).said.push({ at: state(debug).minute, who: 'dai', kind: 'report', text: 'A new report.' });
+    debug.step(0);
+    [...document.querySelectorAll('.sheet [data-job]')].forEach((button, i) => {
+      expect(button).toBe(buttons[i]);
+    });
+    expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(true);
+    expect(document.querySelector('#latest-radio')?.textContent).toContain('A new report.');
+    click('x');
+    chooseGauge('gate');
+    expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(false);
+  });
+  it('distinguishes written readings, previous readings, and radio arrival times', async () => {
     const debug = await boot();
     click('new');
     const run = state(debug);
-    const original = run.board.level;
-    if (!original) throw new Error('Missing opening reading');
+    const original = run.board.level!;
     run.minute = 1410;
     run.inputs.push({ at: 1350, kind: 'ask', keeper: 'dai', job: 'level' });
     const reading = { ...original, at: 1380, wrote: 1350, late: true };
@@ -173,30 +175,12 @@ describe('clarity follow-up', () => {
     run.board.level = reading;
     run.said.push({ at: 1400, who: 'dai', kind: 'report', text: 'Radio’s back. Three-nine.' });
     debug.step(0);
-    const gauge = document.querySelector('[data-g="level"]');
-    expect(gauge?.querySelector('.by')?.textContent).toContain('read 22:30 (as written)');
-    expect(gauge?.querySelector('.was')?.textContent).toContain('read 22:00 (as written)');
+    expect(document.querySelector('[data-g="level"] .by')?.textContent).toContain('read 22:30 (as written)');
+    expect(document.querySelector('[data-g="level"] .same-reader')?.textContent).toContain('read 22:00');
     expect(document.querySelector('#log .line:last-child .t')?.textContent).toBe('reported 23:20');
-    (gauge as HTMLElement).click();
+    chooseGauge('level');
     expect(document.querySelector('.sheet .hint')?.textContent).toContain('read 22:30 (as written)');
     expect(document.querySelector('#threshold')?.textContent).toContain('read 60 min ago (as written)');
-  });
-
-  it('does not label a tree notice as received while the radio is out', async () => {
-    const debug = await boot();
-    click('new');
-    const run = state(debug);
-    run.radioOut = true;
-    run.said.push({ at: run.minute, who: 'dai', kind: 'report', text: 'A tree on the screen.' });
-    debug.step(0);
-    expect(document.querySelector('#log .line:last-child .t')?.textContent).toBe('22:00');
-  });
-
-  it('labels dawn reconstruction with actual reading times', async () => {
-    await boot();
-    click('new');
-    click('help');
-    expect(document.querySelector('#about .legend')?.textContent).toContain('actual reading time');
     expect(
       reportBody(
         {
@@ -209,141 +193,267 @@ describe('clarity follow-up', () => {
       ),
     ).toContain('actual read 23:00');
   });
-
-  it('uses the same written reading label for gate details and every gauge', async () => {
+  it('uses segments for who goes and keeps four gauge reading labels', async () => {
     const debug = await boot();
     click('new');
     const run = state(debug);
     run.night = 3;
-    const opening = run.board.level;
-    if (!opening || !run.board.gate) throw new Error('Missing opening readings');
+    const opening = run.board.level!;
     run.board.weir = { ...opening, gauge: 'weir' };
     run.board.bridge = { ...opening, who: 'nerys', gauge: 'bridge' };
-    run.board.gate.wrote = 1290;
+    run.board.gate!.wrote = 1290;
     debug.step(0);
     expect(document.querySelectorAll('.gauge .by')).toHaveLength(4);
-    for (const by of document.querySelectorAll('.gauge .by'))
-      expect(by.textContent).toMatch(/read \d\d:\d\d \(as written\)/);
-    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
+    chooseGauge('gate');
     expect(document.querySelector('.sheet .who')?.textContent).toContain('read 21:30 (as written)');
-    expect(document.querySelector('.sheet .who')?.textContent).not.toContain('reported 21:30');
+    expect(document.querySelectorAll('.segmented [data-k]')).toHaveLength(2);
+    (document.querySelector('.segmented [data-k="callum"]') as HTMLElement).click();
+    expect(document.querySelector('.segmented [data-k="callum"]')?.getAttribute('aria-pressed')).toBe('true');
   });
-
-  it('reports explicit save failure and lets the player retry', async () => {
-    await boot();
-    click('new');
-    (
-      Array.from(document.querySelectorAll('button')).find(
-        (b) => b.textContent === 'Game menu',
-      ) as HTMLElement
-    ).click();
-    const { lab } = await import('../src/ui/lab.ts');
-    vi.mocked(lab.captureSave).mockClear();
-    const set = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
-      throw new DOMException('Full', 'QuotaExceededError');
-    });
-    const save = Array.from(document.querySelectorAll('dialog button')).find(
-      (b) => b.textContent === 'Save',
-    ) as HTMLElement;
-    save.click();
-    await vi.waitFor(() =>
-      expect(document.querySelector('dialog [role="status"]')?.textContent).toContain(
-        'try Download this run',
-      ),
-    );
-    expect(document.querySelector('.watch')).not.toBeNull();
-    expect(lab.captureSave).not.toHaveBeenCalled();
-    set.mockRestore();
-    save.click();
-    await vi.waitFor(() =>
-      expect(document.querySelector('dialog [role="status"]')?.textContent).toBe('Saved.'),
-    );
-    expect(JSON.parse(localStorage.getItem('glance-save-v1') ?? '{}').minute).toBe(1320);
-  });
-
-  it('separates a stale gate report from the current clock and shows inspection speed', async () => {
+  it('keeps hold to insist and hold-only warnings', async () => {
     const debug = await boot();
     click('new');
-    debug.step(24);
-    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
-    expect(document.querySelector('.sheet .who')?.textContent).toContain('Now 22:24');
-    expect(document.querySelector('.sheet .who')?.textContent).toContain('read 22:00 (as written)');
-    expect(document.querySelector('.sheet')?.textContent).toContain('Reading the desk · time waits');
+    chooseGauge('gate');
+    const button = document.querySelector('.turns [data-job]') as HTMLElement;
+    button.dispatchEvent(new Event('pointerdown'));
+    expect(button.classList.contains('holding')).toBe(true);
+    vi.advanceTimersByTime(501);
+    button.dispatchEvent(new Event('pointerup'));
+    expect(state(debug).inputs.at(-1)).toMatchObject({ kind: 'ask', insist: true });
+    state(debug).night = 2;
+    debug.step(0);
+    chooseGauge('bridge');
+    const warning = document.getElementById('warn')!;
+    const before = state(debug).inputs.length;
+    tap(warning);
+    expect(state(debug).inputs).toHaveLength(before);
+    expect(warning.textContent).toContain('keep your finger');
+    warning.dispatchEvent(new Event('pointerdown'));
+    vi.advanceTimersByTime(501);
+    expect(state(debug).inputs.at(-1)).toMatchObject({ kind: 'warn' });
   });
-
-  it('keeps the forecast expanded while inspection holds the clock, but resets for a new sheet', async () => {
-    let frame: FrameRequestCallback = () => {};
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      frame = callback;
-      return 1;
-    });
+  it('keeps tree notices distinct from received reading reports', async () => {
     const debug = await boot();
     click('new');
-    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
-    (document.querySelector('.sheet details') as HTMLDetailsElement).open = true;
-    const from = performance.now();
-    for (let n = 1; n <= 16; n++) frame(from + n * 250);
-    expect(state(debug).minute).toBe(1320);
-    expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(true);
-    click('x');
-    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
-    expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(false);
+    const run = state(debug);
+    run.radioOut = true;
+    run.said.push({ at: run.minute, who: 'dai', kind: 'report', text: 'A tree on the screen.' });
+    debug.step(0);
+    expect(document.querySelector('#log .line:last-child .t')?.textContent).toBe('22:00');
+    expect(document.querySelector('#skip-caption')?.textContent).toBe('Radio is out');
   });
 });
 
-it('holds menu time without adding inputs, then resumes automatic pacing', async () => {
+it('holds menu time, keeps speeds in the menu, and stops Skip on the first delivered event', async () => {
   let next: FrameRequestCallback = () => {};
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-    next = callback;
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+    next = cb;
     return 1;
   });
-  vi.stubGlobal('cancelAnimationFrame', () => {});
   const debug = await boot();
   click('new');
-  click('x');
+  expect(document.querySelector('#speed')).toBeNull();
+  expect(document.querySelector('#skip')?.textContent).toBe('Skip ⏩');
   let now = performance.now();
   const pulse = () => {
     now += 250;
     next(now);
   };
-  const inputs = JSON.stringify(state(debug).inputs);
   const before = state(debug).minute;
-  document.querySelector<HTMLButtonElement>('#tools [aria-haspopup="dialog"]')?.click();
-  const menu = document.querySelector<HTMLDialogElement>('.lk-notebook');
-  expect(menu?.open).toBe(true);
+  const inputs = JSON.stringify(state(debug).inputs);
+  click('menu');
+  expect(document.querySelector<HTMLDialogElement>('#game-menu')?.open).toBe(true);
+  expect(document.querySelectorAll('[data-pace]')).toHaveLength(4);
+  expect(document.querySelector('#game-menu')?.textContent).not.toMatch(/\bSave\b/);
   for (let i = 0; i < 40; i++) pulse();
   expect(state(debug).minute).toBe(before);
   expect(JSON.stringify(state(debug).inputs)).toBe(inputs);
-  menu?.close();
-  for (let i = 0; i < 4; i++) pulse();
-  expect(state(debug).minute).toBe(before);
-  for (let i = 0; i < 24; i++) pulse();
+  click('dialog-back');
+  tap(document.querySelector('.first-call [data-job]') as HTMLElement);
+  click('skip');
+  expect(document.querySelector('#skip')?.textContent).toBe('Stop');
+  for (let i = 0; i < 12 && document.querySelector('#skip')?.textContent === 'Stop'; i++) pulse();
   expect(state(debug).minute).toBeGreaterThan(before);
-  expect(document.querySelectorAll('#speed button')).toHaveLength(3);
-  expect(JSON.stringify(state(debug).inputs)).toBe(inputs);
-  const veil = document.createElement('div');
-  veil.className = 'hflab-veil';
-  document.body.append(veil);
-  const held = state(debug).minute;
-  for (let i = 0; i < 40; i++) pulse();
-  expect(state(debug).minute).toBe(held);
-  veil.remove();
+  expect(state(debug).minute - before).toBeLessThanOrEqual(60);
+  expect(document.querySelector('#skip')?.textContent).toBe('Skip ⏩');
+  expect(fingerprint(state(debug))).toBe(
+    fingerprint(
+      (await import('../src/sim/dam.ts')).replay(state(debug).seed, state(debug).inputs, state(debug).minute),
+    ),
+  );
 });
 
-it('computes the final tally without a menu setting and reveals it only on request', async () => {
+it('shows save failure without adding a manual Save action', async () => {
   const debug = await boot();
   click('new');
-  expect(document.querySelector('#see-tally')).toBeNull();
+  const set = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+    throw new DOMException('Full', 'QuotaExceededError');
+  });
+  chooseGauge('gate');
+  tap(document.querySelector('.turns [data-job]') as HTMLElement);
+  expect(document.querySelector('#save-warning')?.textContent).toContain('could not save');
+  set.mockRestore();
+  click('menu');
+  expect(document.querySelector('#save-warning')).toBeNull();
+  expect(JSON.parse(localStorage.getItem('glance-save-v1')!).minute).toBe(state(debug).minute);
+});
+
+it('uses phase information and keeps the final tally below people and closed', async () => {
+  const debug = await boot();
+  click('help');
+  expect(document.querySelector('#about')?.textContent).toContain('Five nights');
+  click('new');
+  click('help');
+  expect(document.querySelector('#about')?.textContent).toContain('Let him rest');
   const run = state(debug);
-  run.phase = 'end';
-  run.dawns = [{ ...structuredClone(SAMPLE_DAWN), overtopped: true }];
+  run.night = 4;
   debug.step(0);
-  const ended = JSON.stringify(run);
+  // Re-entering through the save refreshes phase-specific help.
+  click('menu');
+  click('to-title');
+  click('cont');
+  state(debug).water.overtopped = true;
+  debug.step(1);
+  expect(document.querySelector('.week-end')?.textContent).toContain('week ends');
+  expect(document.querySelector('#about')?.textContent).toContain('red line');
+  click('end');
   expect(document.querySelector('#tally-result')?.hasAttribute('hidden')).toBe(true);
-  expect(document.querySelector('[aria-label="Closing tally"]')?.textContent).toContain('Closing tally:');
+  expect(document.querySelector('#about')?.textContent).toContain('own reckoning');
+  const ended = JSON.stringify(state(debug));
   click('see-tally');
   expect(document.querySelector('#tally-result')?.hasAttribute('hidden')).toBe(false);
-  expect(document.querySelector('#see-tally')?.getAttribute('aria-expanded')).toBe('true');
-  expect(document.querySelector('#keep-tally')).toBeNull();
-  expect(JSON.stringify(run)).toBe(ended);
+  expect(JSON.stringify(state(debug))).toBe(ended);
+  click('back');
+  expect(document.querySelector('#chart')).not.toBeNull();
+});
+
+it('marks the final dawn and offers no further night', async () => {
+  const run = newGame(7);
+  while (run.phase !== 'end') {
+    if (run.phase === 'dawn') queueInput(run, { kind: 'next' });
+    else {
+      run.water.gate = 4;
+      step(run);
+    }
+  }
+  const debug = await boot();
+  click('new');
+  Object.assign(state(debug), run);
+  debug.step(0);
+  expect(document.querySelector('.week-end')?.textContent).toContain('after Friday night');
+  expect(document.getElementById('next')).toBeNull();
+  click('end');
+  expect(document.querySelector('h2')?.textContent).toBe('The week is over');
+  click('again');
+  expect(document.querySelector('.first-call')).not.toBeNull();
+});
+
+it('sends linked feedback with verdict and trimmed remembered name', async () => {
+  await boot();
+  click('new');
+  click('menu');
+  click('send-word');
+  (document.querySelector('[data-verdict="keep"]') as HTMLElement).click();
+  (document.getElementById('feedback-note') as HTMLTextAreaElement).value = 'I wanted another reading.';
+  (document.getElementById('feedback-name') as HTMLInputElement).value = '  owner  ';
+  click('feedback-send');
+  await vi.waitFor(() =>
+    expect(document.getElementById('feedback-result')?.textContent).toBe('Sent. Thank you.'),
+  );
+  const { lab } = await import('../src/ui/lab.ts');
+  expect(lab.sendFeedback).toHaveBeenCalledWith('[keep] I wanted another reading.', { name: 'owner' });
+  expect(localStorage.getItem('hf-lab-feedback-name')).toBe('owner');
+});
+
+it('blocks feedback while recording is off, then allows the inline switch', async () => {
+  localStorage.setItem('hf-lab-recording-off', '1');
+  await boot();
+  click('menu');
+  click('send-word');
+  expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(true);
+  expect(document.querySelector('#recording-notice')?.textContent).toContain('nothing is sent');
+  const input = document.getElementById('record-feedback') as HTMLInputElement;
+  input.checked = true;
+  input.dispatchEvent(new Event('change'));
+  expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(false);
+});
+
+it('requires privacy consent and preserves the name and note on fallback', async () => {
+  const { lab } = await import('../src/ui/lab.ts');
+  Object.assign(lab, { privacySignalOn: true });
+  vi.mocked(lab.sendRun).mockRejectedValueOnce(new Error('Offline'));
+  let modalAtFallback = true;
+  vi.mocked(lab.openSendDialog).mockImplementationOnce(() => {
+    modalAtFallback = !!document.querySelector('dialog[open]');
+  });
+  await boot();
+  click('new');
+  click('menu');
+  click('send-word');
+  expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(true);
+  (document.getElementById('feedback-note') as HTMLTextAreaElement).value = 'A note';
+  (document.getElementById('feedback-name') as HTMLInputElement).value = 'owner';
+  const input = document.getElementById('consent-run') as HTMLInputElement;
+  input.checked = true;
+  input.dispatchEvent(new Event('change'));
+  click('feedback-send');
+  await vi.waitFor(() => expect(lab.openSendDialog).toHaveBeenCalled());
+  expect(lab.openSendDialog).toHaveBeenCalledWith(expect.objectContaining({ name: 'owner', note: 'A note' }));
+  expect(modalAtFallback).toBe(false);
+});
+
+it('scrolls the sheet to new radio words while leaving the initial first call visible', async () => {
+  const debug = await boot();
+  click('new');
+  const sheet = document.getElementById('sheet') as HTMLElement;
+  expect(sheet.scrollTop).toBe(0);
+  tap(document.querySelector('.first-call [data-job]') as HTMLElement);
+  Object.defineProperty(sheet, 'scrollHeight', { configurable: true, value: 600 });
+  sheet.scrollTop = 0;
+  state(debug).said.push({ at: state(debug).minute, who: 'dai', kind: 'report', text: 'Four-six.' });
+  debug.step(0);
+  expect(sheet.scrollTop).toBe(600);
+});
+
+it('keeps gate job identity when a forecast appears after a delayed keeper report', async () => {
+  const save = {
+    seed: 12345,
+    inputs: [
+      { kind: 'ask', keeper: 'dai', job: 'gate', target: 6, insist: true, at: 1320 },
+      { kind: 'next', at: 1800 },
+      { kind: 'ask', keeper: 'dai', job: 'gate', target: 6, insist: true, at: 2760 },
+      { kind: 'next', at: 3240 },
+      { kind: 'ask', keeper: 'dai', job: 'gate', target: 6, insist: true, at: 4200 },
+      { kind: 'next', at: 4680 },
+      { kind: 'ask', keeper: 'dai', job: 'gate', target: 6, insist: true, at: 5640 },
+      { kind: 'ask', keeper: 'callum', job: 'clear', insist: true, at: 5810 },
+    ],
+    minute: 5860,
+  };
+  localStorage.setItem('glance-save-v1', JSON.stringify(save));
+  const debug = await boot();
+  click('cont');
+  chooseGauge('gate');
+  const buttons = [...document.querySelectorAll('.sheet [data-job]')];
+  debug.step(3);
+  [...document.querySelectorAll('.sheet [data-job]')].forEach((button, i) => {
+    expect(button).toBe(buttons[i]);
+  });
+});
+
+it('keeps feedback sent when remembering the name fails', async () => {
+  const { lab } = await import('../src/ui/lab.ts');
+  Object.assign(lab, { privacySignalOn: false });
+  await boot();
+  click('new');
+  click('menu');
+  click('send-word');
+  vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+    throw new DOMException('Full', 'QuotaExceededError');
+  });
+  click('feedback-send');
+  await vi.waitFor(() =>
+    expect(document.getElementById('feedback-result')?.textContent).toBe('Sent. Thank you.'),
+  );
+  expect(document.getElementById('feedback-send')?.textContent).toBe('Back to the desk');
 });

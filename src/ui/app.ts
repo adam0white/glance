@@ -5,7 +5,7 @@
  */
 
 import { FRAMEWORK_VERSION } from '@adam0white/human-framework';
-import { notebookMenu, telemetryNotice } from '@adam0white/lab-kit';
+
 import {
   clock,
   type Export,
@@ -45,9 +45,11 @@ import { tallyBody } from './tally.ts';
 import { readingTime } from './time.ts';
 
 const SAVE = 'glance-save-v1';
-const SPEEDS = [0.8, 1.4, 2.4] as const;
-const SPEED_NAMES = ['slow', 'steady', 'fast'];
-let speed = 1;
+let selectedRate = 1.4;
+let paceChoice = 'Automatic';
+let skipUntil = 0;
+let screen = 'title';
+let saveFailed = false;
 
 interface Save {
   seed: number;
@@ -60,9 +62,6 @@ type Sheet =
   | { kind: 'keeper'; who: KeeperId }
   | { kind: 'inn' }
   | null;
-
-const notice = telemetryNotice();
-if (notice) document.body.append(notice);
 
 const app = document.getElementById('app') as HTMLElement;
 let s: GameState | null = null;
@@ -99,9 +98,23 @@ function saveNow() {
   lab.captureSave(JSON.parse(text));
 }
 function writeSave() {
+  if (!s) return;
   try {
     saveNow();
-  } catch {}
+    saveFailed = false;
+  } catch {
+    saveFailed = true;
+  }
+  const host = app.querySelector('.desk-context, .page-body');
+  let warning = document.getElementById('save-warning');
+  if (saveFailed && host && !warning) {
+    warning = document.createElement('p');
+    warning.id = 'save-warning';
+    warning.className = 'save-warning';
+    warning.setAttribute('role', 'status');
+    warning.textContent = 'This browser could not save. Keep a copy of this run before leaving.';
+    host.prepend(warning);
+  } else if (!saveFailed) warning?.remove();
 }
 function clearSave() {
   try {
@@ -113,9 +126,43 @@ function clearSave() {
 
 const esc = (x: string) =>
   x.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
-const footer = () =>
-  `<div class="footer"><a href="https://human.adamwhite.work/games/">◇ all notebooks</a><br/>People by the Human Framework ${FRAMEWORK_VERSION}. What they feel, say and refuse comes from it.</div>`;
-const markLink = '<a class="mark" href="https://human.adamwhite.work">◇ human framework</a>';
+const GAMES = 'https://human.adamwhite.work/games/';
+const PRIVACY = 'https://human.adamwhite.work/lab/privacy/';
+function topbar(label: string, home = false) {
+  return `<header class="topbar"><div class="topbar-label">${home ? `<a href="${GAMES}">All games</a>` : label}</div><div class="topbar-actions"><button id="help" class="info" aria-label="Information" popovertarget="about">i</button><button id="menu" aria-label="Game menu" aria-haspopup="dialog">≡</button></div></header>`;
+}
+function bindTopbar() {
+  showAbout();
+  document.getElementById('menu')?.addEventListener('click', gameMenu);
+}
+function closeDialogs() {
+  app.querySelectorAll('dialog').forEach((d) => {
+    d.remove();
+  });
+  carry = 0;
+  last = performance.now();
+}
+function dialog(
+  id: string,
+  heading: string,
+  body: string,
+  actions = '<button class="primary" id="dialog-back">Back</button>',
+) {
+  skipUntil = 0;
+  closeDialogs();
+  const d = document.createElement('dialog');
+  d.id = id;
+  d.className = 'game-dialog';
+  d.innerHTML = `<div class="dialog-head"><h2>${heading}</h2><button class="x" aria-label="Close">×</button></div><div class="dialog-body">${body}</div><div class="dialog-actions">${actions}</div>`;
+  app.append(d);
+  d.querySelector('.x')?.addEventListener('click', closeDialogs);
+  d.querySelector('#dialog-back')?.addEventListener('click', closeDialogs);
+  d.addEventListener('click', (e) => {
+    if (e.target === d) closeDialogs();
+  });
+  d.showModal();
+  return d;
+}
 
 /** Write markup only when it changed, so a press in progress is not torn out from under the finger. */
 function setHtml(el: HTMLElement, html: string): boolean {
@@ -191,93 +238,120 @@ export function start() {
 
 function title() {
   cancelAnimationFrame(raf);
+  screen = 'title';
+  sheet = null;
+  skipUntil = 0;
   lab.screen('title');
   const save = readSave();
-  app.innerHTML = `<div class="page">
-    ${markLink}
-    <h1>The Glance</h1>
-    <p id="goal">Keep the dam below its crest and the town dry, or warned in time.</p>
-    <div class="actions">
-      ${save ? '<button class="primary" id="cont">Back to the desk</button>' : ''}
-      <button class="${save ? '' : 'primary'}" id="new">${save ? 'Start the week again' : 'Take the night desk'}</button>
-      <button id="help" class="info" aria-label="About the desk" popovertarget="about">i</button>
-      <button id="load">Load a playtest run</button>
-      <input type="file" id="file" accept="application/json" hidden />
-    </div>
-    ${footer()}
-  </div>`;
+  const restored = save ? replay(save.seed, save.inputs, save.minute) : null;
+  app.innerHTML = `<div class="page screen title-screen">${topbar('', true)}
+    <div class="page-body"><h1>The Glance</h1><p class="subtitle">A night desk above a valley town.</p>
+    <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
+    <p id="goal">Keep the dam below its crest and the town dry, or warned in time. Five nights, Monday to Friday. The week ends at Friday's first light, or when water comes over the crest.</p>
+    <button class="reading-row" id="other">Other ways in <span>▸</span></button></div>
+    <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Back to the desk</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">Start the week again</button><div id="restart-confirm" hidden><p>This week's log is torn out.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Take the night desk</button>'}
+    <p class="credit">People by the Human Framework ${FRAMEWORK_VERSION}</p></div></div>`;
+  bindTopbar();
+  drawDawn(document.getElementById('sample-chart') as HTMLCanvasElement, SAMPLE_DAWN);
+  document.getElementById('sample')?.addEventListener('click', () => {
+    const d = dialog('sample-page', 'A sample morning', reportBody(SAMPLE_DAWN, false, true));
+    drawDawn(d.querySelector('#chart') as HTMLCanvasElement, SAMPLE_DAWN);
+  });
   document.getElementById('cont')?.addEventListener('click', () => {
-    if (!save) return;
-    s = replay(save.seed, save.inputs, save.minute);
-    // Give a returning player time to read the desk.
+    if (!restored) return;
+    s = restored;
     readUntil = performance.now() + 6000;
     enter();
   });
   document.getElementById('new')?.addEventListener('click', () => {
-    beginWeek();
+    if (!save) beginWeek();
+    else {
+      document.getElementById('restart-confirm')!.hidden = false;
+      document.getElementById('new')!.hidden = true;
+    }
   });
-  showAbout();
-  const file = document.getElementById('file') as HTMLInputElement;
-  document.getElementById('load')?.addEventListener('click', () => file.click());
+  document.getElementById('confirm-new')?.addEventListener('click', beginWeek);
+  document.getElementById('cancel-new')?.addEventListener('click', () => {
+    document.getElementById('restart-confirm')!.hidden = true;
+    document.getElementById('new')!.hidden = false;
+  });
+  document.getElementById('other')?.addEventListener('click', otherWays);
+}
+
+function otherWays() {
+  const d = dialog(
+    'other-ways',
+    'Other ways in',
+    '<button id="load">Load a playtest run</button><input type="file" id="file" accept="application/json" hidden><p id="load-result" role="status"></p>',
+  );
+  const file = d.querySelector('#file') as HTMLInputElement;
+  d.querySelector('#load')?.addEventListener('click', () => file.click());
   file.addEventListener('change', async () => {
     const f = file.files?.[0];
     if (!f) return;
+    const result = d.querySelector('#load-result') as HTMLElement;
     try {
       const ex = JSON.parse(await f.text()) as Export;
-      const r = replay(ex.seed, ex.inputs, ex.state?.minute);
-      const same = ex.state ? fingerprint(r) === fingerprint(ex.state) : true;
+      if (!Number.isFinite(ex.seed) || !Array.isArray(ex.inputs) || !ex.state) throw new Error('Invalid run');
+      const r = replay(ex.seed, ex.inputs, ex.state.minute);
+      const same = fingerprint(r) === fingerprint(ex.state);
       s = r;
       writeSave();
-      alert(
-        same
-          ? 'Replayed the run: it matches the exported state.'
-          : 'Replayed the run, but it differs from the export.',
-      );
-      enter();
+      result.textContent = same
+        ? 'Replayed. It matches the exported run.'
+        : 'Replayed. It differs from the export.';
+      const resume = d.querySelector('#dialog-back') as HTMLButtonElement;
+      resume.textContent = 'Back to the desk';
+      resume.addEventListener('click', enter);
     } catch {
-      alert('That file is not a run from The Glance.');
+      result.textContent = 'That file is not a run from The Glance.';
     }
   });
 }
 
-/** The first request is available immediately; no input is queued until the player asks. */
 function beginWeek() {
   cancelAnimationFrame(raf);
   clearSave();
   s = newGame(Date.now() >>> 0);
   enter();
-  openSheet({ kind: 'gauge', gauge: 'level', who: 'dai' });
   window.scrollTo(0, 0);
 }
 
-/** Optional background and example, outside the simulation and input log. */
 function showAbout() {
   document.getElementById('about')?.remove();
-  const dialog = document.createElement('div');
-  dialog.setAttribute('popover', 'auto');
-  dialog.id = 'about';
-  dialog.setAttribute('aria-labelledby', 'about-title');
-  dialog.innerHTML = `<div class="page dawn">
-    <button id="close-about" popovertarget="about" popovertargetaction="hide">Back to the desk</button>
-    <h2 id="about-title">About the desk</h2>
-    <p>The river authority, the night desk. Up the valley, one old dam above a town, and on it a keeper with a torch and a radio. Every figure on your board is what he saw.</p>
-    <p>Slow, steady and fast set the night’s pace. New words slow the clock. Opening an inspection or this information holds time. Shut the page and it waits for you.</p>
-    <p>Your watch ends at dawn after Friday night, or sooner if water comes over the crest.</p>
-    <p>The level is water held behind the dam. The weir upstream shows water coming in. More gate turns open it wider: the dam level falls, but the river through town rises later.</p>
-    <p>On the live board, “read” is the reading time as written by the keeper. “Reported” is when the radio report reached your desk. Dawn reconstructs the actual reading times.</p>
-    <p>Tap a gauge to send a keeper. Let him rest between jobs. From Tuesday, ring the Bridge Inn to check the river and warn the lane if needed.</p>
-    <p class="soft">A sample report, not your night. This is a good morning:</p>
-    ${reportBody(SAMPLE_DAWN, false, true)}
-  </div>`;
-  app.append(dialog);
-  dialog.addEventListener('toggle', (event) => {
-    if ((event as ToggleEvent).newState === 'open')
-      drawDawn(dialog.querySelector('#chart') as HTMLCanvasElement, SAMPLE_DAWN);
+  const about = document.createElement('div');
+  about.setAttribute('popover', 'auto');
+  about.id = 'about';
+  let heading = 'The night desk';
+  let words =
+    "The river authority's night desk, one old dam above a town. A keeper reads the gauges by torch and radios the figures in. Every figure on your board is what he saw. Tap a gauge to send him; hold to insist. Five nights; the week ends at Friday's first light, or when water comes over the crest.";
+  if (screen === 'watch') {
+    heading = 'Reading the desk';
+    words =
+      'The level is water held behind the dam; the dial marks the spillway lip and the crest. More gate turns lower the dam, but the river through town rises about forty minutes later. “read” is the time he wrote down; “reported” is when it reached you. Each job shows his answer and roughly how long it takes. Time waits while a sheet is open. Let him rest between jobs.';
+    if (s && s.night >= 2)
+      words +=
+        ' The weir upstream shows water coming in, a long walk away. Ring Nerys at the Bridge Inn for the river. Hold Warn Mill Lane and the warden knocks doors; a warning for nothing costs her goodwill.';
+    if (s && s.night >= 3)
+      words +=
+        ' Choose who goes in each sheet. The other can rest. Two men can read the same gauge differently.';
+    if (s && s.night >= 4)
+      words += ' When the radio is out, no request or report gets through. Silence is the warning.';
+  } else if (screen === 'dawn') {
+    heading = 'The morning page';
+    words =
+      'The red line is what the water did. The dots are what you were told, at the time they were really read. A wrong figure counts as caught if you had it read again within twenty minutes, or lightning showed the wall.';
+  } else if (screen === 'end') {
+    heading = 'The tally';
+    words =
+      "It counts nights the dam held, nights Mill Lane stayed dry or was warned in time, and wrong figures caught. It is the game's own reckoning of the desk's record, not a measure of people.";
+  }
+  about.innerHTML = `<div class="dialog-head"><h2>${heading}</h2><button id="close-about" class="x" aria-label="Close information" popovertarget="about" popovertargetaction="hide">×</button></div><p>${esc(words)}</p>`;
+  app.append(about);
+  about.addEventListener('toggle', () => {
+    skipUntil = 0;
     carry = 0;
     last = performance.now();
-  });
-  dialog.querySelector('#close-about')?.addEventListener('click', () => {
-    if (typeof dialog.hidePopover === 'function') dialog.hidePopover();
   });
 }
 
@@ -289,13 +363,154 @@ function enter() {
   else ending();
 }
 
-/** The shared notebook menu contains run controls only. */
-function gameMenu(): HTMLButtonElement {
-  return notebookMenu({
-    lab,
-    getRun: () => (s ? exportRun(s, FRAMEWORK_VERSION) : {}),
-    filename: 'glance-playtest.json',
-    onSave: saveNow,
+function recordingOff() {
+  return localStorage.getItem('hf-lab-recording-off') === '1';
+}
+function recordSwitch(id: string) {
+  return `<label class="record-switch"><input type="checkbox" id="${id}" ${recordingOff() ? '' : 'checked'}>Record play for the lab</label>`;
+}
+function bindRecord(d: HTMLElement, id: string, changed?: () => void) {
+  d.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('change', (e) => {
+    lab.setEventsOff(!(e.target as HTMLInputElement).checked);
+    changed?.();
+  });
+}
+function gameMenu() {
+  writeSave();
+  const d = dialog(
+    'game-menu',
+    `Game menu${s ? ` · ${planOf(s).title} ${clock(s.minute)}` : ''}`,
+    `<p>The night waits while this is open.</p>
+    ${s?.dawns.length ? '<button class="reading-row" id="mornings">This week’s mornings ▸</button>' : ''}
+    <fieldset class="pace-setting"><legend>The night’s pace</legend>${['Automatic', 'Slow', 'Steady', 'Fast'].map((name) => `<button data-pace="${name}" aria-pressed="${paceChoice === name}">${name}</button>`).join('')}</fieldset>
+    <button class="reading-row" id="send-word">Send word ▸</button><button class="reading-row phone-only" id="fullscreen">Full screen</button><button class="reading-row" id="to-title">To the title page</button><a class="reading-row" href="${GAMES}">All games</a><div class="menu-footer">${recordSwitch('record-menu')}<a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></div>`,
+    '<button class="primary" id="dialog-back">Back to the desk</button>',
+  );
+  bindRecord(d, 'record-menu');
+  d.querySelectorAll<HTMLButtonElement>('[data-pace]').forEach((b) => {
+    b.addEventListener('click', () => {
+      paceChoice = b.dataset.pace!;
+      selectedRate = ({ Slow: 0.8, Steady: 1.4, Fast: 2.4 } as Record<string, number>)[paceChoice] ?? 1.4;
+      d.querySelectorAll('[data-pace]').forEach((x) => {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+    });
+  });
+  d.querySelector('#to-title')?.addEventListener('click', title);
+  d.querySelector('#send-word')?.addEventListener('click', sendWord);
+  d.querySelector('#fullscreen')?.addEventListener('click', () => {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  });
+  d.querySelector('#mornings')?.addEventListener('click', mornings);
+}
+function mornings() {
+  if (!s) return;
+  const d = dialog(
+    'mornings',
+    'This week’s mornings',
+    [...s.dawns]
+      .reverse()
+      .map(
+        (dawn) =>
+          `<button class="reading-row" data-morning="${dawn.night}">${PLANS[dawn.night - 1]?.title} · first light ▸</button>`,
+      )
+      .join(''),
+  );
+  d.querySelectorAll<HTMLButtonElement>('[data-morning]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const morning = s?.dawns.find((x) => x.night === Number(b.dataset.morning));
+      if (!morning) return;
+      const page = dialog(
+        'past-morning',
+        `${PLANS[morning.night - 1]?.title} · first light`,
+        reportBody(morning, morning.night >= 3),
+      );
+      drawDawn(page.querySelector('#chart') as HTMLCanvasElement, morning);
+      page.querySelector('#dialog-back')?.addEventListener('click', mornings);
+    });
+  });
+  d.querySelector('#dialog-back')?.addEventListener('click', gameMenu);
+}
+function sendWord() {
+  let sent = false;
+  const d = dialog(
+    'feedback',
+    'Send word',
+    `<p>Your run, saves and log reach us on their own. Tell us what they can't show.</p>
+    <div class="verdicts" role="group" aria-label="Your verdict">${[
+      ['keep', "I'd keep playing"],
+      ['mixed', 'Not sure'],
+      ['quit', "I'd stop here"],
+    ]
+      .map(([id, label]) => `<button data-verdict="${id}" aria-pressed="false">${label}</button>`)
+      .join('')}</div>
+    <label class="feedback-note">What happened on the desk, what you wanted, what got in the way.<textarea id="feedback-note" rows="4"></textarea></label>
+    <label>Your name or tester id<input id="feedback-name" type="text" maxlength="60" value="${esc(localStorage.getItem('hf-lab-feedback-name') ?? '')}" autocomplete="name"></label><p class="soft">A name links this device’s past and future play history. Leave it empty to stay pseudonymous.</p>
+    <div id="recording-notice">${recordingOff() ? `<p>Recording is off, so nothing is sent.</p>${recordSwitch('record-feedback')}` : ''}</div>
+    ${lab.privacySignalOn && !lab.privacyOverride ? '<label><input id="consent-run" type="checkbox">Send this run with my note</label>' : ''}
+    <details><summary>What is sent</summary><p>Your note, verdict and optional name, with this run, saves and log.</p><pre>${esc(JSON.stringify(s ? { seed: s.seed, night: s.night, minute: s.minute, inputs: s.inputs.length } : { screen: 'title' }, null, 2))}</pre><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></details>
+    <button id="keep-copy">Keep a copy of this run ⤓</button><p id="feedback-result" role="status"></p>`,
+    '<button id="feedback-back">← Back</button><button class="primary" id="feedback-send">Send</button>',
+  );
+  const back = d.querySelector('#feedback-back');
+  if (back) d.querySelector('.dialog-head')?.prepend(back);
+  let verdict = '';
+  const send = d.querySelector('#feedback-send') as HTMLButtonElement;
+  const consent = d.querySelector('#consent-run') as HTMLInputElement | null;
+  const update = () => {
+    send.disabled = recordingOff() || (!!consent && !consent.checked);
+  };
+  bindRecord(d, 'record-feedback', update);
+  consent?.addEventListener('change', update);
+  update();
+  d.querySelector('#feedback-back')?.addEventListener('click', gameMenu);
+  d.querySelector('#keep-copy')?.addEventListener('click', download);
+  d.querySelectorAll<HTMLButtonElement>('[data-verdict]').forEach((b) => {
+    b.addEventListener('click', () => {
+      verdict = verdict === b.dataset.verdict ? '' : b.dataset.verdict!;
+      d.querySelectorAll<HTMLButtonElement>('[data-verdict]').forEach((x) => {
+        x.setAttribute('aria-pressed', String(x.dataset.verdict === verdict));
+      });
+    });
+  });
+  send.addEventListener('click', async () => {
+    if (sent) {
+      closeDialogs();
+      return;
+    }
+    send.disabled = true;
+    const note = (d.querySelector('#feedback-note') as HTMLTextAreaElement).value;
+    const who = (d.querySelector('#feedback-name') as HTMLInputElement).value.trim().slice(0, 60);
+    try {
+      const message = `${verdict ? `[${verdict}] ` : ''}${note}`;
+      if (consent?.checked) {
+        try {
+          await lab.sendRun(s ? exportRun(s, FRAMEWORK_VERSION) : {}, { note: message, name: who });
+        } catch {
+          closeDialogs();
+          lab.openSendDialog({
+            getRun: () => (s ? exportRun(s, FRAMEWORK_VERSION) : {}),
+            name: who,
+            note: message,
+          });
+          return;
+        }
+      } else {
+        await lab.sendFeedback(message, { name: who });
+      }
+      try {
+        localStorage.setItem('hf-lab-feedback-name', who);
+      } catch {
+        /* The note was queued even when this device cannot remember its name. */
+      }
+      sent = true;
+      d.querySelector('#feedback-result')!.textContent = 'Sent. Thank you.';
+      send.textContent = 'Back to the desk';
+      send.disabled = false;
+    } catch {
+      d.querySelector('#feedback-result')!.textContent = 'Could not send. Please try again.';
+      update();
+    }
   });
 }
 
@@ -324,27 +539,20 @@ function watch() {
   requestWake();
   writeSave();
   readUntil = performance.now() + 6000;
-  app.innerHTML = `<div class="watch">
-    <div class="top"><span class="grow"></span><span id="night"></span><span class="clock" id="clock"></span><span class="speed" id="speed" role="group" aria-label="Speed"></span><span id="clock-rate" role="status"></span></div>
-    <canvas id="scene" class="scene" aria-label="The dam, as reported"></canvas>
-    <div class="board" id="board"></div>
-    <div id="concern" class="attention" aria-live="polite"></div>
-    <div class="log" id="log" aria-live="polite"></div>
-    <div class="sheet" id="sheet"></div>
-    <div class="desk-tools" id="tools"><button id="help" class="info" aria-label="About the desk" popovertarget="about">i</button></div>
-  </div>`;
-  showAbout();
-  const sp = document.getElementById('speed') as HTMLElement;
-  sp.innerHTML = SPEED_NAMES.map(
-    (n, i) => `<button data-i="${i}" aria-label="${n}">${['▸', '▸▸', '▸▸▸'][i]}</button>`,
-  ).join('');
-  sp.addEventListener('click', (e) => {
-    const b = (e.target as HTMLElement).closest('button');
-    if (!b) return;
-    speed = Number(b.dataset.i);
+  screen = 'watch';
+  skipUntil = 0;
+  app.innerHTML = `<div class="watch">${topbar('<span id="night"></span> · <span class="clock" id="clock"></span>')}
+    <div class="state-strip"><div id="concern" class="attention keeper-chips" aria-live="polite"></div><div id="clock-rate" role="status"></div></div>
+    <div class="desk-main"><div class="desk-picture"><div class="scene-zone"><canvas id="scene" class="scene" aria-label="The dam, as reported"></canvas><div id="latest-radio" class="latest-radio hand"></div></div><div class="board" id="board"></div></div>
+    <div class="desk-context"><div class="sheet" id="sheet"></div><div class="actionbar" id="skip-bar"><button id="skip" aria-label="Skip to the next event">Skip ⏩</button><span id="skip-caption" class="soft"></span></div></div></div></div>`;
+  bindTopbar();
+  document.getElementById('skip')?.addEventListener('click', () => {
+    if (!s) return;
+    skipUntil = skipUntil ? 0 : s.minute + 60;
+    if (!skipUntil) readUntil = performance.now() + 6000;
+    carry = 0;
     drawTop();
   });
-  document.getElementById('tools')?.prepend(gameMenu());
   document.getElementById('board')?.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('[data-g]') as HTMLElement | null;
     if (!b || !s) return;
@@ -383,19 +591,25 @@ function frame(t: number) {
   const elapsed = Math.max(0, t - last);
   const dt = Math.min(0.25, elapsed / 1000);
   const paused = !!document.querySelector('dialog[open], .hflab-veil, #about:popover-open');
+  if (paused) skipUntil = 0;
   if (paused && readUntil > last) readUntil += elapsed;
   last = t;
   if (s.phase === 'watch' && !paused) {
-    const { rate } = playback(sheet !== null, t < readUntil, SPEEDS[speed]);
+    const { rate } = playback(sheet !== null, t < readUntil, selectedRate, skipUntil > 0);
     if (rate === 0) carry = 0;
     carry += dt * rate;
     let stepped = false;
     while (carry >= 1 && s.phase === 'watch') {
       carry -= 1;
       const before = eventStamp(s);
+      const concernBefore = concernLines(s).join('|');
       step(s);
       stepped = true;
-      if (eventStamp(s) !== before) {
+      if (
+        eventStamp(s) !== before ||
+        (skipUntil > 0 && (concernLines(s).join('|') !== concernBefore || s.minute >= skipUntil))
+      ) {
+        skipUntil = 0;
         readUntil = t + 6000;
         carry = 0;
         break;
@@ -412,6 +626,7 @@ function frame(t: number) {
       drawSheet();
       writeSave();
     }
+    drawTop();
     const canvas = document.getElementById('scene') as HTMLCanvasElement | null;
     if (canvas) drawScene(canvas, s, fx, t);
   }
@@ -439,12 +654,35 @@ function drawTop() {
   const c = document.getElementById('clock');
   if (n) n.textContent = `${planOf(s).title} night`;
   if (c) c.textContent = clock(s.minute);
-  document.querySelectorAll('#speed button').forEach((b, i) => {
-    b.classList.toggle('on', i === speed);
-    b.setAttribute('aria-pressed', String(i === speed));
-  });
   const rate = document.getElementById('clock-rate');
-  if (rate) rate.textContent = playback(sheet !== null, performance.now() < readUntil, SPEEDS[speed]).reason;
+  if (rate)
+    rate.textContent = playback(
+      sheet !== null,
+      performance.now() < readUntil,
+      selectedRate,
+      skipUntil > 0,
+    ).reason;
+  const skip = document.getElementById('skip') as HTMLButtonElement | null;
+  const caption = document.getElementById('skip-caption');
+  if (skip) {
+    const pending = hasPending(s);
+    skip.disabled = !skipUntil && (!pending || s.radioOut);
+    skip.textContent = skipUntil ? 'Stop' : 'Skip ⏩';
+    if (caption) caption.textContent = s.radioOut ? 'Radio is out' : pending ? '' : 'Nothing on its way';
+  }
+  const bar = document.getElementById('skip-bar');
+  if (bar) bar.hidden = sheet !== null;
+}
+
+function hasPending(st: GameState) {
+  return (
+    st.nerys.ringing !== null ||
+    st.inputs.slice(st.applied).some((i) => i.kind === 'ask' || i.kind === 'ring') ||
+    planOf(st).keepers.some((id) => {
+      const k = keeperOf(st, id);
+      return !!k.job || !!k.pending || !!k.deferred || personOf(st, id).activity?.affordanceId === 'nap';
+    })
+  );
 }
 
 function drawBoard() {
@@ -454,13 +692,14 @@ function drawBoard() {
   const plan = planOf(s);
   const html = GAUGES.filter((g) => (g.id === 'weir' ? plan.weir : g.id === 'bridge' ? plan.inn : true))
     .map((g) => {
-      const r = s?.board[g.id] ?? null;
+      const firstLevel = g.id === 'level' && s?.night === 1 && !s.inputs.some((i) => i.kind === 'ask');
+      const r = firstLevel ? null : (s?.board[g.id] ?? null);
       const age = r && s ? s.minute - r.at : 0;
       const fade = r ? Math.max(0.35, 1 - age / 150) : 0.35;
       const who = r ? (r.who === 'nerys' ? 'Nerys' : NAMES[r.who as KeeperId]) : '';
       const doubt = r ? Math.max(0, 1 - r.conf) : 0;
       const ang = needleAngle(r, g.id);
-      return `<button class="gauge" data-g="${g.id}" style="--fade:${fade.toFixed(2)};--tremble:${(doubt * 5).toFixed(1)}deg">
+      return `<button class="gauge ${!r ? 'unread' : ''}" aria-pressed="${(sheet?.kind === 'gauge' && sheet.gauge === g.id) || (sheet?.kind === 'inn' && g.id === 'bridge')}" data-g="${g.id}" style="--fade:${fade.toFixed(2)};--tremble:${(doubt * 5).toFixed(1)}deg">
         <svg viewBox="0 0 60 34" aria-hidden="true"><path d="M5 31 A25 25 0 0 1 55 31" fill="none" stroke="currentColor" stroke-width="1.5"/>
         <g class="needle" style="transform-origin:30px 31px;transform:rotate(${ang.toFixed(1)}deg)"><line x1="30" y1="31" x2="30" y2="9" stroke="var(--rope)" stroke-width="2" stroke-linecap="round"/></g>
         ${g.id === 'level' ? dialTicks() : ''}<circle cx="30" cy="31" r="2" fill="currentColor"/></svg>
@@ -485,7 +724,7 @@ function wasLine(r: Report | null, g: Gauge): string {
   // Same man: "was". Another man: his name, so a disagreement shows as two names.
   const lead = prev.who === r.who ? 'was' : prev.who === 'nerys' ? 'Nerys' : NAMES[prev.who as KeeperId];
   const fig = g === 'level' ? prev.value.toFixed(1) : printed(prev, g).replace(' m', '');
-  return `<span class="was soft">${lead} ${fig}, ${readingTime(prev)}</span>`;
+  return `<span class="was soft ${prev.who === r.who ? 'same-reader' : 'other-reader'}">${lead} ${fig}, ${readingTime(prev)}</span>`;
 }
 
 function sayClass(x: Said): string {
@@ -496,9 +735,24 @@ function sayClass(x: Said): string {
 
 function drawLog() {
   if (!s) return;
+  const lines = s.said.filter((x) => x.at >= watchFrom(s?.night ?? 1) - 1);
+  const latest = document.getElementById('latest-radio');
+  const newest = lines.at(-1);
+  if (latest && newest) {
+    const who =
+      newest.who === 'nerys'
+        ? 'Nerys'
+        : newest.who === 'dai' || newest.who === 'callum'
+          ? NAMES[newest.who]
+          : '';
+    const report = s.reports.findLast((r) => r.who === newest.who && r.at <= newest.at);
+    setHtml(
+      latest,
+      `${who ? `<b>${who}:</b> ` : ''}${hand(newest.text, report ? 1 - report.clarity : 0, newest.at)}`,
+    );
+  }
   const el = document.getElementById('log');
   if (!el) return;
-  const lines = s.said.filter((x) => x.at >= watchFrom(s?.night ?? 1) - 1).slice(-7);
   const key = lines.map((x) => `${x.at}${x.text}`).join('|');
   if (el.dataset.k === key) return;
   el.dataset.k = key;
@@ -517,6 +771,8 @@ function drawLog() {
       return `<div class="line ${sayClass(x)}"><span class="t">${time}</span>${who ? `<b>${who}</b> ` : ''}<span class="${sayClass(x) === 'p' ? 'hand' : ''}">${body}</span></div>`;
     })
     .join('');
+  const logSheet = el.closest<HTMLElement>('.sheet');
+  if (logSheet && !logSheet.querySelector('.first-call')) logSheet.scrollTop = logSheet.scrollHeight;
 }
 
 // ---------- sheets ----------
@@ -525,6 +781,7 @@ function openSheet(sh: Sheet) {
   const same = JSON.stringify(sheet) === JSON.stringify(sh);
   if (!same) document.querySelector<HTMLDetailsElement>('.sheet details')?.removeAttribute('open');
   sheet = sh;
+  skipUntil = 0;
   document.querySelector('.watch')?.classList.toggle('sheet-open', sheet !== null);
   document
     .querySelector('.watch')
@@ -533,19 +790,39 @@ function openSheet(sh: Sheet) {
   sheetKey = '';
   carry = 0;
   drawSheet();
+  drawBoard();
   drawTop();
 }
 
+function shortConcern(line: string) {
+  let words = line.replace(/^[^:]+: /, '').replace(/\.$/, '');
+  const waiting = /waiting/.test(words);
+  words = words.split(';')[0] ?? words;
+  words = words
+    .replace('available', 'free')
+    .replace('reading the level', 'level')
+    .replace('reading the weir', 'weir')
+    .replace('turning the gate', 'gate')
+    .replace('resting by the stove', 'stove')
+    .replace('asleep, as you said', 'asleep')
+    .replace('sleeping', 'asleep')
+    .replace('river report expected', 'looking')
+    .replace(/ · (?:report|finish) expected /, ' ')
+    .replace('call waiting for an answer', 'call waiting');
+  return words + (waiting ? ' ◷' : '');
+}
 function drawConcern() {
   if (!s) return;
   const el = document.getElementById('concern');
-  if (el)
-    setHtml(
-      el,
-      `${concernLines(s)
-        .map((line) => `<div>${esc(line)}</div>`)
-        .join('')}<div id="threshold" class="soft">${esc(thresholdWords(s))}</div>`,
-    );
+  if (!el) return;
+  const lines = concernLines(s);
+  const ids = planOf(s).keepers;
+  const body = `${s.radioOut ? '<span class="radio-chip">Radio · static</span>' : ''}${ids.map((id) => `<button class="keeper-chip" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: free.'))}</button>` : ''}`;
+  if (!setHtml(el, body)) return;
+  el.querySelectorAll<HTMLElement>('[data-k]').forEach((b) => {
+    b.addEventListener('click', () => openSheet({ kind: 'keeper', who: b.dataset.k as KeeperId }));
+  });
+  el.querySelector('[data-inn]')?.addEventListener('click', () => openSheet({ kind: 'inn' }));
 }
 
 function drawSheet() {
@@ -554,52 +831,31 @@ function drawSheet() {
   const el = document.getElementById('sheet');
   if (!el || el.querySelector('.holding')) return;
   if (!sheet) {
-    // Keep the buttons and change only their words, so a tap is never lost to a rebuild.
-    const crew = el.querySelector('.crew');
-    const ids = planOf(s).keepers;
-    if (
-      crew &&
-      crew.querySelectorAll('[data-k]').length === ids.length &&
-      el.dataset.h?.startsWith('<div class="crew">')
-    ) {
-      for (const id of ids) {
-        const span = crew.querySelector(`[data-k="${id}"] .soft`);
-        const words = whereWords(id);
-        if (span && span.textContent !== words) span.textContent = words;
-      }
-      return;
+    const first = s.night === 1 && !s.inputs.some((i) => i.kind === 'ask');
+    const key = `log|${first}`;
+    if (sheetKey !== key) {
+      sheetKey = key;
+      el.innerHTML = `${first ? `<div class="first-call"><p>Nobody has read the level tonight.</p>${verbButtons([{ h: hint(s, 'dai', 'level'), label: 'Ask Dai to read the level', insist: hint(s, 'dai', 'level', undefined, true) }])}</div>` : ''}<div class="log" id="log" aria-live="polite"></div>`;
+      const firstButton = el.querySelector<HTMLButtonElement>('[data-job]');
+      if (firstButton) bindHold(firstButton, (insist) => ask('dai', 'level', undefined, insist));
     }
-    const html = `<div class="crew">${planOf(s)
-      .keepers.map(
-        (id) =>
-          `<button data-k="${id}"><b>${NAMES[id]}</b><span class="soft">${whereWords(id)}</span></button>`,
-      )
-      .join(
-        '',
-      )}${planOf(s).inn ? '<button data-inn="1"><b>Bridge Inn</b><span class="soft">Nerys</span></button>' : ''}</div>
-      `;
-    if (!setHtml(el, html)) return;
-    el.querySelectorAll('[data-k]').forEach((b) => {
-      b.addEventListener('click', () =>
-        openSheet({ kind: 'keeper', who: (b as HTMLElement).dataset.k as KeeperId }),
-      );
-    });
-    el.querySelector('[data-inn]')?.addEventListener('click', () => openSheet({ kind: 'inn' }));
+    drawLog();
     return;
   }
-  // Rebuild only when what it shows can change (each sim minute is enough).
-  const k = `${JSON.stringify(sheet)}|${s.minute}`;
-  if (sheetKey === k) return;
-  sheetKey = k;
+  const k = JSON.stringify(sheet);
+  // A minute changes reads, not controls. Patch the existing DOM when the structure is unchanged.
+  const structureKey = `${k}|${planOf(s).keepers.join(',')}|${sheet.kind === 'keeper' && s.treeKnown && s.water.blocked}|${sheet.kind === 'gauge' && sheet.gauge === 'gate' ? s.board.gate?.value : ''}`;
+  const previousKey = sheetKey;
+  sheetKey = structureKey;
   if (sheet.kind === 'inn') {
     const ringing = s.nerys.ringing !== null;
     const warned = s.warnedAt !== null;
-    const html = `<div class="who"><b>Bridge Inn</b><span class="soft">Nerys, by the river stairs</span><button class="x" id="x">close</button></div>
+    const html = `<div class="who"><b>Bridge Inn</b><span class="soft">Nerys, by the river stairs</span><button class="x" id="x" aria-label="Close inspection">×</button></div>
       <div class="verbs two">
         <button id="ring" ${ringing ? 'disabled' : ''}><span>Ring Nerys</span><span class="h">${ringing ? 'she’s gone to look' : 'how high is the river?'}</span></button>
         <button id="warn" ${warned ? 'disabled' : ''}><span class="fill"></span><span>Warn Mill Lane</span><span class="h">${warned ? `warned at ${clock(s.warnedAt ?? 0)}` : 'hold: the warden knocks doors'}</span></button>
       </div>`;
-    if (!setHtml(el, html)) return;
+    if (!patchSheet(el, html, previousKey === structureKey)) return;
     document.getElementById('x')?.addEventListener('click', () => openSheet(null));
     document.getElementById('ring')?.addEventListener('click', () => {
       if (!s) return;
@@ -626,10 +882,12 @@ function drawSheet() {
   const who = sheet.who;
   const crew = planOf(s).keepers.length > 1;
   const crewRow = crew
-    ? `<div class="crew small">${planOf(s)
+    ? `<div class="crew small segmented" role="group" aria-label="Who goes"><span class="segment-label">Who goes</span>${planOf(
+        s,
+      )
         .keepers.map(
           (id) =>
-            `<button data-k="${id}" class="${id === who ? 'on' : ''}"><b>${NAMES[id]}</b><span class="soft">${whereWords(id)}</span></button>`,
+            `<button data-k="${id}" aria-pressed="${id === who}" class="${id === who ? 'on' : ''}"><b>${NAMES[id]}</b><span class="soft">${whereWords(id)}</span></button>`,
         )
         .join('')}</div>`
     : '';
@@ -642,8 +900,8 @@ function drawSheet() {
     for (let t = 0; t <= TURNS; t++) if (t !== reported) opts.push(t);
     const hs = opts.map((t) => hint(s as GameState, who, 'gate', t));
     const next = hint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
-    head = `<b>Gate</b><span class="soft">Now ${clock(s.minute)} · ${report ? `last gate ${reported}/${TURNS}, ${readingTime(report)}` : 'gate not read'}</span>`;
-    body = `<div class="inspection-speed soft">Reading the desk · time waits</div>${next.forecast ? `<details class="fore"><summary>${NAMES[who]}, on the round after</summary><span class="hand">“${esc(next.forecast)}”</span></details>` : ''}
+    head = `<b>Gate</b><span class="soft">${report ? `last gate ${reported}/${TURNS}, ${readingTime(report)}` : 'gate not read'}</span>`;
+    body = `<details class="fore"><summary>${NAMES[who]}, on the round after</summary><span class="hand">${next.forecast ? `“${esc(next.forecast)}”` : 'No word yet.'}</span></details>
       <div class="verbs turns">${hs
         .map(
           (h) =>
@@ -659,10 +917,10 @@ function drawSheet() {
     head = `<b>${job === 'level' ? 'Level' : 'Weir'}</b><span class="soft">${job === 'level' ? 'water held behind the dam' : 'the weir board, a long walk upstream'}</span>`;
     const firstReading = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
-      ${h.forecast && !firstReading ? `<p class="fore"><span class="soft">${NAMES[who]}, on the round after:</span> <span class="hand">“${esc(h.forecast)}”</span></p>` : ''}
-      <p class="hint">${firstReading ? 'Every figure is what a keeper saw.' : lastWords(s, sheet.gauge)}</p>`;
+      <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">${NAMES[who]}, on the round after:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'No word yet.'}</span></p>
+      <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every figure is what a keeper saw.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
-    head = `<b>${NAMES[who]}</b><span class="soft">${whereWords(who)}</span>`;
+    head = `<b>${NAMES[who]}</b><span class="soft">${esc(concernLines(s).find((line) => line.startsWith(`${NAMES[who]}:`)) ?? whereWords(who))}</span>`;
     const jobs: { job: Job; label: string }[] = [
       { job: 'level', label: 'Read the level' },
       { job: 'stove', label: 'Sit by the stove' },
@@ -676,7 +934,13 @@ function drawSheet() {
     );
   }
   const forecastOpen = el.querySelector<HTMLDetailsElement>('details.fore')?.open ?? false;
-  if (!setHtml(el, `<div class="who">${head}<button class="x" id="x">close</button></div>${crewRow}${body}`))
+  if (
+    !patchSheet(
+      el,
+      `<div class="who">${head}<button class="x" id="x" aria-label="Close inspection">×</button></div>${sheet.kind === 'gauge' ? crewRow : ''}${body}`,
+      previousKey === structureKey,
+    )
+  )
     return;
   const forecast = el.querySelector<HTMLDetailsElement>('details.fore');
   if (forecast) forecast.open = forecastOpen;
@@ -695,6 +959,41 @@ function drawSheet() {
       ask(who, job, t, insist);
     });
   });
+}
+
+function patchSheet(el: HTMLElement, html: string, stable: boolean) {
+  if (!stable) {
+    el.innerHTML = html;
+    return true;
+  }
+  const template = document.createElement('div');
+  template.innerHTML = html;
+  function patch(old: Node, fresh: Node) {
+    if (old.nodeType === Node.TEXT_NODE && fresh.nodeType === Node.TEXT_NODE) {
+      if (old.textContent !== fresh.textContent) old.textContent = fresh.textContent;
+      return;
+    }
+    if (!(old instanceof HTMLElement) || !(fresh instanceof HTMLElement)) return;
+    if (old.tagName !== fresh.tagName) return;
+    for (const attr of Array.from(fresh.attributes))
+      if (attr.name !== 'open' && old.getAttribute(attr.name) !== attr.value)
+        old.setAttribute(attr.name, attr.value);
+    for (const attr of Array.from(old.attributes))
+      if (!fresh.hasAttribute(attr.name) && attr.name !== 'open') old.removeAttribute(attr.name);
+    if (old.childNodes.length !== fresh.childNodes.length) {
+      // Changing hints may add text spans; the control itself remains the same node.
+      old.innerHTML = fresh.innerHTML;
+    } else
+      Array.from(old.childNodes).forEach((child, i) => {
+        const freshChild = fresh.childNodes[i];
+        if (freshChild) patch(child, freshChild);
+      });
+  }
+  Array.from(el.childNodes).forEach((child, i) => {
+    const freshChild = template.childNodes[i];
+    if (freshChild) patch(child, freshChild);
+  });
+  return false;
 }
 
 function verbButtons(items: { h: Hint; label: string; insist: Hint | undefined }[], grid = false): string {
@@ -739,6 +1038,9 @@ function whereWords(id: KeeperId): string {
 function bindHold(b: HTMLButtonElement, go: (insist: boolean) => void) {
   let timer = 0;
   let fired = false;
+  b.addEventListener('click', (e) => {
+    if (e.detail === 0) go(false);
+  });
   b.addEventListener('contextmenu', (e) => e.preventDefault());
   b.addEventListener('pointerdown', () => {
     fired = false;
@@ -783,22 +1085,16 @@ function dawn() {
   const next = PLANS[d.night] ?? null;
   lab.screen(`night ${d.night}: dawn`);
   lab.milestone(`night ${d.night} done`);
-  app.innerHTML = `<div class="page dawn">
-    ${markLink}
+  screen = 'dawn';
+  app.innerHTML = `<div class="page screen dawn">${topbar(`${planOf(s).title} · first light`)}<div class="page-body">
     ${s.phase === 'end' ? `<p class="week-end" role="status">${d.overtopped ? 'The week ends here. Water came over the crest.' : 'First light after Friday night. The week is over; your watch is done.'}</p>` : ''}
     ${reportBody(d, planOf(s).keepers.length > 1)}
-    <div id="closing-tally"></div>
-    <div class="actions">
+    </div><div class="actionbar">
       ${s.phase === 'dawn' && next ? `<button class="primary" id="next">${esc(next.title)} night</button>` : ''}
       ${s.phase === 'end' ? '<button class="primary" id="end">Read the week’s outcome</button>' : ''}
-      <button id="export">Export this run (playtest)</button>
-      <button id="send">Send this run to the notebook</button>
-      <button id="menu">Title page</button>
     </div>
-    ${footer()}
   </div>`;
-  app.querySelector('.actions')?.append(gameMenu());
-  updateTally();
+  bindTopbar();
   const chart = document.getElementById('chart') as HTMLCanvasElement;
   drawDawn(chart, d);
   document.getElementById('next')?.addEventListener('click', () => {
@@ -809,8 +1105,8 @@ function dawn() {
   });
   document.getElementById('end')?.addEventListener('click', ending);
   document.getElementById('export')?.addEventListener('click', download);
-  document.getElementById('send')?.addEventListener('click', sendRun);
-  document.getElementById('menu')?.addEventListener('click', title);
+  document.getElementById('send')?.addEventListener('click', sendWord);
+
   window.scrollTo(0, 0);
 }
 
@@ -831,10 +1127,9 @@ function ending() {
     : ds.length === NIGHTS && flooded === 0
       ? 'Five nights, and the lane never flooded unwarned. You read the men, not the gauges.'
       : `The dam held all week. Mill Lane flooded ${flooded === 1 ? 'once' : `${flooded} times`} without warning.`;
-  app.innerHTML = `<div class="page dawn">
-    ${markLink}
+  screen = 'end';
+  app.innerHTML = `<div class="page screen dawn ending">${topbar('The week is over')}<div class="page-body">
     <h2>The week is over</h2>
-    <div id="closing-tally"></div>
     <p>${esc(verdict)}</p>
     <ul class="week">${ds
       .map(
@@ -844,27 +1139,17 @@ function ending() {
       .join('')}</ul>
     <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong figures before they cost you.` : ''}</p>
     ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(l.aboutYou)}</p></div>`).join('')}
-    <div class="actions">
-      <button class="primary" id="again">Another week</button>
-      <button id="export">Export this run (playtest)</button>
-      <button id="send">Send this run to the notebook</button>
-      <button id="back">Back to the last dawn</button>
-    </div>
-    ${footer()}
-  </div>`;
-  app.querySelector('.actions')?.append(gameMenu());
+    <div id="closing-tally"></div><button class="reading-row" id="back">${PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
+    <div class="actionbar ending-actions"><div><button id="send">Send word</button><button id="export">Download this run</button></div><button class="primary" id="again">Another week</button></div></div>`;
+  bindTopbar();
   updateTally();
   document.getElementById('again')?.addEventListener('click', () => {
     beginWeek();
   });
   document.getElementById('export')?.addEventListener('click', download);
-  document.getElementById('send')?.addEventListener('click', sendRun);
+  document.getElementById('send')?.addEventListener('click', sendWord);
   document.getElementById('back')?.addEventListener('click', dawn);
   window.scrollTo(0, 0);
-}
-
-function sendRun() {
-  lab.openSendDialog({ getRun: () => (s ? exportRun(s, FRAMEWORK_VERSION) : {}) });
 }
 
 function download() {
@@ -907,7 +1192,7 @@ document.addEventListener('visibilitychange', () => {
 export const _debug = {
   step: (n: number) => {
     for (let i = 0; i < n && s && s.phase === 'watch'; i++) step(s);
-    if (s) s.phase === 'watch' ? enter() : dawn();
+    if (s) s.phase === 'watch' ? drawAll() : dawn();
   },
   get state() {
     return s;

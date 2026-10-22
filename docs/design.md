@@ -64,3 +64,11 @@ The desk uses automatic playback. New words, reports and flashes interrupt brisk
 
 ## Owner speed restoration (2026-10-22)
 The original speed choices are restored. Inspection, new-event reading time and menu protections remain. Simulation inputs, saves and replay rules are unchanged.
+
+## Approved UI sweep (2026-10-22)
+
+Adam approved the layout specification: "All good decisions, proceed." He added: "Good direction, proceed please, menu is fine. Just \"until something happens\" is too long, maybe Skip or Fast Forward or something else could be better."
+
+The desk keeps its clock, keeper chips, scene and gauges visible while an inspection replaces only the radio log. Automatic pacing is the default. Slow / Steady / Fast live in the game menu. Skip ⏩ stops on the next delivered event or keeper status change and refuses to run during radio silence. The title shows a sample morning. Send word offers optional verdicts, a note and a remembered optional name. Saves, inputs and simulation rules remain unchanged.
+
+Done means the approved UI is deployed with green exact-commit CI and a clean live release manifest, both requested viewport sizes have live acceptance evidence, the owner quotes are in the lab ledger, and the build report records delivery. Adam accepts the result after the owner retest.
