@@ -705,7 +705,7 @@ function drawBoard() {
         ${g.id === 'level' ? dialTicks() : ''}<circle cx="30" cy="31" r="2" fill="currentColor"/></svg>
         <span class="lab">${g.label}</span>
         <span class="num">${printed(r, g.id)}</span>
-        <span class="by hand">${r ? hand(`${who} · ${readingTime(r)}`, r.who === 'nerys' ? 0 : 1 - r.clarity, r.at) : 'not read'}</span>
+        <span class="by hand">${r ? `${hand(`${who} · read ${clock(r.wrote)}`, r.who === 'nerys' ? 0 : 1 - r.clarity, r.at)}<span class="as-written"> (as written)</span>` : 'not read'}</span>
         ${wasLine(r, g.id)}
       </button>`;
     })
@@ -817,7 +817,7 @@ function drawConcern() {
   if (!el) return;
   const lines = concernLines(s);
   const ids = planOf(s).keepers;
-  const body = `${s.radioOut ? '<span class="radio-chip">Radio · static</span>' : ''}${ids.map((id) => `<button class="keeper-chip" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: free.'))}</button>` : ''}`;
+  const body = `${s.radioOut ? '<span class="radio-chip">Radio · static</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: free.'))}</button>` : ''}`;
   if (!setHtml(el, body)) return;
   el.querySelectorAll<HTMLElement>('[data-k]').forEach((b) => {
     b.addEventListener('click', () => openSheet({ kind: 'keeper', who: b.dataset.k as KeeperId }));

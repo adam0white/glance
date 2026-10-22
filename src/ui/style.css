@@ -1122,3 +1122,8 @@ textarea {
 #feedback .dialog-body {
   flex: 1;
 }
+@media (max-width: 899px) {
+  .gauge .as-written {
+    display: none;
+  }
+}
