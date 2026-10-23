@@ -835,7 +835,7 @@ function drawSheet() {
     const key = `log|${first}`;
     if (sheetKey !== key) {
       sheetKey = key;
-      el.innerHTML = `${first ? `<div class="first-call"><p>Nobody has read the level tonight.</p>${verbButtons([{ h: hint(s, 'dai', 'level'), label: 'Ask Dai to read the level', insist: hint(s, 'dai', 'level', undefined, true) }])}</div>` : ''}<div class="log" id="log" aria-live="polite"></div>`;
+      el.innerHTML = `${first ? `<div class="first-call"><p>Nobody has read the level tonight.</p>${verbButtons([{ h: deskHint(s, 'dai', 'level'), label: 'Ask Dai to read the level', insist: deskHint(s, 'dai', 'level', undefined, true) }])}</div>` : ''}<div class="log" id="log" aria-live="polite"></div>`;
       const firstButton = el.querySelector<HTMLButtonElement>('[data-job]');
       if (firstButton) bindHold(firstButton, (insist) => ask('dai', 'level', undefined, insist));
     }
@@ -898,22 +898,22 @@ function drawSheet() {
     const reported = report?.value;
     const opts: number[] = [];
     for (let t = 0; t <= TURNS; t++) if (t !== reported) opts.push(t);
-    const hs = opts.map((t) => hint(s as GameState, who, 'gate', t));
-    const next = hint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
+    const hs = opts.map((t) => deskHint(s as GameState, who, 'gate', t));
+    const next = deskHint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
     head = `<b>Gate</b><span class="soft">${report ? `last gate ${reported}/${TURNS}, ${readingTime(report)}` : 'gate not read'}</span>`;
     body = `<details class="fore"><summary>${NAMES[who]}, on the round after</summary><span class="hand">${next.forecast ? `“${esc(next.forecast)}”` : 'No word yet.'}</span></details>
       <div class="verbs turns">${hs
         .map(
           (h) =>
-            `<button data-job="gate" data-t="${h.target}"><span class="fill"></span><span>${h.target === 0 ? 'shut' : `${h.target}`}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)} · ~${h.minutes}m</span></button>`,
+            `<button data-job="gate" data-t="${h.target}"><span class="fill"></span><span>${h.target === 0 ? 'shut' : `${h.target}`}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)}${h.minutes ? ` · ~${h.minutes}m` : ''}</span></button>`,
         )
         .join(
           '',
         )}</div><p class="hint">0–${TURNS} turns open. More turns lower the dam; the town river rises later. ${seen.hold ? '' : 'Hold a button to insist.'}</p>`;
   } else if (sheet.kind === 'gauge') {
     const job: Job = sheet.gauge === 'weir' ? 'weir' : 'level';
-    const h = hint(s, who, job);
-    const hi = hint(s, who, job, undefined, true);
+    const h = deskHint(s, who, job);
+    const hi = deskHint(s, who, job, undefined, true);
     head = `<b>${job === 'level' ? 'Level' : 'Weir'}</b><span class="soft">${job === 'level' ? 'water held behind the dam' : 'the weir board, a long walk upstream'}</span>`;
     const firstReading = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
@@ -929,10 +929,17 @@ function drawSheet() {
     if (planOf(s).weir) jobs.splice(1, 0, { job: 'weir', label: 'Go to the weir' });
     if (s.treeKnown && s.water.blocked) jobs.push({ job: 'clear', label: 'Clear the screen' });
     body = verbButtons(
-      jobs.map((j) => ({ h: hint(s as GameState, who, j.job), label: j.label, insist: undefined })),
+      jobs.map((j) => ({ h: deskHint(s as GameState, who, j.job), label: j.label, insist: undefined })),
       true,
     );
   }
+  const activity = personOf(s, who).activity?.affordanceId;
+  const callAdvice = s.radioOut
+    ? 'Requests cannot get through. Call again when the radio clears.'
+    : activity === 'doze' || activity === 'nap'
+      ? 'Wait for his answer. If no answer, call again.'
+      : '';
+  body += `<p class="hint call-advice" ${callAdvice ? '' : 'hidden'}>${callAdvice}</p>`;
   const forecastOpen = el.querySelector<HTMLDetailsElement>('details.fore')?.open ?? false;
   if (
     !patchSheet(
@@ -994,6 +1001,16 @@ function patchSheet(el: HTMLElement, html: string, stable: boolean) {
     if (freshChild) patch(child, freshChild);
   });
   return false;
+}
+
+/** Describe the call before commitment; sleeping and radio silence do not promise queued work. */
+function deskHint(st: GameState, who: KeeperId, job: Job, target?: number, insist = false): Hint {
+  const h = hint(st, who, job, target, insist);
+  const activity = personOf(st, who).activity?.affordanceId;
+  if (st.radioOut) return { ...h, short: 'radio out', minutes: 0, forecast: '' };
+  if (activity === 'doze' || activity === 'nap')
+    return { ...h, short: 'call; wait', minutes: 0, forecast: '' };
+  return h;
 }
 
 function verbButtons(items: { h: Hint; label: string; insist: Hint | undefined }[], grid = false): string {

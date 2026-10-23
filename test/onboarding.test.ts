@@ -1,6 +1,14 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { exportRun, fingerprint, type GameState, newGame, queueInput, step } from '../src/sim/dam.ts';
+import {
+  exportRun,
+  fingerprint,
+  type GameState,
+  newGame,
+  personOf,
+  queueInput,
+  step,
+} from '../src/sim/dam.ts';
 import { SAMPLE_DAWN } from '../src/ui/opener.ts';
 import { reportBody } from '../src/ui/report.ts';
 
@@ -162,6 +170,32 @@ describe('desk sheets and reading labels', () => {
     click('x');
     chooseGauge('gate');
     expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(false);
+  });
+  it('explains unanswered calls before asking, without promising work or a completion time', async () => {
+    const debug = await boot();
+    click('new');
+    tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
+    debug.step(1);
+    const run = state(debug);
+    const activity = personOf(run, 'dai').activity!;
+    activity.affordanceId = 'doze';
+    chooseGauge('level');
+    const words = document.querySelector('.sheet [data-job="level"] .h')?.textContent;
+    expect(words).toBe('call; wait');
+    expect(document.querySelector('.call-advice')?.textContent).toContain('If no answer, call again.');
+    expect(words).not.toContain('min');
+    chooseGauge('gate');
+    expect(document.querySelector('.turns .h')?.textContent).toBe('call; wait');
+    activity.affordanceId = 'nap';
+    debug.step(0);
+    expect(document.querySelector('.call-advice')?.textContent).toContain('If no answer, call again.');
+    run.radioOut = true;
+    debug.step(0);
+    expect(document.querySelector('.turns .h')?.textContent).toBe('radio out');
+    expect(document.querySelector('.call-advice')?.textContent).toContain(
+      'Call again when the radio clears.',
+    );
+    expect(run.inputs).toHaveLength(1);
   });
   it('distinguishes written readings, previous readings, and radio arrival times', async () => {
     const debug = await boot();
