@@ -515,6 +515,7 @@ it.each([false, true])('submits its single recording opt-in checkbox as %s', asy
   const choice = document.querySelector<HTMLInputElement>('#feedback input[type=checkbox]');
   expect(choice).not.toBeNull();
   expect(choice?.checked).toBe(false);
+  expect(document.querySelector('#feedback label label')).toBeNull();
   if (choice) choice.checked = sharePlay;
   await click('feedback-send');
   await vi.waitFor(() =>

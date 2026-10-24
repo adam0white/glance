@@ -550,7 +550,7 @@ function sendWord() {
     }
   };
   const personaChoice = feedbackPersonaControl(lab);
-  if (personaChoice) d.querySelector('textarea')?.after(personaChoice);
+  if (personaChoice) d.querySelector('textarea')?.closest('label')?.after(personaChoice);
 
   let verdict = '';
   const send = d.querySelector('#feedback-send') as HTMLButtonElement;
