@@ -13,7 +13,7 @@ import {
 
 import { FRAMEWORK_VERSION } from '@adam0white/human-framework';
 import { personaChannel, watchPersonaCheckpoint } from '@adam0white/lab-client';
-import { Continuity, LOCAL_KEY } from '../continuity.ts';
+import { Continuity, LOCAL_KEY, watchShelfPreference } from '../continuity.ts';
 import { ALLOCATION, CAST, type CastId, discoveriesFor, rememberedConversation } from '../sim/cast.ts';
 import {
   clock,
@@ -1313,25 +1313,7 @@ function releaseWake() {
   wake?.release().catch(() => {});
   wake = null;
 }
-const invalidateHistory = () => {
-  continuity.invalidate();
-  void continuity.recording().catch(() => {});
-};
-window.addEventListener('hf-lab-preference', invalidateHistory);
-window.addEventListener('hf-persona-preference', invalidateHistory);
-window.addEventListener('storage', (e) => {
-  if (
-    !e.key ||
-    [
-      'hf-lab-player',
-      'hf-lab-recording-off',
-      'hf-lab-events-off:glance',
-      'hf-lab-privacy-override:glance',
-      'hf-persona-opt-in',
-    ].includes(e.key)
-  )
-    invalidateHistory();
-});
+watchShelfPreference(() => continuity.invalidate());
 const terminalAttempts = new Set<string>();
 function closeOwnedDeaths() {
   if (!s || !continuity.shelf.enabled) return;
