@@ -416,45 +416,40 @@ it('sends linked feedback with verdict and trimmed remembered name', async () =>
     expect(document.getElementById('feedback-result')?.textContent).toBe('Sent. Thank you.'),
   );
   const { lab } = await import('../src/ui/lab.ts');
-  expect(lab.sendFeedback).toHaveBeenCalledWith('[keep] I wanted another reading.', { name: 'owner' });
+  expect(lab.sendFeedback).toHaveBeenCalledWith(
+    '[keep] I wanted another reading.',
+    expect.objectContaining({ name: 'owner', run: expect.any(Object) }),
+  );
   expect(localStorage.getItem('hf-lab-feedback-name')).toBe('owner');
 });
 
-it('blocks feedback while recording is off, then allows the inline switch', async () => {
+it('allows feedback while recording is off and keeps the inline switch', async () => {
   localStorage.setItem('hf-lab-recording-off', '1');
   await boot();
   await click('menu');
   await click('send-word');
-  expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(true);
-  expect(document.querySelector('#recording-notice')?.textContent).toContain('nothing is sent');
+  expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(false);
+  expect(document.querySelector('#recording-notice')?.textContent).toContain('still send your note');
   const input = document.getElementById('record-feedback') as HTMLInputElement;
   input.checked = true;
   input.dispatchEvent(new Event('change'));
   expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(false);
 });
 
-it('requires privacy consent and preserves the name and note on fallback', async () => {
+it('allows a privacy note without a run or another dialog', async () => {
   const { lab } = await import('../src/ui/lab.ts');
   Object.assign(lab, { privacySignalOn: true });
-  vi.mocked(lab.sendRun).mockRejectedValueOnce(new Error('Offline'));
-  let modalAtFallback = true;
-  vi.mocked(lab.openSendDialog).mockImplementationOnce(() => {
-    modalAtFallback = !!document.querySelector('dialog[open]');
-  });
   await boot();
   await click('new');
   await click('menu');
   await click('send-word');
-  expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(true);
+  expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(false);
   (document.getElementById('feedback-note') as HTMLTextAreaElement).value = 'A note';
   (document.getElementById('feedback-name') as HTMLInputElement).value = 'owner';
-  const input = document.getElementById('consent-run') as HTMLInputElement;
-  input.checked = true;
-  input.dispatchEvent(new Event('change'));
   await click('feedback-send');
-  await vi.waitFor(() => expect(lab.openSendDialog).toHaveBeenCalled());
-  expect(lab.openSendDialog).toHaveBeenCalledWith(expect.objectContaining({ name: 'owner', note: 'A note' }));
-  expect(modalAtFallback).toBe(false);
+  await vi.waitFor(() => expect(lab.sendFeedback).toHaveBeenCalled());
+  expect(lab.sendRun).not.toHaveBeenCalled();
+  expect(lab.openSendDialog).not.toHaveBeenCalled();
 });
 
 it('scrolls the sheet to new radio words while leaving the initial first call visible', async () => {

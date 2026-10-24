@@ -1,3 +1,4 @@
+import { feedbackPersonaControl } from '@adam0white/lab-kit';
 /**
  * The Glance UI: DOM for the board, the radio log and the sheets; one canvas for the dam. The UI reads state and
  * queues inputs; it never changes the sim directly. Real time drives sim minutes, continuously, slowing while a
@@ -524,7 +525,7 @@ function sendWord() {
   const d = dialog(
     'feedback',
     'Send word',
-    `<p>Your run, saves and log reach us on their own. Tell us what they can't show.</p>
+    `<p>Send a note about this game. Recording and continuing-person choices are optional.</p>
     <div class="verdicts" role="group" aria-label="Your verdict">${[
       ['keep', "I'd keep playing"],
       ['mixed', 'Not sure'],
@@ -534,19 +535,29 @@ function sendWord() {
       .join('')}</div>
     <label class="feedback-note">What happened on the desk, what you wanted, what got in the way.<textarea id="feedback-note" rows="4"></textarea></label>
     <label>Your name or tester id<input id="feedback-name" type="text" maxlength="60" value="${esc(localStorage.getItem('hf-lab-feedback-name') ?? '')}" autocomplete="name"></label><p class="soft">A name links this device’s past and future play history. Leave it empty to stay pseudonymous.</p>
-    <div id="recording-notice">${recordingOff() ? `<p>Recording is off, so nothing is sent.</p>${recordSwitch('record-feedback')}` : ''}</div>
+    <div id="recording-notice">${recordingOff() ? `<p>Recording is off. You can still send your note.</p>${recordSwitch('record-feedback')}` : ''}</div>
     ${lab.privacySignalOn && !lab.privacyOverride ? '<label><input id="consent-run" type="checkbox">Send this run with my note</label>' : ''}
-    <details><summary>What is sent</summary><p>Your note, verdict and optional name, with this run, saves and log.</p><pre>${esc(JSON.stringify(s ? { seed: s.seed, night: s.night, minute: s.minute, inputs: s.inputs.length } : { screen: 'title' }, null, 2))}</pre><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></details>
+    <details><summary>What is sent</summary><p>Your note, verdict and optional name. With recording off, no run or linked history is sent.</p><pre>${esc(JSON.stringify(s ? { seed: s.seed, night: s.night, minute: s.minute, inputs: s.inputs.length } : { screen: 'title' }, null, 2))}</pre><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></details>
     <button id="keep-copy">Keep a copy of this run ⤓</button><p id="feedback-result" role="status"></p>`,
     '<button id="feedback-back">← Back</button><button class="primary" id="feedback-send">Send</button>',
   );
   const back = d.querySelector('#feedback-back');
   if (back) d.querySelector('.dialog-head')?.prepend(back);
+  const feedbackRun = () => {
+    try {
+      return s ? exportRun(s, FRAMEWORK_VERSION) : {};
+    } catch {
+      return undefined;
+    }
+  };
+  const personaChoice = feedbackPersonaControl(lab);
+  if (personaChoice) d.querySelector('textarea')?.after(personaChoice);
+
   let verdict = '';
   const send = d.querySelector('#feedback-send') as HTMLButtonElement;
   const consent = d.querySelector('#consent-run') as HTMLInputElement | null;
   const update = () => {
-    send.disabled = recordingOff() || (!!consent && !consent.checked);
+    send.disabled = false;
   };
   bindRecord(d, 'record-feedback', update);
   consent?.addEventListener('change', update);
@@ -571,20 +582,10 @@ function sendWord() {
     const who = (d.querySelector('#feedback-name') as HTMLInputElement).value.trim().slice(0, 60);
     try {
       const message = `${verdict ? `[${verdict}] ` : ''}${note}`;
-      if (consent?.checked) {
-        try {
-          await lab.sendRun(s ? exportRun(s, FRAMEWORK_VERSION) : {}, { note: message, name: who });
-        } catch {
-          closeDialogs();
-          lab.openSendDialog({
-            getRun: () => (s ? exportRun(s, FRAMEWORK_VERSION) : {}),
-            name: who,
-            note: message,
-          });
-          return;
-        }
+      if (!recordingOff() && consent?.checked && lab.personaRecordingAllowed) {
+        await lab.sendRun(s ? exportRun(s, FRAMEWORK_VERSION) : {}, { note: message, name: who });
       } else {
-        await lab.sendFeedback(message, { name: who });
+        await lab.sendFeedback(message, { name: who, run: feedbackRun() });
       }
       try {
         localStorage.setItem('hf-lab-feedback-name', who);
