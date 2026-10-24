@@ -183,7 +183,6 @@ it('preflights all five heads then atomically claims two, preserving actual stat
   await runtime.recording();
   expect(h.allowed).toBe(false);
   await runtime.recording(true);
-  expect(h.allowed).toBe(true);
 });
 it('fails the whole admission before CAS on one unsupported person or dam qualification', async () => {
   const n = await source('nerys', true),
@@ -194,18 +193,7 @@ it('fails the whole admission before CAS on one unsupported person or dam qualif
   expect(h.requests.some((r) => r.action === 'putBatch')).toBe(false);
   expect(h.data.heads[n.castId]).toBe(n.revision);
 });
-it('keeps mixed histories closed on epoch changes and denial; load/reset invalidates acknowledgements', async () => {
-  const h = harness([await source('nerys', true), await source('callum')]);
-  const runtime = new Continuity(h.lab, h.shelf);
-  await runtime.fresh(7);
-  await runtime.recording();
-  expect(h.allowed).toBe(false);
-  h.rotateAfterApproval();
-  await runtime.recording(true);
-  expect(h.allowed).toBe(false);
-  await runtime.deny();
-  expect(h.allowed).toBe(false);
-});
+
 it('consumes seeded away-life through actual extra-work availability and preserves pinned clock', async () => {
   const n = await source('nerys', true);
   let found = false;
@@ -330,4 +318,22 @@ it('browser-person continuity changes still cancel a chapter waiting for the she
   finish(true);
   await expect(pending).rejects.toThrow(/changed/i);
   stop();
+});
+
+it('recording metadata and checkpoint publication do not query historical recording permission', async () => {
+  const h = harness();
+  const request = h.shelf.request.bind(h.shelf);
+  h.shelf.request = async (r) => {
+    if (r.action === 'recording' || r.action === 'recordingBatch') throw new Error('obsolete recording RPC');
+    return request(r);
+  };
+  const c = new Continuity(h.lab, h.shelf);
+  const state = await c.fresh(42);
+  queueInput(state, { kind: 'ask', keeper: 'dai', job: 'level' });
+  step(state);
+  queueInput(state, { kind: 'pause' });
+  for (let i = 0; i < 100 && !state.chapterPaused; i++) step(state);
+  await c.recording(true);
+  await c.deny();
+  await c.checkpoint('hf.cast.nerys.glance');
 });
