@@ -337,3 +337,30 @@ it('recording metadata and checkpoint publication do not query historical record
   await c.deny();
   await c.checkpoint('hf.cast.nerys.glance');
 });
+
+it.each(['prepareBatch', 'putBatch'])(
+  'preserves old receipts when real admission fails at %s',
+  async (stage) => {
+    const h = harness([await source('nerys', true)]);
+    const runtime = new Continuity(h.lab, h.shelf);
+    const previous = await runtime.fresh(7);
+    const saved = runtime.localSave(previous);
+    const heads = structuredClone(runtime.heads);
+    const request = h.shelf.request.bind(h.shelf);
+    let attempts = 0;
+    h.shelf.request = async (r) => {
+      if (r.action === stage) {
+        attempts++;
+        // Model an accepted batch whose reply was lost, as well as a failed preflight.
+        if (stage === 'putBatch') await request(r);
+        throw new Error('Shelf unavailable. Use a local file.');
+      }
+      return request(r);
+    };
+    await expect(runtime.fresh(8)).rejects.toThrow('Shelf unavailable');
+    expect(attempts).toBe(1);
+    expect(runtime.heads).toEqual(heads);
+    expect(runtime.localSave(previous)).toBe(saved);
+    expect(runtime.busy).toBe(false);
+  },
+);

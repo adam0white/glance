@@ -1106,9 +1106,7 @@ textarea {
 .sample-morning {
   overflow: hidden;
 }
-.sample-morning canvas {
-  height: 100% !important;
-}
+
 #feedback-back {
   font-size: 14px;
   width: auto;
@@ -1125,5 +1123,306 @@ textarea {
 @media (max-width: 899px) {
   .gauge .as-written {
     display: none;
+  }
+}
+
+/* Width-based type and layout. These sizes apply to the text itself, including fixed-size descendants. */
+:root {
+  --body-size: clamp(16px, 1.35vw + 7px, 22px);
+  --small-size: clamp(14px, 1vw + 10.5px, 20px);
+}
+html,
+body {
+  font-size: var(--body-size);
+}
+body {
+  display: flex;
+  flex-direction: column;
+}
+#app {
+  width: 100%;
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+#lab-notice {
+  flex: none;
+  max-height: 18dvh;
+  overflow: auto;
+  font-size: var(--small-size);
+}
+#lab-notice > * {
+  position: static !important;
+  margin: 0 auto;
+  max-width: 1180px;
+}
+.topbar {
+  height: auto;
+  min-height: 48px;
+  font-size: var(--small-size);
+}
+.subtitle,
+#goal,
+.dialog-body p,
+#about p,
+.sheet,
+.log,
+.verbs button,
+.verbs.turns button,
+.page-body h3,
+textarea,
+input[type="text"],
+.week,
+.misses,
+.ending-actions > div > button {
+  font-size: var(--body-size);
+  line-height: 1.45;
+}
+.gauge .lab,
+.gauge .by,
+.gauge .was,
+.sheet .hint,
+.sheet .fore,
+.sheet .who .soft,
+.crew button,
+.verbs .h,
+#clock-rate,
+#concern button,
+#concern .chip,
+.line .t,
+#skip-caption,
+.segmented .segment-label,
+.previous-reading,
+.legend,
+.houses,
+.record-switch,
+.menu-footer a,
+.save-time,
+#restart-confirm p,
+#feedback .dialog-body > label,
+#feedback .dialog-body > .soft,
+#feedback .dialog-body > p,
+.sample-morning > span,
+.verdicts button,
+.misses .t,
+#feedback small,
+.save-warning {
+  font-size: var(--small-size);
+  line-height: 1.4;
+}
+.gauge .num {
+  font-size: clamp(18px, 1.5vw + 7px, 25px);
+  line-height: 1.3;
+}
+.gauge .by {
+  font-family: var(--text);
+}
+.state-strip {
+  height: auto;
+}
+#concern {
+  height: auto;
+  min-height: 44px;
+}
+#clock-rate {
+  height: auto;
+  line-height: 1.4;
+}
+.board {
+  height: auto;
+  align-items: stretch;
+  grid-auto-columns: minmax(0, 1fr);
+}
+.gauge {
+  height: auto;
+  min-height: 108px;
+  overflow: visible;
+}
+.gauge .by {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.gauge .was {
+  white-space: normal;
+}
+.sheet .who {
+  height: auto;
+  min-height: 44px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.sheet .who .soft {
+  min-width: 0;
+}
+.sheet .crew {
+  flex-wrap: wrap;
+}
+.segmented .segment-label {
+  width: auto;
+}
+.verbs.turns {
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+}
+.verbs button,
+.verbs.turns button {
+  height: auto;
+  min-height: 64px;
+  overflow: visible;
+}
+#latest-radio {
+  position: static;
+  max-height: none;
+  overflow: visible;
+  padding: 4px 10px;
+  font-size: var(--body-size);
+  line-height: 1.35;
+}
+.scene-zone {
+  height: auto;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.scene {
+  height: clamp(120px, 20vw, 300px);
+  flex: none;
+}
+#skip-bar,
+#skip-bar:has(#skip-caption:not(:empty)),
+#skip-bar:has(#skip-caption:empty) {
+  height: auto;
+  min-height: 64px;
+}
+.sample-morning {
+  height: auto;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+}
+.sample-morning > span {
+  position: static;
+}
+.sample-morning canvas {
+  min-height: 140px;
+}
+.page-body,
+.page.screen > .actionbar {
+  width: min(100%, 760px);
+  margin-inline: auto;
+}
+.game-dialog {
+  max-height: calc(100dvh - 16px);
+}
+#feedback {
+  height: auto;
+  max-height: calc(100dvh - 16px);
+}
+.dialog-body {
+  overflow-y: auto;
+}
+.dialog-head h2 {
+  font-size: clamp(20px, 2vw, 26px);
+}
+#feedback textarea {
+  height: auto;
+  min-height: 100px;
+}
+#feedback .dialog-actions {
+  padding-top: 8px;
+}
+#about {
+  max-height: 80dvh;
+}
+@media (min-width: 768px) {
+  .desk-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 1fr);
+    gap: clamp(8px, 2vw, 24px);
+    overflow: auto;
+  }
+  .desk-picture {
+    min-width: 0;
+    overflow: auto;
+  }
+  .desk-context {
+    min-width: 0;
+    height: 100%;
+  }
+  .board {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 6px;
+  }
+  .gauge {
+    min-height: 132px;
+  }
+  .gauge .was,
+  .gauge .as-written {
+    display: block;
+  }
+  .scene-zone {
+    aspect-ratio: auto;
+  }
+  .watch {
+    padding-top: 0;
+  }
+  .watch .topbar {
+    position: static;
+    padding-right: 8px;
+  }
+  .watch .topbar-actions {
+    position: static;
+  }
+  .watch .state-strip {
+    position: static;
+    height: auto;
+    display: block;
+  }
+  #clock-rate {
+    max-width: none;
+    font-size: var(--small-size);
+  }
+  .game-dialog {
+    inset: auto 0;
+    margin: 0 auto;
+    width: min(760px, 100%);
+    height: auto;
+    border-radius: 12px;
+  }
+  #feedback {
+    inset: auto 0;
+    width: min(760px, 100%);
+    height: auto;
+  }
+  .phone-only {
+    display: block !important;
+  }
+}
+@media (max-width: 767px) {
+  .desk-main {
+    overflow: auto;
+  }
+  .desk-picture {
+    flex: none;
+  }
+  .desk-context {
+    min-height: 240px;
+  }
+  .sheet {
+    min-height: 180px;
+  }
+  .board {
+    gap: 3px;
+    padding: 0 4px;
+  }
+  .gauge svg {
+    width: 38px;
+    height: 22px;
+  }
+}
+
+@media (min-width: 768px) {
+  .scene {
+    height: auto;
+    aspect-ratio: 360 / 236;
   }
 }

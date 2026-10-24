@@ -81,6 +81,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   localStorage.clear();
+  window.history.replaceState({}, '', '/?lab=1');
   document.body.innerHTML = '<div id="app"></div>';
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   vi.stubGlobal('requestAnimationFrame', () => 1);
@@ -124,9 +125,9 @@ describe('title and first call', () => {
       insist: false,
     });
     expect(document.querySelector('.first-call')).toBeNull();
-    expect(document.querySelector('#concern')?.textContent).toContain('◷');
+    expect(document.querySelector('#concern')?.textContent).toContain('waiting for an answer');
     debug.step(1);
-    expect(document.querySelector('#concern')?.textContent).toMatch(/Dai.*level ~22:/);
+    expect(document.querySelector('#concern')?.textContent).toMatch(/Dai.*level.*~22:/);
   });
   it('asks before discarding a saved week and resumes the old fingerprint', async () => {
     const expected = newGame(7);
@@ -200,17 +201,17 @@ describe('desk sheets and reading labels', () => {
     activity.affordanceId = 'doze';
     chooseGauge('level');
     const words = document.querySelector('.sheet [data-job="level"] .h')?.textContent;
-    expect(words).toBe('call; wait');
+    expect(words).toBe('Call and wait for his answer.');
     expect(document.querySelector('.call-advice')?.textContent).toContain('If no answer, call again.');
     expect(words).not.toContain('min');
     chooseGauge('gate');
-    expect(document.querySelector('.turns .h')?.textContent).toBe('call; wait');
+    expect(document.querySelector('.turns .h')?.textContent).toBe('Call and wait for his answer.');
     activity.affordanceId = 'nap';
     debug.step(0);
     expect(document.querySelector('.call-advice')?.textContent).toContain('If no answer, call again.');
     run.radioOut = true;
     debug.step(0);
-    expect(document.querySelector('.turns .h')?.textContent).toBe('radio out');
+    expect(document.querySelector('.turns .h')?.textContent).toBe('The radio is out.');
     expect(document.querySelector('.call-advice')?.textContent).toContain(
       'Call again when the radio clears.',
     );
@@ -280,7 +281,7 @@ describe('desk sheets and reading labels', () => {
     const before = state(debug).inputs.length;
     tap(warning);
     expect(state(debug).inputs).toHaveLength(before);
-    expect(warning.textContent).toContain('keep your finger');
+    expect(warning.textContent).toContain('Hold this button');
     warning.dispatchEvent(new Event('pointerdown'));
     vi.advanceTimersByTime(501);
     expect(state(debug).inputs.at(-1)).toMatchObject({ kind: 'warn' });
@@ -293,7 +294,7 @@ describe('desk sheets and reading labels', () => {
     run.said.push({ at: run.minute, who: 'dai', kind: 'report', text: 'A tree on the screen.' });
     debug.step(0);
     expect(document.querySelector('#log .line:last-child .t')?.textContent).toBe('22:00');
-    expect(document.querySelector('#skip-caption')?.textContent).toBe('Radio is out');
+    expect(document.querySelector('#skip-caption')?.textContent).toBe('The radio is out.');
   });
 });
 
@@ -356,7 +357,7 @@ it('shows save failure without adding a manual Save action', async () => {
 it('uses phase information and keeps the final tally below people and closed', async () => {
   const debug = await boot();
   await click('help');
-  expect(document.querySelector('#about')?.textContent).toContain('Five nights');
+  expect(document.querySelector('#about')?.textContent).toContain('five nights');
   await click('new');
   await click('help');
   expect(document.querySelector('#about')?.textContent).toContain('Let him rest');
@@ -400,6 +401,7 @@ it('marks the final dawn and offers no further night', async () => {
   await click('end');
   expect(document.querySelector('h2')?.textContent).toBe('The week is over');
   await click('again');
+  await click('menu-confirm-new');
   expect(document.querySelector('.first-call')).not.toBeNull();
 });
 
@@ -498,12 +500,13 @@ it('keeps feedback sent when remembering the name fails', async () => {
   await click('new');
   await click('menu');
   await click('send-word');
-  vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+  const failedName = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
     throw new DOMException('Full', 'QuotaExceededError');
   });
   await click('feedback-send');
   await vi.waitFor(() => expect(document.getElementById('feedback-result')?.textContent).toContain('queued'));
   expect(document.getElementById('feedback-send')?.textContent).toBe('Back to the desk');
+  failedName.mockRestore();
 });
 
 it.each([false, true])('submits its single recording opt-in checkbox as %s', async (sharePlay) => {
@@ -534,4 +537,60 @@ it('shows the effective privacy default and opts in with the single recording sw
   recording.click();
   expect(setRecording).toHaveBeenCalledWith(false);
   expect(recording.checked).toBe(true);
+});
+
+it.each(['', '?lab=0', '?lab=true', '?lab=01'])(
+  'keeps diagnostics out of ordinary URL %s',
+  async (search) => {
+    window.history.replaceState({}, '', `/${search}`);
+    await boot();
+    expect(document.getElementById('other')).toBeNull();
+    expect(document.querySelector('.credit')).toBeNull();
+    await click('menu');
+    expect(document.getElementById('browser-people')).toBeNull();
+    expect(document.querySelector('[data-pace]')).toBeNull();
+    expect(document.getElementById('to-title')).toBeNull();
+    expect(document.getElementById('send-word')?.textContent).toBe('Feedback');
+    expect(document.querySelector('#game-menu a')?.getAttribute('href')).toBe(
+      'https://human.adamwhite.work/games/',
+    );
+    expect(document.getElementById('menu-new')).not.toBeNull();
+  },
+);
+
+it('preserves the saved run and receipts when shared admission fails', async () => {
+  window.history.replaceState({}, '', '/');
+  const saved = JSON.stringify(localFixture(newGame(7)));
+  localStorage.setItem('glance-cast-local-v3', saved);
+  const { Continuity } = await import('../src/continuity.ts');
+  vi.spyOn(Continuity.prototype, 'fresh').mockRejectedValue(
+    new Error('Shelf unavailable. Use a local file.'),
+  );
+  await boot();
+  await click('new');
+  await click('confirm-new');
+  expect(localStorage.getItem('glance-cast-local-v3')).toBe(saved);
+  expect(document.querySelector('#start-error')?.textContent).toContain('saved week is unchanged');
+  expect(document.querySelector('#start-error')?.textContent).not.toMatch(/Shelf|local file/);
+  expect(document.querySelector('#retry-start')).not.toBeNull();
+  expect(document.querySelector('#error-feedback')).not.toBeNull();
+  expect(document.querySelector('#continuity')).toBeNull();
+});
+
+it('resumes an old paused chapter through the ordinary Resume button', async () => {
+  window.history.replaceState({}, '', '/');
+  const run = newGame(7);
+  queueInput(run, { kind: 'ask', keeper: 'dai', job: 'level', insist: true });
+  step(run);
+  queueInput(run, { kind: 'pause' });
+  step(run);
+  for (let i = 0; i < 100 && !run.chapterPaused; i++) step(run);
+  expect(run.chapterPaused).toBe(true);
+  localStorage.setItem('glance-cast-local-v3', JSON.stringify(localFixture(run)));
+  const debug = await boot();
+  await click('cont');
+  await click('menu');
+  await click('dialog-back');
+  expect(state(debug).chapterPaused).toBe(false);
+  expect(state(debug).inputs.at(-1)?.kind).toBe('resume');
 });

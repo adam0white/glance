@@ -2,16 +2,17 @@
 import { clock, type Dawn, PLANS } from '../sim/dam.ts';
 import { NAMES } from '../sim/keepers.ts';
 import { spoken } from '../sim/reading.ts';
+import { displayWords } from './words.ts';
 
 const esc = (x: string) =>
   x.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
 
 const CAUSE: Record<string, string> = {
-  fresh: 'A plain misread',
+  fresh: 'He misread the gauge',
   sleepy: 'He was short of sleep, and further behind than he felt',
-  trough: 'The small hours, when the body is at its lowest',
-  spent: 'He was spent from the wheel',
-  weather: 'Rain in his face and a weak torch',
+  trough: 'It was the early morning, when people are least alert',
+  spent: 'Turning the wheel had exhausted him',
+  weather: 'Rain was in his face and his torch was weak',
   afraid: 'He was frightened',
   skipped: 'He never walked there; he gave you the last figure',
   gossip: '',
@@ -36,15 +37,16 @@ function fateWords(d: Dawn): string {
   const parts: string[] = [];
   parts.push(
     d.mill === 'dry'
-      ? 'Mill Lane slept dry.'
+      ? 'Mill Lane stayed dry.'
       : d.mill === 'saved'
-        ? 'Mill Lane took water, but they had their things upstairs.'
+        ? 'Mill Lane flooded, but people had moved their things upstairs.'
         : 'Mill Lane flooded before anyone knocked.',
   );
   if (d.square !== 'dry')
-    parts.push(d.square === 'saved' ? 'The square went under; they were ready.' : 'The square went under.');
-  if (d.falseAlarm) parts.push('The warning was for nothing. The lane will remember.');
-  if (d.spilled && !d.overtopped) parts.push('The dam went over its lip and the spillway ran.');
+    parts.push(d.square === 'saved' ? 'The square flooded, but people were ready.' : 'The square flooded.');
+  if (d.falseAlarm) parts.push('The warning was a false alarm. People on the lane will remember.');
+  if (d.spilled && !d.overtopped)
+    parts.push('Water rose above the spillway lip and flowed into the spillway.');
   return parts.join(' ');
 }
 
@@ -64,20 +66,20 @@ function missLine(m: Dawn['misses'][number]): string {
   return `<li><span class="t">actual read ${clock(m.at)}</span> ${who} said <b>${f}</b> at the ${m.gauge === 'level' ? 'staff' : 'weir'}. It was ${t}. <span class="soft">${esc(causeWords(m))}.</span>${m.caught ? ' <span class="caught">You caught it.</span>' : ''}</li>`;
 }
 
-export function reportBody(d: Dawn, crew: boolean, sample = false): string {
+export function reportBody(d: Dawn, _crew: boolean, sample = false): string {
   const caught = d.misses.filter((m) => m.caught).length;
   return `    <h2>${sample ? 'A sample morning' : `${PLANS[d.night - 1]?.title ?? ''}, first light`}</h2>
     <p>${esc(fateWords(d))}</p>
     <canvas id="chart" class="chart" aria-label="${sample ? 'Sample night: opening the gate lowered the dam level; the river rose later. The water stayed below the crest and the town stayed dry.' : "The night's true level against his figures"}"></canvas>
-    <p class="soft legend"><span class="key red"></span> what the water did <span class="key dot"></span> what ${crew ? 'they' : 'he'} told you, at the actual reading time</p>
+    <p class="soft legend"><span class="key red"></span> The red line shows the true water level. <span class="key dot"></span> The dots show reported readings, at the actual reading time.</p>
     <div class="houses"><span class="soft">Mill Lane</span>${houseRow(4, d.overtopped ? 'flooded' : d.mill)}<span class="soft">square</span>${houseRow(6, d.overtopped ? 'flooded' : d.square)}</div>
     ${d.misses.length ? `<h3>Where the board was wrong</h3><ul class="misses">${d.misses.slice(0, 6).map(missLine).join('')}</ul><p class="soft">A figure counts as caught when you had it read again within twenty minutes, or lightning showed the wall. ${caught ? `You caught ${count(caught)} of ${count(d.misses.length)}.` : 'You caught none of them.'}</p>` : '<p>Every figure tonight was near enough the truth.</p>'}
     ${d.dozes.map((z) => `<p class="soft">${NAMES[z.who]} fell asleep on watch, ${clock(z.from)} to ${clock(z.to)}.</p>`).join('')}
-    ${d.strain.map((id) => `<p class="soft">${NAMES[id]} hurt his shoulder on the wheel. He didn’t say.</p>`).join('')}
+    ${d.strain.map((id) => `<p class="soft">${NAMES[id]} hurt his shoulder on the wheel. He did not tell you.</p>`).join('')}
     ${d.lines
       .map(
         (l) =>
-          `<div class="keeperline"><b>${NAMES[l.id]}</b>${l.line ? `<p class="hand">${esc(l.line)}</p>` : ''}<p class="hand">${esc(l.aboutYou)}</p></div>`,
+          `<div class="keeperline"><b>${NAMES[l.id]}</b>${l.line ? `<p class="hand">${esc(displayWords(l.line))}</p>` : ''}<p class="hand">${esc(displayWords(l.aboutYou))}</p></div>`,
       )
       .join('')}
 `;

@@ -50,6 +50,9 @@ import { reportBody } from './report.ts';
 import { drawScene, type SceneFx, sceneHit } from './scene.ts';
 import { tallyBody } from './tally.ts';
 import { readingTime } from './time.ts';
+import { displayWords, hintWords } from './words.ts';
+
+const labMode = () => new URLSearchParams(location.search).get('lab') === '1';
 
 const SAVE = LOCAL_KEY;
 const continuity = new Continuity(lab, personaChannel(), () => {
@@ -127,7 +130,8 @@ function writeSave() {
     warning.id = 'save-warning';
     warning.className = 'save-warning';
     warning.setAttribute('role', 'status');
-    warning.textContent = 'This browser could not save. Keep a copy of this run before leaving.';
+    warning.textContent =
+      'This browser could not save your progress. Keep this page open. The game will try saving again as you play.';
     host.prepend(warning);
   } else if (!saveFailed) warning?.remove();
 }
@@ -144,7 +148,7 @@ const esc = (x: string) =>
 const GAMES = 'https://human.adamwhite.work/games/';
 const PRIVACY = 'https://human.adamwhite.work/lab/privacy/';
 function topbar(label: string, home = false) {
-  return `<header class="topbar"><div class="topbar-label">${home ? `<a href="${GAMES}">All games</a>` : label}</div><div class="topbar-actions"><button id="help" class="info" aria-label="Information" popovertarget="about">i</button><button id="menu" aria-label="Game menu" aria-haspopup="dialog">≡</button></div></header>`;
+  return `<header class="topbar"><div class="topbar-label">${home ? `<a href="${GAMES}" target="_top">All games</a>` : label}</div><div class="topbar-actions"><button id="help" class="info" aria-label="Information" popovertarget="about">i</button><button id="menu" aria-label="Game menu" aria-haspopup="dialog">≡</button></div></header>`;
 }
 function bindTopbar() {
   showAbout();
@@ -254,7 +258,12 @@ export function start() {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   title();
   const notice = telemetryNotice();
-  if (notice) document.body.append(notice);
+  if (notice) {
+    const footer = document.getElementById('lab-notice') ?? document.createElement('footer');
+    footer.id = 'lab-notice';
+    footer.append(notice);
+    document.body.append(footer);
+  }
 }
 
 function title() {
@@ -274,10 +283,10 @@ function title() {
   app.innerHTML = `<div class="page screen title-screen">${topbar('', true)}
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">A night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
-    <p id="goal">Keep the dam below its crest and the town dry, or warned in time. Five nights, Monday to Friday. The week ends at Friday's first light, or when water comes over the crest.</p>
-    <button class="reading-row" id="other">Other ways in <span>▸</span></button></div>
-    <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Back to the desk</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">Start the week again</button><div id="restart-confirm" hidden><p>This week's log is torn out.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Take the night desk</button>'}
-    <p class="credit">People by the Human Framework ${FRAMEWORK_VERSION}</p></div></div>`;
+    <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. You work five nights, Monday to Friday. The week ends at Friday's first light, or when water comes over the crest.</p>
+    ${labMode() ? '<button class="reading-row" id="other">Lab tools <span>▸</span></button>' : ''}</div>
+    <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
+    ${labMode() ? `<p class="credit">People by the Human Framework ${FRAMEWORK_VERSION}</p>` : ''}</div></div>`;
   bindTopbar();
   drawDawn(document.getElementById('sample-chart') as HTMLCanvasElement, SAMPLE_DAWN);
   document.getElementById('sample')?.addEventListener('click', () => {
@@ -285,7 +294,14 @@ function title() {
     drawDawn(d.querySelector('#chart') as HTMLCanvasElement, SAMPLE_DAWN);
   });
   document.getElementById('cont')?.addEventListener('click', async () => {
-    if (!restored) return;
+    if (!restored) {
+      startError(
+        new Error('The saved run could not be read.'),
+        () => document.getElementById('cont')?.click(),
+        'load',
+      );
+      return;
+    }
     try {
       const loaded = await continuity.loadLocal(JSON.stringify(save));
       s = loaded;
@@ -295,8 +311,7 @@ function title() {
       readUntil = performance.now() + 6000;
       enter();
     } catch (error) {
-      continuity.status = String(error);
-      continuityMenu();
+      startError(error, () => document.getElementById('cont')?.click(), 'load');
     }
   });
   document.getElementById('new')?.addEventListener('click', () => {
@@ -317,6 +332,7 @@ function title() {
 }
 
 function otherWays() {
+  if (!labMode()) return;
   const d = dialog(
     'other-ways',
     'Other ways in',
@@ -349,7 +365,7 @@ function otherWays() {
 async function beginWeek(localOnly = false) {
   continuity.invalidate();
   cancelAnimationFrame(raf);
-  s = null;
+  const previous = s;
   try {
     const prepared = await continuity.fresh(Date.now() >>> 0, localOnly === true);
     s = prepared;
@@ -360,12 +376,29 @@ async function beginWeek(localOnly = false) {
     enter();
     window.scrollTo(0, 0);
   } catch (error) {
-    continuity.status = String(error);
-    continuityMenu();
+    s = previous;
+    if (s?.phase === 'watch') {
+      last = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
+    startError(error, () => void beginWeek(localOnly));
   }
 }
 
+function startError(error: unknown, retry: () => void, action = 'start') {
+  console.error('Glance chapter failed', error);
+  const d = dialog(
+    'start-error',
+    action === 'load' ? 'Could not resume' : 'Could not start',
+    `<p>We could not ${action === 'load' ? 'resume' : 'start'} the week. Your saved week is unchanged. You can try again or send Feedback.</p>${labMode() ? `<pre>${esc(String(error))}</pre>` : ''}`,
+    '<button id="retry-start">Try again</button><button id="error-feedback">Feedback</button><button id="dialog-back">Back</button>',
+  );
+  d.querySelector('#retry-start')?.addEventListener('click', retry);
+  d.querySelector('#error-feedback')?.addEventListener('click', sendWord);
+}
+
 function continuityMenu() {
+  if (!labMode()) return;
   const d = dialog(
     'continuity',
     'People between chapters',
@@ -414,19 +447,20 @@ function showAbout() {
   about.id = 'about';
   let heading = 'The night desk';
   let words =
-    "The river authority's night desk, one old dam above a town. A keeper reads the gauges by torch and radios the figures in. Every figure on your board is what he saw. Tap a gauge to send him; hold to insist. Five nights; the week ends at Friday's first light, or when water comes over the crest.";
+    "You work at the river authority's night desk. One old dam stands above a town. A keeper reads the gauges by torch and radios the figures in. Every figure on your board is what he saw. Tap a gauge to choose a job. Tap the job to ask him; hold the job button to insist. You work five nights. The week ends at Friday's first light, or when water comes over the crest.";
   if (screen === 'watch') {
     heading = 'Reading the desk';
     words =
-      'The level is water held behind the dam; the dial marks the spillway lip and the crest. More gate turns lower the dam, but the river through town rises about forty minutes later. “read” is the time he wrote down; “reported” is when it reached you. Each job shows his answer and roughly how long it takes. Time waits while a sheet is open. Let him rest between jobs.';
+      'The level is the height of water behind the dam. The spillway lip is where water starts to overflow into the spillway. The crest is the top of the dam. The dial marks both heights. More gate turns lower the dam, but the river through town rises about forty minutes later. “read” is the time he wrote down; “reported” is when it reached you. Each job shows his answer and roughly how long it takes. Time waits while a sheet is open. Let him rest between jobs.';
     if (s && s.night >= 2)
       words +=
-        ' The weir upstream shows water coming in, a long walk away. Ring Nerys at the Bridge Inn for the river. Hold Warn Mill Lane and the warden knocks doors; a warning for nothing costs her goodwill.';
+        ' The weir is a low barrier upstream. Its gauge shows how much water is coming in. It is a long walk away. Ring Nerys at the Bridge Inn for the river. Hold Warn Mill Lane and the warden knocks doors; a warning for nothing costs her goodwill.';
     if (s && s.night >= 3)
       words +=
         ' Choose who goes in each sheet. The other can rest. Two men can read the same gauge differently.';
     if (s && s.night >= 4)
-      words += ' When the radio is out, no request or report gets through. Silence is the warning.';
+      words +=
+        ' When the radio is out, no request or report gets through. You cannot send requests or receive reports until the radio returns.';
   } else if (screen === 'dawn') {
     heading = 'The morning page';
     words =
@@ -470,11 +504,23 @@ function gameMenu() {
     'game-menu',
     `Game menu${s ? ` · ${planOf(s).title} ${clock(s.minute)}` : ''}`,
     `<p>The night waits while this is open.</p>
-    ${s?.dawns.length ? '<button class="reading-row" id="mornings">This week’s mornings ▸</button>' : ''}
-    <fieldset class="pace-setting"><legend>The night’s pace</legend>${['Automatic', 'Slow', 'Steady', 'Fast'].map((name) => `<button data-pace="${name}" aria-pressed="${paceChoice === name}">${name}</button>`).join('')}</fieldset>
-    <button class="reading-row" id="browser-people">People between chapters</button><button class="reading-row" id="send-word">Send word ▸</button><button class="reading-row phone-only" id="fullscreen">Full screen</button><button class="reading-row" id="to-title">To the title page</button><a class="reading-row" href="${GAMES}">All games</a><div class="menu-footer">${recordSwitch('record-menu')}<a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></div>`,
-    '<button class="primary" id="dialog-back">Back to the desk</button>',
+    ${labMode() ? `<fieldset class="pace-setting"><legend>The night’s pace</legend>${['Automatic', 'Slow', 'Steady', 'Fast'].map((name) => `<button data-pace="${name}" aria-pressed="${paceChoice === name}">${name}</button>`).join('')}</fieldset><button class="reading-row" id="browser-people">People between chapters</button><button class="reading-row" id="to-title">To the title page</button>` : ''}
+    <button class="reading-row" id="send-word">Feedback</button><button class="reading-row" id="fullscreen">Full screen</button><a class="reading-row" href="${GAMES}" target="_top">All games</a>${recordSwitch('record-menu')}<button id="menu-new">New game</button><div id="menu-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="menu-confirm-new">Yes, start again</button><button id="menu-cancel-new">Cancel</button></div>`,
+    '<button class="primary" id="dialog-back">Resume</button>',
   );
+  d.querySelector('#menu-new')?.addEventListener('click', () => {
+    d.querySelector<HTMLElement>('#menu-confirm')!.hidden = false;
+  });
+  d.querySelector('#menu-cancel-new')?.addEventListener('click', () => {
+    d.querySelector<HTMLElement>('#menu-confirm')!.hidden = true;
+  });
+  d.querySelector('#menu-confirm-new')?.addEventListener('click', () => void beginWeek());
+  d.querySelector('#dialog-back')?.addEventListener('click', () => {
+    if (s?.chapterPaused) {
+      queueInput(s, { kind: 'resume' });
+      writeSave();
+    }
+  });
   bindRecord(d, 'record-menu');
   d.querySelectorAll<HTMLButtonElement>('[data-pace]').forEach((b) => {
     b.addEventListener('click', () => {
@@ -519,13 +565,20 @@ function mornings() {
       page.querySelector('#dialog-back')?.addEventListener('click', mornings);
     });
   });
-  d.querySelector('#dialog-back')?.addEventListener('click', gameMenu);
+  d.querySelector('#dialog-back')?.addEventListener('click', () => openSheet(null));
+}
+function feedbackName() {
+  try {
+    return localStorage.getItem('hf-lab-feedback-name') ?? '';
+  } catch {
+    return '';
+  }
 }
 function sendWord() {
   let sent = false;
   const d = dialog(
     'feedback',
-    'Send word',
+    'Feedback',
     `<p>Send a note about this game. Recorded play links across games on this device. You can switch recording off in the menu.</p>
     <div class="verdicts" role="group" aria-label="Your verdict">${[
       ['keep', "I'd keep playing"],
@@ -534,10 +587,9 @@ function sendWord() {
     ]
       .map(([id, label]) => `<button data-verdict="${id}" aria-pressed="false">${label}</button>`)
       .join('')}</div>
-    <label class="feedback-note">What happened on the desk, what you wanted, what got in the way.<textarea id="feedback-note" rows="4"></textarea></label>
-    <label>Your name or tester id<input id="feedback-name" type="text" maxlength="60" value="${esc(localStorage.getItem('hf-lab-feedback-name') ?? '')}" autocomplete="name"></label><p class="soft">A name links this device’s past and future play history. Leave it empty to stay pseudonymous.</p>
-    <details><summary>What is sent</summary><p>Your note, verdict and optional name. With recording off, no run or linked history is sent.</p><pre>${esc(JSON.stringify(s ? { seed: s.seed, night: s.night, minute: s.minute, inputs: s.inputs.length } : { screen: 'title' }, null, 2))}</pre><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></details>
-    <button id="keep-copy">Keep a copy of this run ⤓</button><p id="feedback-result" role="status"></p>`,
+    <label class="feedback-note">What happened? What did you want to do? What got in the way?<textarea id="feedback-note" rows="4"></textarea></label>
+    <label>Your name (optional)<input id="feedback-name" type="text" maxlength="60" value="${esc(feedbackName())}" autocomplete="name"></label><p class="soft">A name links this device’s past and future play history. Leave it empty to stay pseudonymous.</p>
+    <p class="soft">We send your note, verdict and optional name. With recording off, we send no run or linked history unless you choose to share it below. <a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></p><p id="feedback-result" role="status"></p>`,
     '<button id="feedback-back">← Back</button><button class="primary" id="feedback-send">Submit</button>',
   );
   const back = d.querySelector('#feedback-back');
@@ -585,7 +637,7 @@ function sendWord() {
         run: feedbackRun(),
         sharePlay,
       });
-      const sentMessage = `${noteOnly ? 'Note and verdict queued without a run or history linkage' : 'Note and verdict queued with available run and linked play'} · ${receipt}`;
+      const sentMessage = `${noteOnly ? 'Your feedback was queued without a run or linked history.' : 'Your feedback was queued with available run and linked play.'} · ${receipt}`;
       try {
         localStorage.setItem('hf-lab-feedback-name', who);
       } catch {
@@ -632,8 +684,9 @@ function watch() {
   app.innerHTML = `<div class="watch">${topbar('<span id="night"></span> · <span class="clock" id="clock"></span>')}
     <div class="state-strip"><div id="concern" class="attention keeper-chips" aria-live="polite"></div><div id="clock-rate" role="status"></div></div>
     <div class="desk-main"><div class="desk-picture"><div class="scene-zone"><canvas id="scene" class="scene" aria-label="The dam, as reported"></canvas><div id="latest-radio" class="latest-radio hand"></div></div><div class="board" id="board"></div></div>
-    <div class="desk-context"><div class="sheet" id="sheet"></div><div class="actionbar" id="skip-bar"><button id="skip" aria-label="Skip to the next event">Skip ⏩</button><span id="skip-caption" class="soft"></span></div></div></div></div>`;
+    <div class="desk-context"><div class="sheet" id="sheet"></div>${s.dawns.length ? '<button id="mornings" class="reading-row">This week’s mornings</button>' : ''}<div class="actionbar" id="skip-bar"><button id="skip" aria-label="Skip to the next event">Skip ⏩</button><span id="skip-caption" class="soft"></span></div></div></div></div>`;
   bindTopbar();
+  document.getElementById('mornings')?.addEventListener('click', mornings);
   document.getElementById('skip')?.addEventListener('click', () => {
     if (!s) return;
     skipUntil = skipUntil ? 0 : s.minute + 60;
@@ -756,7 +809,8 @@ function drawTop() {
     const pending = hasPending(s);
     skip.disabled = !skipUntil && (!pending || s.radioOut);
     skip.textContent = skipUntil ? 'Stop' : 'Skip ⏩';
-    if (caption) caption.textContent = s.radioOut ? 'Radio is out' : pending ? '' : 'Nothing on its way';
+    if (caption)
+      caption.textContent = s.radioOut ? 'The radio is out.' : pending ? '' : 'No report is on its way.';
   }
   const bar = document.getElementById('skip-bar');
   if (bar) bar.hidden = sheet !== null;
@@ -836,7 +890,7 @@ function drawLog() {
     const report = s.reports.findLast((r) => r.who === newest.who && r.at <= newest.at);
     setHtml(
       latest,
-      `${who ? `<b>${who}:</b> ` : ''}${hand(newest.text, report ? 1 - report.clarity : 0, newest.at)}`,
+      `${who ? `<b>${who}:</b> ` : ''}${hand(displayWords(newest.text), report ? 1 - report.clarity : 0, newest.at)}`,
     );
   }
   const el = document.getElementById('log');
@@ -853,7 +907,7 @@ function drawLog() {
           ? [...(s?.reports ?? [])].reverse().find((q) => q.who === x.who && q.at <= x.at)
           : undefined;
       const loose = r ? 1 - r.clarity : 0;
-      const body = sayClass(x) === 'p' ? hand(x.text, loose, x.at) : esc(x.text);
+      const body = sayClass(x) === 'p' ? hand(displayWords(x.text), loose, x.at) : esc(displayWords(x.text));
       // Tree notices can be stamped before delivery; only reading reports certify arrival here.
       const readingArrival = x.kind === 'report' && !x.text.includes('tree');
       const time = `${readingArrival ? 'reported ' : ''}${clock(x.at)}`;
@@ -884,21 +938,9 @@ function openSheet(sh: Sheet) {
 }
 
 function shortConcern(line: string) {
-  let words = line.replace(/^[^:]+: /, '').replace(/\.$/, '');
-  const waiting = /waiting/.test(words);
-  words = words.split(';')[0] ?? words;
-  words = words
-    .replace('available', 'free')
-    .replace('reading the level', 'level')
-    .replace('reading the weir', 'weir')
-    .replace('turning the gate', 'gate')
-    .replace('resting by the stove', 'stove')
-    .replace('asleep, as you said', 'asleep')
-    .replace('sleeping', 'asleep')
-    .replace('river report expected', 'looking')
-    .replace(/ · (?:report|finish) expected /, ' ')
-    .replace('call waiting for an answer', 'call waiting');
-  return words + (waiting ? ' ◷' : '');
+  return line
+    .replace(/^[^:]+: /, '')
+    .replace(/^(available|not answering|asleep|reading|turning|resting|sleeping)/, 'He is $1');
 }
 function drawConcern() {
   if (!s) return;
@@ -941,8 +983,8 @@ function drawSheet() {
     const warned = s.warnedAt !== null;
     const html = `<div class="who"><b>Bridge Inn</b><span class="soft">Nerys, by the river stairs</span><button class="x" id="x" aria-label="Close inspection">×</button></div>
       <div class="verbs two">
-        <button id="ring" ${ringing ? 'disabled' : ''}><span>Ring Nerys</span><span class="h">${ringing ? 'she’s gone to look' : 'how high is the river?'}</span></button>
-        <button id="warn" ${warned ? 'disabled' : ''}><span class="fill"></span><span>Warn Mill Lane</span><span class="h">${warned ? `warned at ${clock(s.warnedAt ?? 0)}` : 'hold: the warden knocks doors'}</span></button>
+        <button id="ring" ${ringing ? 'disabled' : ''}><span>Ring Nerys</span><span class="h">${ringing ? 'She has gone to look.' : 'Ask how high the river is.'}</span></button>
+        <button id="warn" ${warned ? 'disabled' : ''}><span class="fill"></span><span>Warn Mill Lane</span><span class="h">${warned ? `warned at ${clock(s.warnedAt ?? 0)}` : 'Hold to send the warden to warn people.'}</span></button>
       </div>${castConversations(['nerys', 'bilal', 'wren'])}`;
     if (!patchSheet(el, html, previousKey === structureKey)) return;
     bindConversations(el);
@@ -958,7 +1000,7 @@ function drawSheet() {
       bindHold(w, (insist) => {
         if (!insist) {
           const h = w.querySelector('.h');
-          if (h) h.textContent = 'keep your finger on it: the warden knocks doors';
+          if (h) h.textContent = 'Hold this button to send the warden to warn people.';
           w.classList.add('nudge');
           return;
         }
@@ -991,33 +1033,33 @@ function drawSheet() {
     const hs = opts.map((t) => deskHint(s as GameState, who, 'gate', t));
     const next = deskHint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
     head = `<b>Gate</b><span class="soft">${report ? `last gate ${reported}/${TURNS}, ${readingTime(report)}` : 'gate not read'}</span>`;
-    body = `<details class="fore"><summary>${NAMES[who]}, on the round after</summary><span class="hand">${next.forecast ? `“${esc(next.forecast)}”` : 'No word yet.'}</span></details>
+    body = `<details class="fore"><summary>${NAMES[who]}, after this job</summary><span class="hand">${next.forecast ? `“${esc(displayWords(next.forecast))}”` : 'No word yet.'}</span></details>
       <div class="verbs turns">${hs
         .map(
           (h) =>
-            `<button data-job="gate" data-t="${h.target}"><span class="fill"></span><span>${h.target === 0 ? 'shut' : `${h.target}`}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)}${h.minutes ? ` · ~${h.minutes}m` : ''}</span></button>`,
+            `<button data-job="gate" data-t="${h.target}"><span class="fill"></span><span>${h.target === 0 ? 'Shut' : `${h.target} ${h.target === 1 ? 'turn' : 'turns'}`}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(hintWords(h.short))}${h.minutes ? ` · ~${h.minutes}m` : ''}</span></button>`,
         )
         .join(
           '',
-        )}</div><p class="hint">0–${TURNS} turns open. More turns lower the dam; the town river rises later. ${seen.hold ? '' : 'Hold a button to insist.'}</p>`;
+        )}</div><p class="hint">The gate opens from 0 to ${TURNS} turns. More turns lower the dam level; the town river rises later. ${seen.hold ? '' : 'Hold a button to insist.'}</p>`;
   } else if (sheet.kind === 'gauge') {
     const job: Job = sheet.gauge === 'weir' ? 'weir' : 'level';
     const h = deskHint(s, who, job);
     const hi = deskHint(s, who, job, undefined, true);
-    head = `<b>${job === 'level' ? 'Level' : 'Weir'}</b><span class="soft">${job === 'level' ? 'water held behind the dam' : 'the weir board, a long walk upstream'}</span>`;
+    head = `<b>${job === 'level' ? 'Level' : 'Weir'}</b><span class="soft">${job === 'level' ? 'water held behind the dam' : 'the upstream weir gauge; it shows incoming water'}</span>`;
     const firstReading = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
-      <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">${NAMES[who]}, on the round after:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'No word yet.'}</span></p>
-      <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every figure is what a keeper saw.' : lastWords(s, sheet.gauge)}</p>`;
+      <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">${NAMES[who]}, after this job:</span> <span class="hand">${h.forecast ? `“${esc(displayWords(h.forecast))}”` : 'No word yet.'}</span></p>
+      <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every reading is what a keeper saw. It may be wrong.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
     head = `<b>${NAMES[who]}</b><span class="soft">${esc(concernLines(s).find((line) => line.startsWith(`${NAMES[who]}:`)) ?? whereWords(who))}</span>`;
     const jobs: { job: Job; label: string }[] = [
       { job: 'level', label: 'Read the level' },
       { job: 'stove', label: 'Sit by the stove' },
-      { job: 'nap', label: 'Get your head down' },
+      { job: 'nap', label: 'Take a nap' },
     ];
     if (planOf(s).weir) jobs.splice(1, 0, { job: 'weir', label: 'Go to the weir' });
-    if (s.treeKnown && s.water.blocked) jobs.push({ job: 'clear', label: 'Clear the screen' });
+    if (s.treeKnown && s.water.blocked) jobs.push({ job: 'clear', label: 'Clear the debris screen' });
     body = verbButtons(
       jobs.map((j) => ({
         h: deskHint(s as GameState, who, j.job),
@@ -1067,7 +1109,7 @@ function drawSheet() {
 function castConversations(ids: CastId[]): string {
   if (!s) return '';
   const available = discoveriesFor(s);
-  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask whether they want to continue'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. Close this inspection to let the shift continue. Dam requests still go to the keepers.</p></details>`;
+  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(displayWords(CAST[id].role))}</p>${s?.discoveries[id] ? `<p class="hand">${esc(displayWords(rememberedConversation(s as GameState, id) ?? ''))}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask whether they want to continue'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. Close this inspection to let the shift continue. Dam requests still go to the keepers.</p></details>`;
 }
 function bindConversations(el: HTMLElement) {
   el.querySelectorAll<HTMLButtonElement>('[data-talk]').forEach((button) => {
@@ -1129,7 +1171,7 @@ function verbButtons(items: { h: Hint; label: string; insist: Hint | undefined }
   return `<div class="verbs ${grid ? 'grid' : 'one'}">${items
     .map(
       ({ h, label, insist }) =>
-        `<button data-job="${h.job}"><span class="fill"></span><span>${esc(label)}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)}${h.minutes && h.job !== 'stove' && h.job !== 'nap' ? ` · ~${h.minutes} min` : ''}${insist && insist.verdict !== h.verdict ? ` · held: ${esc(insist.short)}` : ''}</span></button>`,
+        `<button data-job="${h.job}"><span class="fill"></span><span>${esc(label)}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(hintWords(h.short))}${h.minutes && h.job !== 'stove' && h.job !== 'nap' ? ` · ~${h.minutes} min` : ''}${insist && insist.verdict !== h.verdict ? ` · held: ${esc(hintWords(insist.short))}` : ''}</span></button>`,
     )
     .join('')}</div>`;
 }
@@ -1138,7 +1180,7 @@ function lastWords(st: GameState, g: Gauge): string {
   const r = st.board[g];
   if (!r) return 'Nobody has read it yet tonight.';
   const who = r.who === 'nerys' ? 'Nerys' : NAMES[r.who as KeeperId];
-  return `Last: ${who}, ${readingTime(r)}: “${esc(reportWords(st, r))}”`;
+  return `Last: ${who}, ${readingTime(r)}: “${esc(displayWords(reportWords(st, r)))}”`;
 }
 
 function whereWords(id: KeeperId): string {
@@ -1257,9 +1299,9 @@ function ending() {
   const misses = ds.reduce((a, d) => a + d.misses.length, 0);
   const caught = ds.reduce((a, d) => a + d.misses.filter((m) => m.caught).length, 0);
   const verdict = !held
-    ? 'The dam went over on your watch. There will be an inquiry, and they will read the log.'
+    ? 'Water came over the top of the dam on your watch. There will be an inquiry, and they will read the log.'
     : ds.length === NIGHTS && flooded === 0
-      ? 'Five nights, and the lane never flooded unwarned. You read the men, not the gauges.'
+      ? 'You worked five nights, and the lane never flooded without warning. You checked the keepers’ readings carefully.'
       : `The dam held all week. Mill Lane flooded ${flooded === 1 ? 'once' : `${flooded} times`} without warning.`;
   screen = 'end';
   app.innerHTML = `<div class="page screen dawn ending">${topbar('The week is over')}<div class="page-body">
@@ -1268,17 +1310,18 @@ function ending() {
     <ul class="week">${ds
       .map(
         (d) =>
-          `<li><b>${PLANS[d.night - 1]?.title}</b> ${d.overtopped ? 'overtopped' : d.spilled ? 'spilled' : 'held'} · Mill Lane ${d.overtopped ? 'flooded' : d.mill} · caught ${d.misses.filter((m) => m.caught).length} of ${d.misses.length}</li>`,
+          `<li><b>${PLANS[d.night - 1]?.title}</b> ${d.overtopped ? 'Water came over the dam.' : d.spilled ? 'Water flowed into the spillway.' : 'The dam held.'} Mill Lane ${d.overtopped || d.mill === 'flooded' ? 'flooded without warning' : d.mill === 'saved' ? 'flooded after a warning' : 'stayed dry'}. You caught ${d.misses.filter((m) => m.caught).length} of ${d.misses.length} wrong readings.</li>`,
       )
       .join('')}</ul>
-    <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong figures before they cost you.` : ''}</p>
-    ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(l.aboutYou)}</p></div>`).join('')}
+    <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong figures during the week.` : ''}</p>
+    ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(displayWords(l.aboutYou))}</p></div>`).join('')}
     <div id="closing-tally"></div><button class="reading-row" id="back">${PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
-    <div class="actionbar ending-actions"><div><button id="send">Send word</button><button id="export">Download this run</button></div><button class="primary" id="again">Another week</button></div></div>`;
+    <div class="actionbar ending-actions"><div><button id="send">Feedback</button>${labMode() ? '<button id="export">Download this run</button>' : ''}</div><button class="primary" id="again">New game</button></div></div>`;
   bindTopbar();
   updateTally();
   document.getElementById('again')?.addEventListener('click', () => {
-    beginWeek();
+    gameMenu();
+    document.getElementById('menu-new')?.click();
   });
   document.getElementById('export')?.addEventListener('click', download);
   document.getElementById('send')?.addEventListener('click', sendWord);
