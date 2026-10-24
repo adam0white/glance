@@ -535,8 +535,6 @@ function sendWord() {
       .join('')}</div>
     <label class="feedback-note">What happened on the desk, what you wanted, what got in the way.<textarea id="feedback-note" rows="4"></textarea></label>
     <label>Your name or tester id<input id="feedback-name" type="text" maxlength="60" value="${esc(localStorage.getItem('hf-lab-feedback-name') ?? '')}" autocomplete="name"></label><p class="soft">A name links this device’s past and future play history. Leave it empty to stay pseudonymous.</p>
-    <div id="recording-notice">${recordingOff() ? `<p>Recording is off. You can still send your note.</p>${recordSwitch('record-feedback')}` : ''}</div>
-    ${lab.privacySignalOn && !lab.privacyOverride ? '<label><input id="consent-run" type="checkbox">Send this run with my note</label>' : ''}
     <details><summary>What is sent</summary><p>Your note, verdict and optional name. With recording off, no run or linked history is sent.</p><pre>${esc(JSON.stringify(s ? { seed: s.seed, night: s.night, minute: s.minute, inputs: s.inputs.length } : { screen: 'title' }, null, 2))}</pre><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></details>
     <button id="keep-copy">Keep a copy of this run ⤓</button><p id="feedback-result" role="status"></p>`,
     '<button id="feedback-back">← Back</button><button class="primary" id="feedback-send">Send</button>',
@@ -555,12 +553,9 @@ function sendWord() {
 
   let verdict = '';
   const send = d.querySelector('#feedback-send') as HTMLButtonElement;
-  const consent = d.querySelector('#consent-run') as HTMLInputElement | null;
   const update = () => {
     send.disabled = false;
   };
-  bindRecord(d, 'record-feedback', update);
-  consent?.addEventListener('change', update);
   update();
   d.querySelector('#feedback-back')?.addEventListener('click', gameMenu);
   d.querySelector('#keep-copy')?.addEventListener('click', download);
@@ -582,11 +577,7 @@ function sendWord() {
     const who = (d.querySelector('#feedback-name') as HTMLInputElement).value.trim().slice(0, 60);
     try {
       const message = `${verdict ? `[${verdict}] ` : ''}${note}`;
-      if (!recordingOff() && consent?.checked && lab.personaRecordingAllowed) {
-        await lab.sendRun(s ? exportRun(s, FRAMEWORK_VERSION) : {}, { note: message, name: who });
-      } else {
-        await lab.sendFeedback(message, { name: who, run: feedbackRun() });
-      }
+      await lab.sendFeedback(message, { name: who, run: feedbackRun() });
       try {
         localStorage.setItem('hf-lab-feedback-name', who);
       } catch {

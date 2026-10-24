@@ -423,17 +423,16 @@ it('sends linked feedback with verdict and trimmed remembered name', async () =>
   expect(localStorage.getItem('hf-lab-feedback-name')).toBe('owner');
 });
 
-it('allows feedback while recording is off and keeps the inline switch', async () => {
+it('allows feedback while recording is off without another recording choice', async () => {
   localStorage.setItem('hf-lab-recording-off', '1');
   await boot();
   await click('menu');
   await click('send-word');
   expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(false);
-  expect(document.querySelector('#recording-notice')?.textContent).toContain('still send your note');
-  const input = document.getElementById('record-feedback') as HTMLInputElement;
-  input.checked = true;
-  input.dispatchEvent(new Event('change'));
-  expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(false);
+  expect(document.getElementById('record-feedback')).toBeNull();
+  await click('feedback-send');
+  const { lab } = await import('../src/ui/lab.ts');
+  expect(lab.sendFeedback).toHaveBeenCalled();
 });
 
 it('allows a privacy note without a run or another dialog', async () => {
