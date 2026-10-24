@@ -505,3 +505,28 @@ it('keeps feedback sent when remembering the name fails', async () => {
   await vi.waitFor(() => expect(document.getElementById('feedback-result')?.textContent).toContain('queued'));
   expect(document.getElementById('feedback-send')?.textContent).toBe('Back to the desk');
 });
+
+it.each(['pending', 'failed'])(
+  'routes the inline choice through the whole-history coordinator when %s without blocking feedback',
+  async (outcome) => {
+    await boot();
+    const { lab } = await import('../src/ui/lab.ts');
+    Object.assign(lab, { personaRecordingRequired: true, personaRecordingAllowed: false });
+    await click('menu');
+    await click('send-word');
+    const { Continuity } = await import('../src/continuity.ts');
+    const choice = vi
+      .spyOn(Continuity.prototype, 'recording')
+      .mockImplementationOnce(() =>
+        outcome === 'pending' ? new Promise<void>(() => {}) : Promise.reject(new Error('epoch changed')),
+      );
+    const rawGrant = vi.spyOn(lab, 'allowPersonaRecording');
+    rawGrant.mockClear();
+    document.querySelector<HTMLInputElement>('#feedback input[type=checkbox]')?.click();
+    await vi.waitFor(() => expect(choice).toHaveBeenCalledWith(true));
+    expect(rawGrant).not.toHaveBeenCalled();
+    expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(false);
+    await click('feedback-send');
+    await vi.waitFor(() => expect(lab.sendFeedback).toHaveBeenCalled());
+  },
+);

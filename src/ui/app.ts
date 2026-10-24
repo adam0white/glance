@@ -548,7 +548,24 @@ function sendWord() {
       return undefined;
     }
   };
-  const personaChoice = feedbackPersonaControl(lab);
+  const personaChoice = feedbackPersonaControl({
+    personaRecordingRequired: lab.personaRecordingRequired,
+    get personaRecordingAllowed() {
+      return lab.personaRecordingAllowed;
+    },
+    allowPersonaRecording(allow) {
+      void Promise.resolve()
+        .then(() => (allow ? continuity.recording(true) : continuity.deny()))
+        .then(syncPersonaChoice, syncPersonaChoice);
+    },
+  });
+  function syncPersonaChoice() {
+    const input = personaChoice?.querySelector('input');
+    if (input) input.checked = lab.personaRecordingAllowed;
+  }
+  if (personaChoice?.lastChild)
+    personaChoice.lastChild.textContent =
+      ' Link all continuing histories in this run to lab recording (optional)';
   if (personaChoice) d.querySelector('textarea')?.after(personaChoice);
 
   let verdict = '';
