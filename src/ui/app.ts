@@ -577,14 +577,16 @@ function sendWord() {
     const who = (d.querySelector('#feedback-name') as HTMLInputElement).value.trim().slice(0, 60);
     try {
       const message = `${verdict ? `[${verdict}] ` : ''}${note}`;
-      await lab.sendFeedback(message, { name: who, run: feedbackRun() });
+      const noteOnly = !lab.telemetryOn || (lab.privacySignalOn && !lab.privacyOverride);
+      const receipt = await lab.sendFeedback(message, { name: who, run: feedbackRun() });
+      const sentMessage = `${noteOnly ? 'Note and verdict queued without a run or history linkage' : 'Note and verdict queued. Run details depend on recording and availability; continuing-person history links only after explicit consent'} · ${receipt}`;
       try {
         localStorage.setItem('hf-lab-feedback-name', who);
       } catch {
         /* The note was queued even when this device cannot remember its name. */
       }
       sent = true;
-      d.querySelector('#feedback-result')!.textContent = 'Sent. Thank you.';
+      d.querySelector('#feedback-result')!.textContent = sentMessage;
       send.textContent = 'Back to the desk';
       send.disabled = false;
     } catch {

@@ -412,9 +412,7 @@ it('sends linked feedback with verdict and trimmed remembered name', async () =>
   (document.getElementById('feedback-note') as HTMLTextAreaElement).value = 'I wanted another reading.';
   (document.getElementById('feedback-name') as HTMLInputElement).value = '  owner  ';
   await click('feedback-send');
-  await vi.waitFor(() =>
-    expect(document.getElementById('feedback-result')?.textContent).toBe('Sent. Thank you.'),
-  );
+  await vi.waitFor(() => expect(document.getElementById('feedback-result')?.textContent).toContain('queued'));
   const { lab } = await import('../src/ui/lab.ts');
   expect(lab.sendFeedback).toHaveBeenCalledWith(
     '[keep] I wanted another reading.',
@@ -504,8 +502,6 @@ it('keeps feedback sent when remembering the name fails', async () => {
     throw new DOMException('Full', 'QuotaExceededError');
   });
   await click('feedback-send');
-  await vi.waitFor(() =>
-    expect(document.getElementById('feedback-result')?.textContent).toBe('Sent. Thank you.'),
-  );
+  await vi.waitFor(() => expect(document.getElementById('feedback-result')?.textContent).toContain('queued'));
   expect(document.getElementById('feedback-send')?.textContent).toBe('Back to the desk');
 });
