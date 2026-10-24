@@ -1,4 +1,10 @@
-import { feedbackPersonaControl, feedbackSharePlay } from '@adam0white/lab-kit';
+import {
+  feedbackPersonaControl,
+  feedbackSharePlay,
+  setTelemetryOff,
+  telemetryNotice,
+  telemetryOn,
+} from '@adam0white/lab-kit';
 /**
  * The Glance UI: DOM for the board, the radio log and the sheets; one canvas for the dam. The UI reads state and
  * queues inputs; it never changes the sim directly. Real time drives sim minutes, continuously, slowing while a
@@ -247,6 +253,8 @@ export function start() {
   )
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   title();
+  const notice = telemetryNotice();
+  if (notice) document.body.append(notice);
 }
 
 function title() {
@@ -328,7 +336,7 @@ function otherWays() {
       await continuity.recording();
       if (generation !== continuity.generation || s !== loaded) return;
       writeSave();
-      result.textContent = 'Replayed. It matches the exported run. File history stays recording-gated.';
+      result.textContent = 'Replayed. It matches the exported run. Recording follows your menu choice.';
       const resume = d.querySelector('#dialog-back') as HTMLButtonElement;
       resume.textContent = 'Back to the desk';
       resume.addEventListener('click', enter);
@@ -445,15 +453,14 @@ function enter() {
   else ending();
 }
 
-function recordingOff() {
-  return localStorage.getItem('hf-lab-recording-off') === '1';
-}
 function recordSwitch(id: string) {
-  return `<label class="record-switch"><input type="checkbox" id="${id}" ${recordingOff() ? '' : 'checked'}>Record play for the lab</label>`;
+  return `<label class="record-switch"><input type="checkbox" id="${id}" ${telemetryOn(lab) ? 'checked' : ''}>Record play for the lab</label>`;
 }
 function bindRecord(d: HTMLElement, id: string, changed?: () => void) {
   d.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('change', (e) => {
-    lab.setEventsOff(!(e.target as HTMLInputElement).checked);
+    const input = e.target as HTMLInputElement;
+    setTelemetryOff(lab, !input.checked);
+    input.checked = telemetryOn(lab);
     changed?.();
   });
 }

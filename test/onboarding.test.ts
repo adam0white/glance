@@ -521,3 +521,16 @@ it.each([false, true])('submits its single recording opt-in checkbox as %s', asy
     expect(lab.sendFeedback).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ sharePlay })),
   );
 });
+
+it('shows the effective privacy default and opts in with the single recording switch', async () => {
+  await boot();
+  const { lab } = await import('../src/ui/lab.ts');
+  const setRecording = vi.fn((off: boolean) => Object.assign(lab, { telemetryOn: !off }));
+  Object.assign(lab, { telemetryOn: false, privacySignalOn: true, setTelemetryOff: setRecording });
+  await click('menu');
+  const recording = document.getElementById('record-menu') as HTMLInputElement;
+  expect(recording.checked).toBe(false);
+  recording.click();
+  expect(setRecording).toHaveBeenCalledWith(false);
+  expect(recording.checked).toBe(true);
+});
