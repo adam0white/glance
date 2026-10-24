@@ -1,69 +1,48 @@
-/** Canonical content revision 1. Local profile pin pending the released shared cast module.
+/** Canonical content revision 1. Complete profiles come from the published shared cast artifact.
  * Supports bounded, invited conversations, not qualifications, free reading of secrets, or travel admission.
  */
 import { createPerson, MINUTES_PER_YEAR, type Person, type PersonSpec } from '@adam0white/human-framework';
+import { canonicalCast, castForGame } from '@adam0white/lab-client';
 import type { GameState } from './dam.ts';
 
 export type CastId = 'dai' | 'callum' | 'nerys' | 'bilal' | 'wren';
-export const VALUES = {
-  benevolence: 0.5,
-  universalism: 0.5,
-  tradition: 0.5,
-  conformity: 0.5,
-  security: 0.5,
-  achievement: 0.5,
-  power: 0.5,
-  hedonism: 0.5,
-  stimulation: 0.5,
-  selfDirection: 0.5,
-};
-const traits = (
-  honesty: number,
-  emotionality: number,
-  extraversion: number,
-  agreeableness: number,
-  conscientiousness: number,
-  openness: number,
-) => ({ honesty, emotionality, extraversion, agreeableness, conscientiousness, openness });
 export const CAST = {
   dai: {
     castId: 'hf.cast.dai.glance',
     name: 'Dai',
     age: 63,
-    traits: traits(0.7, 0.3, 0.35, 0.35, 0.75, 0.45),
     role: 'Dam keeper, thirty-one years here. Separated; his adult daughter lives nearby.',
   },
   callum: {
     castId: 'hf.cast.callum.glance',
     name: 'Callum',
     age: 24,
-    traits: traits(0.8, 0.8, 0.55, 0.85, 0.8, 0.55),
     role: 'Agency keeper, second week. His partner and baby are at home.',
   },
   nerys: {
     castId: 'hf.cast.nerys.glance',
     name: 'Nerys',
     age: 47,
-    traits: traits(0.75, 0.55, 0.75, 0.6, 0.7, 0.65),
     role: 'Bridge Inn keeper. She and her long-term partner run the inn; her river reports are observations from the steps.',
   },
   bilal: {
     castId: 'hf.cast.bilal.rope',
     name: 'Bilal',
     age: 41,
-    traits: traits(0.85, 0.5, 0.5, 0.85, 0.7, 0.5),
     role: 'Visiting maintenance technician. A five-day portable-lamp repair contract, with family leave and travel arranged from the Coast. Married, with a stepchild. No gate or dam-engineering authority.',
   },
   wren: {
     castId: 'hf.cast.wren.rope',
     name: 'Wren',
     age: 29,
-    traits: traits(0.65, 0.35, 0.3, 0.25, 0.55, 0.7),
     role: 'Visiting field ecologist from the Coast, on a five-day downstream survey with access agreed. An older sibling remains at home. No control-room engineering authority.',
   },
 } as const;
 export function canonicalSpec(id: CastId): Pick<PersonSpec, 'traits' | 'values'> {
-  return { traits: { ...CAST[id].traits }, values: { ...VALUES } };
+  const canonical = canonicalCast(CAST[id].castId);
+  if (!castForGame('glance').some((c) => c.castId === canonical.castId))
+    throw new Error('Unallocated identity');
+  return { traits: structuredClone(canonical.traits), values: structuredClone(canonical.values) };
 }
 export function makeVisitor(id: 'nerys' | 'bilal' | 'wren', seed: number, now: number): Person {
   const c = CAST[id];
@@ -79,9 +58,14 @@ export function makeVisitor(id: 'nerys' | 'bilal' | 'wren', seed: number, now: n
 }
 
 /** Availability is operational, not permission to inspect somebody's private material. */
+export function lifeReady(s: GameState, id: CastId): boolean {
+  const firstRole = id === 'dai' ? 1320 : id === 'callum' ? 4200 : 2760;
+  return !s.life[id] || !!s.life[id]?.availableForExtraWork || s.minute >= firstRole + 30;
+}
 export function discoveriesFor(s: GameState): CastId[] {
   if (s.phase !== 'watch' || s.radioOut) return [];
   return (Object.keys(CAST) as CastId[]).filter((id) => {
+    if (!lifeReady(s, id)) return false;
     if (s.discoveries[id]) return false;
     if (id === 'nerys') return s.night >= 2 && s.nerys.ringing === null && s.nerys.goodwill >= 0.35;
     if (id === 'bilal' || id === 'wren')
@@ -143,3 +127,8 @@ export function talk(s: GameState, id: CastId): void {
     s.said.push({ at: s.minute, who: id, kind: 'answer', text: 'Not yet. Please give me a quiet minute.' });
   }
 }
+
+export const ALLOCATION = Object.entries(CAST).map(([id, c]) => ({
+  ...canonicalCast(c.castId),
+  id: id as CastId,
+}));

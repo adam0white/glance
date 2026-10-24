@@ -1,6 +1,6 @@
 # Canonical cast adoption
 
-Content phase only. Full delivery requires the published shared life contract and owner acceptance follows technical delivery. Source: HF docs/lab/cast-registry.md, entries24–28 and Glance allocation. Canonical profiles pinned locally pending published shared module. Fresh authored travel replaces no actual carried history; continuing travel awaits semantic admission.
+Canonical adoption implementation. Owner acceptance follows technical delivery. Source: HF docs/lab/cast-registry.md, entries24–28 and Glance allocation. Canonical profiles use the released shared cast artifact. Fresh authored travel replaces no actual carried history; continuing travel awaits semantic admission.
 
 ## Exhaustive foreground census
 
@@ -32,4 +32,20 @@ Focused mechanism control at seed7 uses ordinary gate requests and available con
 
 Discovered dialogue remains readable in the People detail on later nights, independently of the bounded radio log.
 
-Current edition glance@2-cast refuses old imported exports with Start fresh and stores local saves separately. No old-save migration promised. Whole-cast admission, away-life, loaded receipt ownership, terminal closure and privacy gates await published platform-ready; no continuity claim in this phase.
+Current edition glance@3-cast-life refuses old imported exports with Start fresh and stores local saves separately. No old-save migration promised. Whole-cast admission, away-life, loaded receipt ownership, terminal closure and privacy gates are implemented below; live journey evidence remains in the scratch report.
+
+## Published continuity implementation
+
+HF2.18.0/engine2.17.0, immutable client0.4/kit0.5 now replace the temporary profile pin. The shared canonical allocation supplies complete opening traits/values. All five expected heads, including absence, are preflighted before one atomic claim. Every applicable compatible head enters together; one incompatible or closed head blocks the chapter with explicit fresh-local recovery.
+
+Finite peer adapter: Commonstead source game/rules commonstead/commonstead-3, native commonstead-cast/1 and commonstead-calendar/1; sourceRole and source Person ID hf.cast.nerys.glance. Exact identity, revision, source engine/schema/minute/full RNG/checkpoint SHA256, DEFAULT_NORMS and supported rest/eat/drink/sleep calendar meanings are checked. Actual portable traits, values, RNG, fitness and circadian peak enter the HF Person. Unsupported skills and memories stay in the full source archive. Dai's Commonstead passport refuses because it does not certify current dam operating skills. Unknown sources/dialects refuse; public profiles never count as history.
+
+Replay pins full initial actors for all five plus every preparation/input/claim. Current file imports replay and compare complete state, discard ownership and remain file-origin through local reload. Local wrappers separately preserve the exact accepted heads, source archive and run identity. A source build stamp has the actual build prefix plus a run nonce, preventing identical native claims from becoming an unrelated stale source's idempotent checkpoint. No latest-head retry. Old editions refuse plainly.
+
+Carried assignment/place/one-sided public notices are pinned in the opening radio log. Availability has actual effect at each person's first role scene: a carried unavailable Nerys asks for a call after22:30 on night2; later calls follow the original bounded witness loop. Keeper place and first-scene extra-work availability consume life. No mutual recognition or secret knowledge is inferred.
+
+Pause chapter is a logged gameplay input. Current activities finish before pausing. Nerys asks her partner to cover the inn at this boundary; outstanding river calls must complete. Keeper/contractor roles still bind until the week closes. HF health/project/goal/debt/calendar restrictions can still refuse export; no active goal is cancelled for travel. Actual source snapshots and checksum receipts stay in bounded local export archives. Owned death publishes exact-parent terminal closure; this slice has no authored lethal event, so death protocol evidence is synthetic.
+
+Recording is closed before hooks. All pinned historical branches must permit one unchanged opaque epoch or receive explicit complete-group approval. Identity/recording/continuity/load changes invalidate the generation. File imports never inherit source ownership, authorship or automatic recording permission. Character-analysis consent stays separate. Local play/export remains possible when recording is denied.
+
+Technical verification and genuine browser journey receipts are recorded in /Users/abdul/code/.lab-scratch/cast/glance.md; no synthetic control is a human playtest or a cross-origin journey.

@@ -5,13 +5,13 @@
  */
 
 import { FRAMEWORK_VERSION } from '@adam0white/human-framework';
-import { CAST, type CastId, discoveriesFor, rememberedConversation } from '../sim/cast.ts';
+import { personaChannel, watchPersonaCheckpoint } from '@adam0white/lab-client';
+import { Continuity, LOCAL_KEY } from '../continuity.ts';
+import { ALLOCATION, CAST, type CastId, discoveriesFor, rememberedConversation } from '../sim/cast.ts';
 import {
   clock,
-  type Export,
   exportRun,
   fingerprint,
-  GAME_VERSION,
   type GameState,
   type Gauge,
   type Hint,
@@ -20,13 +20,11 @@ import {
   type Job,
   keeperOf,
   NIGHTS,
-  newGame,
   PLANS,
   personOf,
   planOf,
   queueInput,
   type Report,
-  replay,
   reportWords,
   type Said,
   step,
@@ -34,6 +32,7 @@ import {
   watchFrom,
 } from '../sim/dam.ts';
 import { KEEPERS, type KeeperId, NAMES } from '../sim/keepers.ts';
+import { importCurrent } from '../sim/run.ts';
 import { CREST, LIP, TURNS } from '../sim/water.ts';
 import { concernLines, thresholdWords } from './concern.ts';
 import { drawDawn } from './dawn.ts';
@@ -45,7 +44,12 @@ import { drawScene, type SceneFx, sceneHit } from './scene.ts';
 import { tallyBody } from './tally.ts';
 import { readingTime } from './time.ts';
 
-const SAVE = 'glance-save-v2-cast';
+const SAVE = LOCAL_KEY;
+const continuity = new Continuity(lab, personaChannel(), () => {
+  if (s) writeSave();
+  const status = document.getElementById('continuity-status');
+  if (status) status.textContent = continuity.status;
+});
 let selectedRate = 1.4;
 let paceChoice = 'Automatic';
 let skipUntil = 0;
@@ -53,9 +57,11 @@ let screen = 'title';
 let saveFailed = false;
 
 interface Save {
-  seed: number;
-  inputs: Input[];
-  minute: number;
+  run: ReturnType<typeof exportRun>;
+  runId: string;
+  heads: unknown[];
+  fileOrigin: boolean;
+  sources: unknown[];
 }
 
 type Sheet =
@@ -94,12 +100,13 @@ function readSave(): Save | null {
 }
 function saveNow() {
   if (!s) throw new Error('No run to save');
-  const text = JSON.stringify({ seed: s.seed, inputs: s.inputs, minute: s.minute });
+  const text = continuity.localSave(s);
   localStorage.setItem(SAVE, text);
-  lab.captureSave(JSON.parse(text));
+  lab.captureSave(exportRun(s, FRAMEWORK_VERSION));
 }
 function writeSave() {
   if (!s) return;
+  closeOwnedDeaths();
   try {
     saveNow();
     saveFailed = false;
@@ -232,19 +239,29 @@ function needleAngle(r: Report | null, g: Gauge): number {
 // ---------- title ----------
 
 export function start() {
-  if ('serviceWorker' in navigator && location.hostname !== 'localhost')
+  if (
+    !import.meta.env.DEV &&
+    'serviceWorker' in navigator &&
+    !['localhost', '127.0.0.1'].includes(location.hostname)
+  )
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   title();
 }
 
 function title() {
+  continuity.invalidate();
   cancelAnimationFrame(raf);
   screen = 'title';
   sheet = null;
   skipUntil = 0;
   lab.screen('title');
   const save = readSave();
-  const restored = save ? replay(save.seed, save.inputs, save.minute) : null;
+  let restored: GameState | null = null;
+  try {
+    if (save) restored = importCurrent(save.run);
+  } catch {
+    /* Explicit fresh play remains available. */
+  }
   app.innerHTML = `<div class="page screen title-screen">${topbar('', true)}
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">A night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
@@ -258,11 +275,20 @@ function title() {
     const d = dialog('sample-page', 'A sample morning', reportBody(SAMPLE_DAWN, false, true));
     drawDawn(d.querySelector('#chart') as HTMLCanvasElement, SAMPLE_DAWN);
   });
-  document.getElementById('cont')?.addEventListener('click', () => {
+  document.getElementById('cont')?.addEventListener('click', async () => {
     if (!restored) return;
-    s = restored;
-    readUntil = performance.now() + 6000;
-    enter();
+    try {
+      const loaded = await continuity.loadLocal(JSON.stringify(save));
+      s = loaded;
+      const generation = continuity.generation;
+      await continuity.recording();
+      if (generation !== continuity.generation || s !== loaded) return;
+      readUntil = performance.now() + 6000;
+      enter();
+    } catch (error) {
+      continuity.status = String(error);
+      continuityMenu();
+    }
   });
   document.getElementById('new')?.addEventListener('click', () => {
     if (!save) beginWeek();
@@ -271,7 +297,9 @@ function title() {
       document.getElementById('new')!.hidden = true;
     }
   });
-  document.getElementById('confirm-new')?.addEventListener('click', beginWeek);
+  document.getElementById('confirm-new')?.addEventListener('click', () => {
+    void beginWeek();
+  });
   document.getElementById('cancel-new')?.addEventListener('click', () => {
     document.getElementById('restart-confirm')!.hidden = true;
     document.getElementById('new')!.hidden = false;
@@ -283,25 +311,23 @@ function otherWays() {
   const d = dialog(
     'other-ways',
     'Other ways in',
-    '<button id="load">Load a playtest run</button><input type="file" id="file" accept="application/json" hidden><p id="load-result" role="status"></p>',
+    '<button id="browser-people">Browser people and continuity</button><button id="load">Load a playtest run</button><input type="file" id="file" accept="application/json" hidden><p id="load-result" role="status"></p>',
   );
   const file = d.querySelector('#file') as HTMLInputElement;
+  d.querySelector('#browser-people')?.addEventListener('click', continuityMenu);
   d.querySelector('#load')?.addEventListener('click', () => file.click());
   file.addEventListener('change', async () => {
     const f = file.files?.[0];
     if (!f) return;
     const result = d.querySelector('#load-result') as HTMLElement;
     try {
-      const ex = JSON.parse(await f.text()) as Export;
-      if (ex.game !== GAME_VERSION || ex.state?.version !== GAME_VERSION) throw new Error('Old edition');
-      if (!Number.isFinite(ex.seed) || !Array.isArray(ex.inputs) || !ex.state) throw new Error('Invalid run');
-      const r = replay(ex.seed, ex.inputs, ex.state.minute);
-      const same = fingerprint(r) === fingerprint(ex.state);
-      s = r;
+      const loaded = await continuity.importFile(await f.text());
+      s = loaded;
+      const generation = continuity.generation;
+      await continuity.recording();
+      if (generation !== continuity.generation || s !== loaded) return;
       writeSave();
-      result.textContent = same
-        ? 'Replayed. It matches the exported run.'
-        : 'Replayed. It differs from the export.';
+      result.textContent = 'Replayed. It matches the exported run. File history stays recording-gated.';
       const resume = d.querySelector('#dialog-back') as HTMLButtonElement;
       resume.textContent = 'Back to the desk';
       resume.addEventListener('click', enter);
@@ -311,12 +337,71 @@ function otherWays() {
   });
 }
 
-function beginWeek() {
+async function beginWeek(localOnly = false) {
+  continuity.invalidate();
   cancelAnimationFrame(raf);
-  clearSave();
-  s = newGame(Date.now() >>> 0);
-  enter();
-  window.scrollTo(0, 0);
+  s = null;
+  try {
+    const prepared = await continuity.fresh(Date.now() >>> 0, localOnly === true);
+    s = prepared;
+    const generation = continuity.generation;
+    clearSave();
+    await continuity.recording();
+    if (generation !== continuity.generation || s !== prepared) return;
+    enter();
+    window.scrollTo(0, 0);
+  } catch (error) {
+    continuity.status = String(error);
+    continuityMenu();
+  }
+}
+
+function continuityMenu() {
+  const d = dialog(
+    'continuity',
+    'People between chapters',
+    `<p id="continuity-status" role="status">${esc(continuity.status)}</p><p>All five allocated people are checked together before a fresh chapter starts. Loaded runs keep their pinned initial people. Local continuity, recording and character analysis are separate choices.</p><label><input type="checkbox" id="continuity-enabled" ${continuity.shelf.enabled ? 'checked' : ''}>Continue people between games</label><button id="fresh-local">Start fresh locally without browser histories</button>${s ? `<button id="departure">${s.chapterPaused ? 'Resume chapter' : 'Pause chapter for departure'}</button><p>Finish the storm week before leaving duties. Current work must reach its real boundary. Some health or obligations may still refuse travel.</p><details><summary>Save a person to browser continuity</summary>${ALLOCATION.map((c) => `<p>${c.name}<button data-checkpoint="${c.castId}">Save ${c.name}</button><button data-fork="${c.castId}">Save ${c.name} as explicit alternative branch</button></p>`).join('')}</details><details><summary>Recording this history</summary><button id="allow-history">Allow recording all histories in this run</button><button id="deny-history">Keep this history local</button></details><button id="continuity-export">Download run and source archive</button>` : ''}<a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">Inspect or export browser people</a>`,
+    '<button id="dialog-back">Back</button>',
+  );
+  const attempt = async (action: () => Promise<unknown>) => {
+    try {
+      await action();
+    } catch (error) {
+      continuity.status = String(error);
+    }
+    const status = document.getElementById('continuity-status');
+    if (status) status.textContent = continuity.status;
+    writeSave();
+  };
+  d.querySelector('#continuity-enabled')?.addEventListener('change', (e) => {
+    void attempt(() => continuity.setEnabled((e.target as HTMLInputElement).checked));
+  });
+  d.querySelector('#fresh-local')?.addEventListener('click', () => {
+    void beginWeek(true);
+  });
+  d.querySelector('#departure')?.addEventListener('click', () => {
+    if (!s) return;
+    queueInput(s, { kind: s.chapterPaused ? 'resume' : 'pause' });
+    writeSave();
+    closeDialogs();
+  });
+  d.querySelectorAll<HTMLButtonElement>('[data-checkpoint]').forEach((b) => {
+    b.addEventListener('click', () => {
+      void attempt(() => continuity.checkpoint(b.dataset.checkpoint ?? ''));
+    });
+  });
+  d.querySelectorAll<HTMLButtonElement>('[data-fork]').forEach((b) => {
+    b.addEventListener('click', () => {
+      void attempt(() => continuity.checkpoint(b.dataset.fork ?? '', true));
+    });
+  });
+  d.querySelector('#allow-history')?.addEventListener('click', () => {
+    void attempt(() => continuity.recording(true));
+  });
+  d.querySelector('#deny-history')?.addEventListener('click', () => {
+    void attempt(() => continuity.deny());
+  });
+  d.querySelector('#continuity-export')?.addEventListener('click', download);
 }
 
 function showAbout() {
@@ -385,7 +470,7 @@ function gameMenu() {
     `<p>The night waits while this is open.</p>
     ${s?.dawns.length ? '<button class="reading-row" id="mornings">This week’s mornings ▸</button>' : ''}
     <fieldset class="pace-setting"><legend>The night’s pace</legend>${['Automatic', 'Slow', 'Steady', 'Fast'].map((name) => `<button data-pace="${name}" aria-pressed="${paceChoice === name}">${name}</button>`).join('')}</fieldset>
-    <button class="reading-row" id="send-word">Send word ▸</button><button class="reading-row phone-only" id="fullscreen">Full screen</button><button class="reading-row" id="to-title">To the title page</button><a class="reading-row" href="${GAMES}">All games</a><div class="menu-footer">${recordSwitch('record-menu')}<a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></div>`,
+    <button class="reading-row" id="browser-people">People between chapters</button><button class="reading-row" id="send-word">Send word ▸</button><button class="reading-row phone-only" id="fullscreen">Full screen</button><button class="reading-row" id="to-title">To the title page</button><a class="reading-row" href="${GAMES}">All games</a><div class="menu-footer">${recordSwitch('record-menu')}<a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></div>`,
     '<button class="primary" id="dialog-back">Back to the desk</button>',
   );
   bindRecord(d, 'record-menu');
@@ -398,6 +483,7 @@ function gameMenu() {
       });
     });
   });
+  d.querySelector('#browser-people')?.addEventListener('click', continuityMenu);
   d.querySelector('#to-title')?.addEventListener('click', title);
   d.querySelector('#send-word')?.addEventListener('click', sendWord);
   d.querySelector('#fullscreen')?.addEventListener('click', () => {
@@ -1193,7 +1279,7 @@ function ending() {
 
 function download() {
   if (!s) return;
-  const ex = exportRun(s, FRAMEWORK_VERSION);
+  const ex = continuity.export(s);
   const blob = new Blob([JSON.stringify(ex)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1216,6 +1302,48 @@ function releaseWake() {
   wake?.release().catch(() => {});
   wake = null;
 }
+const invalidateHistory = () => {
+  continuity.invalidate();
+  void continuity.recording().catch(() => {});
+};
+window.addEventListener('hf-lab-preference', invalidateHistory);
+window.addEventListener('hf-persona-preference', invalidateHistory);
+window.addEventListener('storage', (e) => {
+  if (
+    !e.key ||
+    [
+      'hf-lab-player',
+      'hf-lab-recording-off',
+      'hf-lab-events-off:glance',
+      'hf-lab-privacy-override:glance',
+      'hf-persona-opt-in',
+    ].includes(e.key)
+  )
+    invalidateHistory();
+});
+const terminalAttempts = new Set<string>();
+function closeOwnedDeaths() {
+  if (!s || !continuity.shelf.enabled) return;
+  for (const person of s.people) {
+    const cast = ALLOCATION.find((c) => c.id === person.id);
+    const key = `${continuity.runId}/${continuity.generation}/${cast?.castId}`;
+    if (
+      cast &&
+      !person.body.alive &&
+      continuity.heads.some((h) => h.castId === cast.castId && !h.terminal) &&
+      !terminalAttempts.has(key)
+    ) {
+      terminalAttempts.add(key);
+      void continuity.checkpoint(cast.castId).catch((error) => {
+        continuity.status = String(error);
+        if (!/stale|parent|conflict/i.test(String(error))) terminalAttempts.delete(key);
+      });
+    }
+  }
+}
+watchPersonaCheckpoint(() => {
+  if (s?.chapterPaused || s?.phase === 'end') void continuity.checkpointAll().catch(() => {});
+});
 window.addEventListener('pagehide', () => writeSave());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {

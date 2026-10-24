@@ -34,8 +34,10 @@ import {
   snapshot,
   tick,
 } from '@adam0white/human-framework';
-import { type CastId, makeVisitor, talk } from './cast.ts';
+import { canonicalPersona } from '@adam0white/lab-client';
+import { ALLOCATION, type CastId, lifeReady, makeVisitor, talk } from './cast.ts';
 import { ENGINEER, KEEPERS, type KeeperId, makeKeeper, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
+import { admitResident, type Chapter, checkChapter, lifeAdmission } from './passport.ts';
 import {
   biasOf,
   type Clarity,
@@ -64,7 +66,7 @@ import {
   weirOf,
 } from './water.ts';
 
-export const GAME_VERSION = 'glance@2-cast';
+export const GAME_VERSION = 'glance@3-cast-life';
 export const NIGHTS = 5;
 
 export type Gauge = 'level' | 'weir' | 'gate' | 'bridge';
@@ -74,6 +76,7 @@ export type Job = 'level' | 'weir' | 'gate' | 'stove' | 'nap' | 'clear';
 export type Input =
   | { at: number; kind: 'ask'; keeper: KeeperId; job: Job; target?: number; insist?: boolean }
   | { at: number; kind: 'talk'; person: CastId }
+  | { at: number; kind: 'pause' | 'resume' }
   | { at: number; kind: 'ring' }
   | { at: number; kind: 'warn' }
   | { at: number; kind: 'next' };
@@ -170,6 +173,10 @@ export interface Dawn {
 export interface GameState {
   version: string;
   seed: number;
+  chapter: Chapter | null;
+  chapterPaused: boolean;
+  pauseRequested: boolean;
+  life: Partial<Record<CastId, ReturnType<typeof lifeAdmission>>>;
   night: number;
   phase: 'watch' | 'dawn' | 'end';
   minute: number;
@@ -366,10 +373,14 @@ const DEST: Record<Job, Place> = {
 
 // ---------- setup ----------
 
-export function newGame(seed: number): GameState {
+export function newGame(seed: number, chapter?: Chapter): GameState {
   const now = 15 * 60;
   const s: GameState = {
     version: GAME_VERSION,
+    chapter: chapter ? structuredClone(chapter) : null,
+    chapterPaused: false,
+    pauseRequested: false,
+    life: {},
     seed,
     night: 1,
     phase: 'watch',
@@ -415,6 +426,27 @@ export function newGame(seed: number): GameState {
   };
   dayHours(s, 1);
   startNight(s, 1);
+  if (chapter) {
+    checkChapter(chapter);
+    s.people = s.people.map((p) => {
+      const c = ALLOCATION.find((c) => c.id === p.id)!;
+      const input = chapter.inputs.find((i) => i.parent.castId === c.castId);
+      const expected = input ? admitResident(input, p) : p;
+      if (canonicalPersona(chapter.initial[c.castId]) !== canonicalPersona(expected))
+        throw new Error('Pinned actor differs from semantic admission.');
+      if (input) {
+        const facts = lifeAdmission(input, 'glance');
+        s.life[c.id] = facts;
+        say(s, 'narrator', `${c.name}: ${facts.line}`, 'journal');
+        const keeper = s.keepers.find((k) => k.id === c.id);
+        if (keeper) {
+          keeper.place = facts.startsAtHome ? 'hut' : facts.life.place === 'public-garden' ? 'staff' : 'gate';
+          keeper.idleUntil = s.minute + (facts.availableForExtraWork ? 0 : 30);
+        }
+      }
+      return restore(structuredClone(expected));
+    });
+  }
   return s;
 }
 
@@ -726,7 +758,7 @@ function shortOf(r: SuggestionResolution): string {
 
 export function queueInput(s: GameState, input: NewInput): void {
   s.inputs.push({ ...input, at: s.minute } as Input);
-  if (s.phase !== 'watch') applyPending(s);
+  if (s.phase !== 'watch' || s.chapterPaused) applyPending(s);
 }
 
 function applyPending(s: GameState) {
@@ -739,13 +771,39 @@ function applyPending(s: GameState) {
 }
 
 function apply(s: GameState, inp: Input) {
+  if (s.chapterPaused && inp.kind !== 'resume') return;
   switch (inp.kind) {
+    case 'pause': {
+      s.pauseRequested = true;
+      s.chapterPaused = s.people.every((p) => !p.activity);
+      say(
+        s,
+        'narrator',
+        'Departure requested. Finish current work. Nerys’s partner confirms inn cover during this bounded chapter pause; an outstanding river call must finish first. Dam and contractor duties still bind until the week closes.',
+        'journal',
+      );
+      return;
+    }
+    case 'resume': {
+      s.pauseRequested = false;
+      s.chapterPaused = false;
+      return;
+    }
     case 'ask': {
       if (s.phase !== 'watch') return;
       const k = keeperOf(s, inp.keeper);
       if (!k.on) return;
       if (s.radioOut) {
         say(s, 'radio', `Static. ${NAMES[k.id]} can’t hear you.`, 'radio');
+        return;
+      }
+      if (s.life[inp.keeper] && !s.life[inp.keeper]?.availableForExtraWork && s.minute < watchFrom(1) + 30) {
+        say(
+          s,
+          inp.keeper,
+          'I am finishing my own routine. Give me half an hour before extra work.',
+          'answer',
+        );
         return;
       }
       const p = personOf(s, inp.keeper);
@@ -801,6 +859,15 @@ function apply(s: GameState, inp: Input) {
 }
 
 function ringInn(s: GameState) {
+  if (!lifeReady(s, 'nerys')) {
+    say(
+      s,
+      'nerys',
+      'I am finishing my own routine away from the river steps. Ring after half past; my partner has the inn covered.',
+      'answer',
+    );
+    return;
+  }
   const m = s.minute - watchFrom(s.night);
   const late = m > 90;
   s.nerys.calls += 1;
@@ -871,8 +938,9 @@ function innAnswers(s: GameState) {
 
 /** Advance one sim minute of the watch. */
 export function step(s: GameState): void {
-  if (s.phase !== 'watch') return;
+  if (s.phase !== 'watch' || s.chapterPaused) return;
   applyPending(s);
+  if (s.chapterPaused) return;
   const plan = planOf(s);
   const m = s.minute - watchFrom(s.night);
   // World.
@@ -911,6 +979,7 @@ export function step(s: GameState): void {
   for (const k of s.keepers) if (k.on) keeperMinute(s, k, rain);
   if (m % 5 === 0) recordSeries(s, rain);
   s.minute += 1;
+  if (s.pauseRequested && s.people.every((p) => !p.activity)) s.chapterPaused = true;
   if (s.water.overtopped) {
     say(s, 'narrator', 'Water came over the crest of the dam.', 'journal');
     closeNight(s, true);
@@ -990,6 +1059,7 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
     reviewed(p);
     return;
   }
+  if (s.pauseRequested && !a && !k.pending) return;
   const offers = idleOffers(s, k).filter((o) => !a || o.id !== a.affordanceId || k.pending);
   const voice = k.pending ?? (!a && k.deferred && s.minute <= k.deferred.until ? k.deferred : null);
   const voiceOffers = voice ? offersFor(s, k.id, voice.target) : offers;
@@ -1505,14 +1575,14 @@ export function restoreState(json: GameState): GameState {
 }
 
 /** Rebuild a run from its seed and input log, stepping watch minutes until `until` (or the last input). */
-export function replay(seed: number, inputs: readonly Input[], until?: number): GameState {
-  const s = newGame(seed);
+export function replay(seed: number, inputs: readonly Input[], until?: number, chapter?: Chapter): GameState {
+  const s = newGame(seed, chapter);
   for (const inp of inputs) {
-    while (s.phase === 'watch' && s.minute < inp.at) step(s);
+    while (s.phase === 'watch' && !s.chapterPaused && s.minute < inp.at) step(s);
     s.inputs.push(inp);
-    if (s.phase !== 'watch') applyPending(s);
+    if (s.phase !== 'watch' || s.chapterPaused) applyPending(s);
   }
-  if (until !== undefined) while (s.phase === 'watch' && s.minute < until) step(s);
+  if (until !== undefined) while (s.phase === 'watch' && !s.chapterPaused && s.minute < until) step(s);
   return s;
 }
 

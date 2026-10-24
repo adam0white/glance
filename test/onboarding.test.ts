@@ -4,9 +4,11 @@ import {
   exportRun,
   fingerprint,
   type GameState,
+  type Input,
   newGame,
   personOf,
   queueInput,
+  replay,
   step,
 } from '../src/sim/dam.ts';
 import { SAMPLE_DAWN } from '../src/ui/opener.ts';
@@ -14,6 +16,9 @@ import { reportBody } from '../src/ui/report.ts';
 
 vi.mock('../src/ui/lab.ts', () => ({
   lab: {
+    setPersonaRecording() {},
+    allowPersonaRecording() {},
+    build: () => ({ c: 'test' }),
     screen() {},
     milestone() {},
     openSendDialog: vi.fn(),
@@ -27,10 +32,24 @@ vi.mock('../src/ui/lab.ts', () => ({
   },
 }));
 
-function click(id: string) {
+vi.mock('@adam0white/lab-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@adam0white/lab-client')>()),
+  personaChannel: () => ({
+    ready: Promise.resolve(true),
+    enabled: false,
+    setEnabled() {},
+    request: async () => null,
+  }),
+  watchPersonaCheckpoint: () => () => {},
+}));
+function localFixture(s: GameState) {
+  return { run: exportRun(s, '2.18.0'), runId: 'test-run', heads: [], fileOrigin: false, sources: [] };
+}
+async function click(id: string) {
   const button = document.getElementById(id);
   expect(button, id).not.toBeNull();
   button?.click();
+  for (let i = 0; i < 20; i++) await Promise.resolve();
 }
 async function boot() {
   const app = await import('../src/ui/app.ts');
@@ -49,12 +68,12 @@ function tap(button: HTMLElement) {
   button.dispatchEvent(new Event('pointerup'));
 }
 async function importRun(run: ReturnType<typeof exportRun>) {
-  click('other');
+  await click('other');
   const file = document.getElementById('file') as HTMLInputElement;
   Object.defineProperty(file, 'files', { value: [{ text: async () => JSON.stringify(run) }] });
   file.dispatchEvent(new Event('change'));
   await vi.waitFor(() => expect(document.getElementById('load-result')?.textContent).toContain('matches'));
-  click('dialog-back');
+  await click('dialog-back');
 }
 
 beforeEach(() => {
@@ -79,15 +98,15 @@ describe('title and first call', () => {
     expect(document.querySelector('#sample-chart')).not.toBeNull();
     expect(document.querySelector('#goal')?.textContent).toContain("Friday's first light");
     expect(document.querySelector('#load')).toBeNull();
-    click('sample');
+    await click('sample');
     expect(document.querySelector('#sample-page .legend')?.textContent).toContain('actual reading time');
-    click('dialog-back');
-    click('other');
+    await click('dialog-back');
+    await click('other');
     expect(document.querySelector('#load')).not.toBeNull();
   });
   it('starts on the whole desk with no inspection or queued input', async () => {
     const debug = await boot();
-    click('new');
+    await click('new');
     expect(document.querySelector('.watch.sheet-open')).toBeNull();
     expect(document.querySelector('#scene')).not.toBeNull();
     expect(document.querySelectorAll('.gauge')).toHaveLength(2);
@@ -112,13 +131,13 @@ describe('title and first call', () => {
   it('asks before discarding a saved week and resumes the old fingerprint', async () => {
     const expected = newGame(7);
     for (let i = 0; i < 20; i++) step(expected);
-    localStorage.setItem('glance-save-v2-cast', JSON.stringify({ seed: 7, inputs: [], minute: 1340 }));
+    localStorage.setItem('glance-cast-local-v3', JSON.stringify(localFixture(replay(7, [], 1340))));
     const debug = await boot();
-    click('new');
+    await click('new');
     expect(document.getElementById('restart-confirm')?.hidden).toBe(false);
-    expect(JSON.parse(localStorage.getItem('glance-save-v2-cast')!).minute).toBe(1340);
-    click('cancel-new');
-    click('cont');
+    expect(JSON.parse(localStorage.getItem('glance-cast-local-v3')!).run.state.minute).toBe(1340);
+    await click('cancel-new');
+    await click('cont');
     expect(fingerprint(state(debug))).toBe(fingerprint(expected));
   });
   it('imports inline and resumes the same replay fingerprint without alert', async () => {
@@ -136,7 +155,7 @@ describe('title and first call', () => {
 describe('desk sheets and reading labels', () => {
   it('keeps the desk nodes when a sheet opens, and close adds no input', async () => {
     const debug = await boot();
-    click('new');
+    await click('new');
     const scene = document.querySelector('#scene');
     const top = document.querySelector('.topbar');
     chooseGauge('gate');
@@ -147,13 +166,13 @@ describe('desk sheets and reading labels', () => {
     expect(document.querySelector('#clock-rate')?.textContent).toBe('Time waits while you look');
     expect(document.getElementById('skip-bar')?.hidden).toBe(true);
     const before = state(debug).inputs.length;
-    click('x');
+    await click('x');
     expect(state(debug).inputs).toHaveLength(before);
     expect(document.getElementById('skip-bar')?.hidden).toBe(false);
   });
   it('preserves controls and forecast disclosure across minute and report updates', async () => {
     const debug = await boot();
-    click('new');
+    await click('new');
     chooseGauge('gate');
     const buttons = [...document.querySelectorAll('.sheet [data-job]')];
     const details = document.querySelector('.sheet details') as HTMLDetailsElement;
@@ -167,13 +186,13 @@ describe('desk sheets and reading labels', () => {
     });
     expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(true);
     expect(document.querySelector('#latest-radio')?.textContent).toContain('A new report.');
-    click('x');
+    await click('x');
     chooseGauge('gate');
     expect((document.querySelector('.sheet details') as HTMLDetailsElement).open).toBe(false);
   });
   it('explains unanswered calls before asking, without promising work or a completion time', async () => {
     const debug = await boot();
-    click('new');
+    await click('new');
     tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
     debug.step(1);
     const run = state(debug);
@@ -199,7 +218,7 @@ describe('desk sheets and reading labels', () => {
   });
   it('distinguishes written readings, previous readings, and radio arrival times', async () => {
     const debug = await boot();
-    click('new');
+    await click('new');
     const run = state(debug);
     const original = run.board.level!;
     run.minute = 1410;
@@ -229,7 +248,7 @@ describe('desk sheets and reading labels', () => {
   });
   it('uses segments for who goes and keeps four gauge reading labels', async () => {
     const debug = await boot();
-    click('new');
+    await click('new');
     const run = state(debug);
     run.night = 3;
     const opening = run.board.level!;
@@ -246,7 +265,7 @@ describe('desk sheets and reading labels', () => {
   });
   it('keeps hold to insist and hold-only warnings', async () => {
     const debug = await boot();
-    click('new');
+    await click('new');
     chooseGauge('gate');
     const button = document.querySelector('.turns [data-job]') as HTMLElement;
     button.dispatchEvent(new Event('pointerdown'));
@@ -268,7 +287,7 @@ describe('desk sheets and reading labels', () => {
   });
   it('keeps tree notices distinct from received reading reports', async () => {
     const debug = await boot();
-    click('new');
+    await click('new');
     const run = state(debug);
     run.radioOut = true;
     run.said.push({ at: run.minute, who: 'dai', kind: 'report', text: 'A tree on the screen.' });
@@ -285,7 +304,7 @@ it('holds menu time, keeps speeds in the menu, and stops Skip on the first deliv
     return 1;
   });
   const debug = await boot();
-  click('new');
+  await click('new');
   expect(document.querySelector('#speed')).toBeNull();
   expect(document.querySelector('#skip')?.textContent).toBe('Skip ⏩');
   let now = performance.now();
@@ -295,16 +314,16 @@ it('holds menu time, keeps speeds in the menu, and stops Skip on the first deliv
   };
   const before = state(debug).minute;
   const inputs = JSON.stringify(state(debug).inputs);
-  click('menu');
+  await click('menu');
   expect(document.querySelector<HTMLDialogElement>('#game-menu')?.open).toBe(true);
   expect(document.querySelectorAll('[data-pace]')).toHaveLength(4);
   expect(document.querySelector('#game-menu')?.textContent).not.toMatch(/\bSave\b/);
   for (let i = 0; i < 40; i++) pulse();
   expect(state(debug).minute).toBe(before);
   expect(JSON.stringify(state(debug).inputs)).toBe(inputs);
-  click('dialog-back');
+  await click('dialog-back');
   tap(document.querySelector('.first-call [data-job]') as HTMLElement);
-  click('skip');
+  await click('skip');
   expect(document.querySelector('#skip')?.textContent).toBe('Stop');
   for (let i = 0; i < 12 && document.querySelector('#skip')?.textContent === 'Stop'; i++) pulse();
   expect(state(debug).minute).toBeGreaterThan(before);
@@ -319,7 +338,7 @@ it('holds menu time, keeps speeds in the menu, and stops Skip on the first deliv
 
 it('shows save failure without adding a manual Save action', async () => {
   const debug = await boot();
-  click('new');
+  await click('new');
   const set = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
     throw new DOMException('Full', 'QuotaExceededError');
   });
@@ -327,37 +346,39 @@ it('shows save failure without adding a manual Save action', async () => {
   tap(document.querySelector('.turns [data-job]') as HTMLElement);
   expect(document.querySelector('#save-warning')?.textContent).toContain('could not save');
   set.mockRestore();
-  click('menu');
+  await click('menu');
   expect(document.querySelector('#save-warning')).toBeNull();
-  expect(JSON.parse(localStorage.getItem('glance-save-v2-cast')!).minute).toBe(state(debug).minute);
+  expect(JSON.parse(localStorage.getItem('glance-cast-local-v3')!).run.state.minute).toBe(
+    state(debug).minute,
+  );
 });
 
 it('uses phase information and keeps the final tally below people and closed', async () => {
   const debug = await boot();
-  click('help');
+  await click('help');
   expect(document.querySelector('#about')?.textContent).toContain('Five nights');
-  click('new');
-  click('help');
+  await click('new');
+  await click('help');
   expect(document.querySelector('#about')?.textContent).toContain('Let him rest');
   const run = state(debug);
   run.night = 4;
   debug.step(0);
   // Re-entering through the save refreshes phase-specific help.
-  click('menu');
-  click('to-title');
-  click('cont');
+  await click('menu');
+  await click('to-title');
+  await click('cont');
   state(debug).water.overtopped = true;
   debug.step(1);
   expect(document.querySelector('.week-end')?.textContent).toContain('week ends');
   expect(document.querySelector('#about')?.textContent).toContain('red line');
-  click('end');
+  await click('end');
   expect(document.querySelector('#tally-result')?.hasAttribute('hidden')).toBe(true);
   expect(document.querySelector('#about')?.textContent).toContain('own reckoning');
   const ended = JSON.stringify(state(debug));
-  click('see-tally');
+  await click('see-tally');
   expect(document.querySelector('#tally-result')?.hasAttribute('hidden')).toBe(false);
   expect(JSON.stringify(state(debug))).toBe(ended);
-  click('back');
+  await click('back');
   expect(document.querySelector('#chart')).not.toBeNull();
 });
 
@@ -371,26 +392,26 @@ it('marks the final dawn and offers no further night', async () => {
     }
   }
   const debug = await boot();
-  click('new');
+  await click('new');
   Object.assign(state(debug), run);
   debug.step(0);
   expect(document.querySelector('.week-end')?.textContent).toContain('after Friday night');
   expect(document.getElementById('next')).toBeNull();
-  click('end');
+  await click('end');
   expect(document.querySelector('h2')?.textContent).toBe('The week is over');
-  click('again');
+  await click('again');
   expect(document.querySelector('.first-call')).not.toBeNull();
 });
 
 it('sends linked feedback with verdict and trimmed remembered name', async () => {
   await boot();
-  click('new');
-  click('menu');
-  click('send-word');
+  await click('new');
+  await click('menu');
+  await click('send-word');
   (document.querySelector('[data-verdict="keep"]') as HTMLElement).click();
   (document.getElementById('feedback-note') as HTMLTextAreaElement).value = 'I wanted another reading.';
   (document.getElementById('feedback-name') as HTMLInputElement).value = '  owner  ';
-  click('feedback-send');
+  await click('feedback-send');
   await vi.waitFor(() =>
     expect(document.getElementById('feedback-result')?.textContent).toBe('Sent. Thank you.'),
   );
@@ -402,8 +423,8 @@ it('sends linked feedback with verdict and trimmed remembered name', async () =>
 it('blocks feedback while recording is off, then allows the inline switch', async () => {
   localStorage.setItem('hf-lab-recording-off', '1');
   await boot();
-  click('menu');
-  click('send-word');
+  await click('menu');
+  await click('send-word');
   expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(true);
   expect(document.querySelector('#recording-notice')?.textContent).toContain('nothing is sent');
   const input = document.getElementById('record-feedback') as HTMLInputElement;
@@ -421,16 +442,16 @@ it('requires privacy consent and preserves the name and note on fallback', async
     modalAtFallback = !!document.querySelector('dialog[open]');
   });
   await boot();
-  click('new');
-  click('menu');
-  click('send-word');
+  await click('new');
+  await click('menu');
+  await click('send-word');
   expect((document.getElementById('feedback-send') as HTMLButtonElement).disabled).toBe(true);
   (document.getElementById('feedback-note') as HTMLTextAreaElement).value = 'A note';
   (document.getElementById('feedback-name') as HTMLInputElement).value = 'owner';
   const input = document.getElementById('consent-run') as HTMLInputElement;
   input.checked = true;
   input.dispatchEvent(new Event('change'));
-  click('feedback-send');
+  await click('feedback-send');
   await vi.waitFor(() => expect(lab.openSendDialog).toHaveBeenCalled());
   expect(lab.openSendDialog).toHaveBeenCalledWith(expect.objectContaining({ name: 'owner', note: 'A note' }));
   expect(modalAtFallback).toBe(false);
@@ -438,7 +459,7 @@ it('requires privacy consent and preserves the name and note on fallback', async
 
 it('scrolls the sheet to new radio words while leaving the initial first call visible', async () => {
   const debug = await boot();
-  click('new');
+  await click('new');
   const sheet = document.getElementById('sheet') as HTMLElement;
   expect(sheet.scrollTop).toBe(0);
   tap(document.querySelector('.first-call [data-job]') as HTMLElement);
@@ -464,9 +485,12 @@ it('keeps gate job identity when a forecast appears after a delayed keeper repor
     ],
     minute: 5860,
   };
-  localStorage.setItem('glance-save-v2-cast', JSON.stringify(save));
+  localStorage.setItem(
+    'glance-cast-local-v3',
+    JSON.stringify(localFixture(replay(save.seed, save.inputs as Input[], save.minute))),
+  );
   const debug = await boot();
-  click('cont');
+  await click('cont');
   chooseGauge('gate');
   const buttons = [...document.querySelectorAll('.sheet [data-job]')];
   debug.step(3);
@@ -479,13 +503,13 @@ it('keeps feedback sent when remembering the name fails', async () => {
   const { lab } = await import('../src/ui/lab.ts');
   Object.assign(lab, { privacySignalOn: false });
   await boot();
-  click('new');
-  click('menu');
-  click('send-word');
+  await click('new');
+  await click('menu');
+  await click('send-word');
   vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
     throw new DOMException('Full', 'QuotaExceededError');
   });
-  click('feedback-send');
+  await click('feedback-send');
   await vi.waitFor(() =>
     expect(document.getElementById('feedback-result')?.textContent).toBe('Sent. Thank you.'),
   );
