@@ -5,12 +5,13 @@
  */
 
 import { FRAMEWORK_VERSION } from '@adam0white/human-framework';
-
+import { CAST, type CastId, discoveriesFor, rememberedConversation } from '../sim/cast.ts';
 import {
   clock,
   type Export,
   exportRun,
   fingerprint,
+  GAME_VERSION,
   type GameState,
   type Gauge,
   type Hint,
@@ -44,7 +45,7 @@ import { drawScene, type SceneFx, sceneHit } from './scene.ts';
 import { tallyBody } from './tally.ts';
 import { readingTime } from './time.ts';
 
-const SAVE = 'glance-save-v1';
+const SAVE = 'glance-save-v2-cast';
 let selectedRate = 1.4;
 let paceChoice = 'Automatic';
 let skipUntil = 0;
@@ -292,6 +293,7 @@ function otherWays() {
     const result = d.querySelector('#load-result') as HTMLElement;
     try {
       const ex = JSON.parse(await f.text()) as Export;
+      if (ex.game !== GAME_VERSION || ex.state?.version !== GAME_VERSION) throw new Error('Old edition');
       if (!Number.isFinite(ex.seed) || !Array.isArray(ex.inputs) || !ex.state) throw new Error('Invalid run');
       const r = replay(ex.seed, ex.inputs, ex.state.minute);
       const same = fingerprint(r) === fingerprint(ex.state);
@@ -304,7 +306,7 @@ function otherWays() {
       resume.textContent = 'Back to the desk';
       resume.addEventListener('click', enter);
     } catch {
-      result.textContent = 'That file is not a run from The Glance.';
+      result.textContent = 'That file is not a run from this edition of The Glance. Start fresh.';
     }
   });
 }
@@ -758,7 +760,8 @@ function drawLog() {
   el.dataset.k = key;
   el.innerHTML = lines
     .map((x) => {
-      const who = x.who === 'narrator' || x.who === 'radio' ? '' : x.who === 'nerys' ? 'Nerys' : NAMES[x.who];
+      const who =
+        x.who === 'narrator' || x.who === 'radio' ? '' : x.who === 'nerys' ? 'Nerys' : CAST[x.who].name;
       const r =
         x.kind === 'report' && x.who !== 'nerys'
           ? [...(s?.reports ?? [])].reverse().find((q) => q.who === x.who && q.at <= x.at)
@@ -854,8 +857,9 @@ function drawSheet() {
       <div class="verbs two">
         <button id="ring" ${ringing ? 'disabled' : ''}><span>Ring Nerys</span><span class="h">${ringing ? 'she’s gone to look' : 'how high is the river?'}</span></button>
         <button id="warn" ${warned ? 'disabled' : ''}><span class="fill"></span><span>Warn Mill Lane</span><span class="h">${warned ? `warned at ${clock(s.warnedAt ?? 0)}` : 'hold: the warden knocks doors'}</span></button>
-      </div>`;
+      </div>${castConversations(['nerys', 'bilal', 'wren'])}`;
     if (!patchSheet(el, html, previousKey === structureKey)) return;
+    bindConversations(el);
     document.getElementById('x')?.addEventListener('click', () => openSheet(null));
     document.getElementById('ring')?.addEventListener('click', () => {
       if (!s) return;
@@ -939,6 +943,7 @@ function drawSheet() {
     : activity === 'doze' || activity === 'nap'
       ? 'Wait for his answer. If no answer, call again.'
       : '';
+  if (sheet.kind === 'keeper') body += castConversations([who]);
   body += `<p class="hint call-advice" ${callAdvice ? '' : 'hidden'}>${callAdvice}</p>`;
   const forecastOpen = el.querySelector<HTMLDetailsElement>('details.fore')?.open ?? false;
   if (
@@ -949,6 +954,7 @@ function drawSheet() {
     )
   )
     return;
+  bindConversations(el);
   const forecast = el.querySelector<HTMLDetailsElement>('details.fore');
   if (forecast) forecast.open = forecastOpen;
   document.getElementById('x')?.addEventListener('click', () => openSheet(null));
@@ -964,6 +970,22 @@ function drawSheet() {
       const job = btn.dataset.job as Job;
       const t = btn.dataset.t !== undefined ? Number(btn.dataset.t) : undefined;
       ask(who, job, t, insist);
+    });
+  });
+}
+
+function castConversations(ids: CastId[]): string {
+  if (!s) return '';
+  const available = discoveriesFor(s);
+  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask whether they want to continue'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. Close this inspection to let the shift continue. Dam requests still go to the keepers.</p></details>`;
+}
+function bindConversations(el: HTMLElement) {
+  el.querySelectorAll<HTMLButtonElement>('[data-talk]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!s) return;
+      queueInput(s, { kind: 'talk', person: button.dataset.talk as CastId });
+      writeSave();
+      openSheet(null);
     });
   });
 }

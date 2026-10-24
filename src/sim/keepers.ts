@@ -5,6 +5,8 @@
  */
 import { createPerson, MINUTES_PER_YEAR, type Person, promise } from '@adam0white/human-framework';
 
+import { canonicalSpec } from './cast.ts';
+
 export type KeeperId = 'dai' | 'callum';
 export const KEEPERS: readonly KeeperId[] = ['dai', 'callum'];
 export const ENGINEER = 'engineer';
@@ -29,13 +31,7 @@ export function makeKeeper(id: KeeperId, seed: number, now: number): Person {
       now,
       bornAt: now - 63 * MINUTES_PER_YEAR,
       sex: 'male',
-      traits: {
-        honesty: 0.7,
-        emotionality: 0.3,
-        extraversion: 0.35,
-        agreeableness: 0.35,
-        conscientiousness: 0.75,
-      },
+      ...canonicalSpec(id),
       skills: { gate: 0.9, gauges: 0.9 },
       body: { sleepDebt: 8, fitness: 0.55 },
       voices: [{ voiceId: ENGINEER, trust: 0.45 }],
@@ -57,13 +53,7 @@ export function makeKeeper(id: KeeperId, seed: number, now: number): Person {
       now,
       bornAt: now - 24 * MINUTES_PER_YEAR,
       sex: 'male',
-      traits: {
-        honesty: 0.8,
-        emotionality: 0.8,
-        extraversion: 0.55,
-        agreeableness: 0.85,
-        conscientiousness: 0.8,
-      },
+      ...canonicalSpec(id),
       skills: { gate: 0.4, gauges: 0.5 },
       body: { sleepDebt: 4, fitness: 0.75 },
       voices: [{ voiceId: ENGINEER, trust: 0.75 }],

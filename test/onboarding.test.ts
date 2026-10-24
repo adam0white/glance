@@ -112,11 +112,11 @@ describe('title and first call', () => {
   it('asks before discarding a saved week and resumes the old fingerprint', async () => {
     const expected = newGame(7);
     for (let i = 0; i < 20; i++) step(expected);
-    localStorage.setItem('glance-save-v1', JSON.stringify({ seed: 7, inputs: [], minute: 1340 }));
+    localStorage.setItem('glance-save-v2-cast', JSON.stringify({ seed: 7, inputs: [], minute: 1340 }));
     const debug = await boot();
     click('new');
     expect(document.getElementById('restart-confirm')?.hidden).toBe(false);
-    expect(JSON.parse(localStorage.getItem('glance-save-v1')!).minute).toBe(1340);
+    expect(JSON.parse(localStorage.getItem('glance-save-v2-cast')!).minute).toBe(1340);
     click('cancel-new');
     click('cont');
     expect(fingerprint(state(debug))).toBe(fingerprint(expected));
@@ -329,7 +329,7 @@ it('shows save failure without adding a manual Save action', async () => {
   set.mockRestore();
   click('menu');
   expect(document.querySelector('#save-warning')).toBeNull();
-  expect(JSON.parse(localStorage.getItem('glance-save-v1')!).minute).toBe(state(debug).minute);
+  expect(JSON.parse(localStorage.getItem('glance-save-v2-cast')!).minute).toBe(state(debug).minute);
 });
 
 it('uses phase information and keeps the final tally below people and closed', async () => {
@@ -464,7 +464,7 @@ it('keeps gate job identity when a forecast appears after a delayed keeper repor
     ],
     minute: 5860,
   };
-  localStorage.setItem('glance-save-v1', JSON.stringify(save));
+  localStorage.setItem('glance-save-v2-cast', JSON.stringify(save));
   const debug = await boot();
   click('cont');
   chooseGauge('gate');

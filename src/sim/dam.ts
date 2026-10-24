@@ -34,6 +34,7 @@ import {
   snapshot,
   tick,
 } from '@adam0white/human-framework';
+import { type CastId, makeVisitor, talk } from './cast.ts';
 import { ENGINEER, KEEPERS, type KeeperId, makeKeeper, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
 import {
   biasOf,
@@ -63,7 +64,7 @@ import {
   weirOf,
 } from './water.ts';
 
-export const GAME_VERSION = 'glance@1';
+export const GAME_VERSION = 'glance@2-cast';
 export const NIGHTS = 5;
 
 export type Gauge = 'level' | 'weir' | 'gate' | 'bridge';
@@ -72,6 +73,7 @@ export type Job = 'level' | 'weir' | 'gate' | 'stove' | 'nap' | 'clear';
 
 export type Input =
   | { at: number; kind: 'ask'; keeper: KeeperId; job: Job; target?: number; insist?: boolean }
+  | { at: number; kind: 'talk'; person: CastId }
   | { at: number; kind: 'ring' }
   | { at: number; kind: 'warn' }
   | { at: number; kind: 'next' };
@@ -98,7 +100,7 @@ export interface Report {
 
 export interface Said {
   at: number;
-  who: KeeperId | 'nerys' | 'narrator' | 'radio';
+  who: CastId | 'narrator' | 'radio';
   text: string;
   kind: 'answer' | 'report' | 'journal' | 'radio';
 }
@@ -172,6 +174,8 @@ export interface GameState {
   phase: 'watch' | 'dawn' | 'end';
   minute: number;
   people: Person[];
+  discoveries: Partial<Record<CastId, boolean>>;
+  conversations: Partial<Record<CastId, number>>;
   keepers: KeeperState[];
   water: Water;
   board: Record<Gauge, Report | null>;
@@ -320,7 +324,7 @@ export const PLANS: NightPlan[] = [
         text: 'She was at the mark in seventy-nine. I was sixteen. My dad had this wheel.',
       },
       { at: 150, who: 'nerys', text: 'River’s talking tonight. I’ve moved the chairs upstairs.' },
-      { at: 240, who: 'callum', text: 'Sir, my wife rang. She says the lane’s full of water. Our lane.' },
+      { at: 240, who: 'callum', text: 'Sir, my partner rang. She says the lane’s full of water. Our lane.' },
     ],
   },
 ];
@@ -370,7 +374,12 @@ export function newGame(seed: number): GameState {
     night: 1,
     phase: 'watch',
     minute: now,
-    people: KEEPERS.map((id) => makeKeeper(id, seed, now)),
+    people: [
+      ...KEEPERS.map((id) => makeKeeper(id, seed, now)),
+      ...(['nerys', 'bilal', 'wren'] as const).map((id) => makeVisitor(id, seed, now)),
+    ],
+    discoveries: {},
+    conversations: {},
     keepers: KEEPERS.map((id) => ({
       id,
       on: false,
@@ -442,7 +451,7 @@ function morningHours(s: GameState, night: number) {
       Math.max(p.now, d + 6 * 60 + 30),
     );
     tick(p, Math.max(p.now, d + 7 * 60 + 15));
-    const hours = p.id === 'dai' ? 6 : 4.5;
+    const hours = p.id === 'callum' ? 4.5 : 6;
     hostAct(
       p,
       offer('sleep', { mode: 'sleep', duration: hours * 60, effort: 0, advertises: { sleep: 1, rest: 0.5 } }),
@@ -759,6 +768,10 @@ function apply(s: GameState, inp: Input) {
       if (p.activity) interrupt(p, s.minute, 'voice:engineer');
       return;
     }
+    case 'talk': {
+      talk(s, inp.person);
+      return;
+    }
     case 'ring': {
       if (s.phase !== 'watch' || !planOf(s).inn || s.nerys.ringing !== null) return;
       ringInn(s);
@@ -892,6 +905,8 @@ export function step(s: GameState): void {
     if (beat.at === m && beatHeard(s, beat))
       say(s, beat.who, beat.text, beat.who === 'radio' ? 'radio' : 'answer');
   if (s.nerys.ringing !== null && s.minute >= s.nerys.ringing) innAnswers(s);
+  // Supporting people have their own HF bodies, not dam operating skills.
+  for (const p of s.people) if (!KEEPERS.includes(p.id as KeeperId)) tick(p, s.minute);
   // People.
   for (const k of s.keepers) if (k.on) keeperMinute(s, k, rain);
   if (m % 5 === 0) recordSeries(s, rain);
@@ -1511,5 +1526,7 @@ export function fingerprint(s: GameState): string {
     reports: s.reports.map((r) => [r.at, r.who, r.gauge, r.value]),
     dawns: s.dawns.map((d) => [d.night, d.mill, d.square, d.maxLevel, d.misses.length, d.lines]),
     people: s.people.map((p) => [p.id, p.trace.length, p.now, trustOf(p)]),
+    discoveries: s.discoveries,
+    conversations: s.conversations,
   });
 }
