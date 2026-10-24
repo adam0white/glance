@@ -1,4 +1,4 @@
-import { feedbackPersonaControl } from '@adam0white/lab-kit';
+import { feedbackPersonaControl, feedbackSharePlay } from '@adam0white/lab-kit';
 /**
  * The Glance UI: DOM for the board, the radio log and the sheets; one canvas for the dam. The UI reads state and
  * queues inputs; it never changes the sim directly. Real time drives sim minutes, continuously, slowing while a
@@ -361,7 +361,7 @@ function continuityMenu() {
   const d = dialog(
     'continuity',
     'People between chapters',
-    `<p id="continuity-status" role="status">${esc(continuity.status)}</p><p>All five allocated people are checked together before a fresh chapter starts. Loaded runs keep their pinned initial people. Local continuity, recording and character analysis are separate choices.</p><label><input type="checkbox" id="continuity-enabled" ${continuity.shelf.enabled ? 'checked' : ''}>Continue people between games</label><button id="fresh-local">Start fresh locally without browser histories</button>${s ? `<button id="departure">${s.chapterPaused ? 'Resume chapter' : 'Pause chapter for departure'}</button><p>Finish the storm week before leaving duties. Current work must reach its real boundary. Some health or obligations may still refuse travel.</p><details><summary>Save a person to browser continuity</summary>${ALLOCATION.map((c) => `<p>${c.name}<button data-checkpoint="${c.castId}">Save ${c.name}</button><button data-fork="${c.castId}">Save ${c.name} as explicit alternative branch</button></p>`).join('')}</details><details><summary>Recording this history</summary><button id="allow-history">Allow recording all histories in this run</button><button id="deny-history">Keep this history local</button></details><button id="continuity-export">Download run and source archive</button>` : ''}<a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">Inspect or export browser people</a>`,
+    `<p id="continuity-status" role="status">${esc(continuity.status)}</p><p>All five allocated people are checked together before a fresh chapter starts. Loaded runs keep their pinned initial people. Local continuity, recording and character analysis are separate choices.</p><label><input type="checkbox" id="continuity-enabled" ${continuity.shelf.enabled ? 'checked' : ''}>Continue people between games</label><button id="fresh-local">Start fresh locally without browser histories</button>${s ? `<button id="departure">${s.chapterPaused ? 'Resume chapter' : 'Pause chapter for departure'}</button><p>Finish the storm week before leaving duties. Current work must reach its real boundary. Some health or obligations may still refuse travel.</p><details><summary>Save a person to browser continuity</summary>${ALLOCATION.map((c) => `<p>${c.name}<button data-checkpoint="${c.castId}">Save ${c.name}</button><button data-fork="${c.castId}">Save ${c.name} as explicit alternative branch</button></p>`).join('')}</details><p>Recorded play links across games on this device. Switch recording off in the game menu.</p><button id="continuity-export">Download run and source archive</button>` : ''}<a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">Inspect or export browser people</a>`,
     '<button id="dialog-back">Back</button>',
   );
   const attempt = async (action: () => Promise<unknown>) => {
@@ -395,12 +395,6 @@ function continuityMenu() {
     b.addEventListener('click', () => {
       void attempt(() => continuity.checkpoint(b.dataset.fork ?? '', true));
     });
-  });
-  d.querySelector('#allow-history')?.addEventListener('click', () => {
-    void attempt(() => continuity.recording(true));
-  });
-  d.querySelector('#deny-history')?.addEventListener('click', () => {
-    void attempt(() => continuity.deny());
   });
   d.querySelector('#continuity-export')?.addEventListener('click', download);
 }
@@ -525,7 +519,7 @@ function sendWord() {
   const d = dialog(
     'feedback',
     'Send word',
-    `<p>Send a note about this game. Recording and continuing-person choices are optional.</p>
+    `<p>Send a note about this game. Recorded play links across games on this device. You can switch recording off in the menu.</p>
     <div class="verdicts" role="group" aria-label="Your verdict">${[
       ['keep', "I'd keep playing"],
       ['mixed', 'Not sure'],
@@ -537,7 +531,7 @@ function sendWord() {
     <label>Your name or tester id<input id="feedback-name" type="text" maxlength="60" value="${esc(localStorage.getItem('hf-lab-feedback-name') ?? '')}" autocomplete="name"></label><p class="soft">A name links this device’s past and future play history. Leave it empty to stay pseudonymous.</p>
     <details><summary>What is sent</summary><p>Your note, verdict and optional name. With recording off, no run or linked history is sent.</p><pre>${esc(JSON.stringify(s ? { seed: s.seed, night: s.night, minute: s.minute, inputs: s.inputs.length } : { screen: 'title' }, null, 2))}</pre><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></details>
     <button id="keep-copy">Keep a copy of this run ⤓</button><p id="feedback-result" role="status"></p>`,
-    '<button id="feedback-back">← Back</button><button class="primary" id="feedback-send">Send</button>',
+    '<button id="feedback-back">← Back</button><button class="primary" id="feedback-send">Submit</button>',
   );
   const back = d.querySelector('#feedback-back');
   if (back) d.querySelector('.dialog-head')?.prepend(back);
@@ -548,24 +542,7 @@ function sendWord() {
       return undefined;
     }
   };
-  const personaChoice = feedbackPersonaControl({
-    personaRecordingRequired: lab.personaRecordingRequired,
-    get personaRecordingAllowed() {
-      return lab.personaRecordingAllowed;
-    },
-    allowPersonaRecording(allow) {
-      void Promise.resolve()
-        .then(() => (allow ? continuity.recording(true) : continuity.deny()))
-        .then(syncPersonaChoice, syncPersonaChoice);
-    },
-  });
-  function syncPersonaChoice() {
-    const input = personaChoice?.querySelector('input');
-    if (input) input.checked = lab.personaRecordingAllowed;
-  }
-  if (personaChoice?.lastChild)
-    personaChoice.lastChild.textContent =
-      ' Link all continuing histories in this run to lab recording (optional)';
+  const personaChoice = feedbackPersonaControl(lab);
   if (personaChoice) d.querySelector('textarea')?.after(personaChoice);
 
   let verdict = '';
@@ -594,9 +571,14 @@ function sendWord() {
     const who = (d.querySelector('#feedback-name') as HTMLInputElement).value.trim().slice(0, 60);
     try {
       const message = `${verdict ? `[${verdict}] ` : ''}${note}`;
-      const noteOnly = !lab.telemetryOn || (lab.privacySignalOn && !lab.privacyOverride);
-      const receipt = await lab.sendFeedback(message, { name: who, run: feedbackRun() });
-      const sentMessage = `${noteOnly ? 'Note and verdict queued without a run or history linkage' : 'Note and verdict queued. Run details depend on recording and availability; continuing-person history links only after explicit consent'} · ${receipt}`;
+      const sharePlay = feedbackSharePlay(personaChoice);
+      const noteOnly = !lab.telemetryOn && !sharePlay;
+      const receipt = await lab.sendFeedback(message, {
+        name: who,
+        run: feedbackRun(),
+        sharePlay,
+      });
+      const sentMessage = `${noteOnly ? 'Note and verdict queued without a run or history linkage' : 'Note and verdict queued with available run and linked play'} · ${receipt}`;
       try {
         localStorage.setItem('hf-lab-feedback-name', who);
       } catch {
@@ -1030,7 +1012,11 @@ function drawSheet() {
     if (planOf(s).weir) jobs.splice(1, 0, { job: 'weir', label: 'Go to the weir' });
     if (s.treeKnown && s.water.blocked) jobs.push({ job: 'clear', label: 'Clear the screen' });
     body = verbButtons(
-      jobs.map((j) => ({ h: deskHint(s as GameState, who, j.job), label: j.label, insist: undefined })),
+      jobs.map((j) => ({
+        h: deskHint(s as GameState, who, j.job),
+        label: j.label,
+        insist: undefined,
+      })),
       true,
     );
   }
@@ -1168,7 +1154,12 @@ function whereWords(id: KeeperId): string {
     }[j.job];
     return walking ? `walking to ${where}` : j.job === 'stove' ? 'by the stove' : `at ${where}`;
   }
-  return { hut: 'in the hut', gate: 'at the wheel', staff: 'on the dam face', weir: 'at the weir' }[k.place];
+  return {
+    hut: 'in the hut',
+    gate: 'at the wheel',
+    staff: 'on the dam face',
+    weir: 'at the weir',
+  }[k.place];
 }
 
 function bindHold(b: HTMLButtonElement, go: (insist: boolean) => void) {
@@ -1304,7 +1295,9 @@ function download() {
 async function requestWake() {
   try {
     const nav = navigator as Navigator & {
-      wakeLock?: { request(t: 'screen'): Promise<{ release(): Promise<void> }> };
+      wakeLock?: {
+        request(t: 'screen'): Promise<{ release(): Promise<void> }>;
+      };
     };
     if (nav.wakeLock && !wake) wake = await nav.wakeLock.request('screen');
   } catch {}
