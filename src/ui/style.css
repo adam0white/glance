@@ -1147,12 +1147,9 @@ body {
 }
 #lab-notice {
   flex: none;
-  max-height: 18dvh;
-  overflow: auto;
   font-size: var(--small-size);
 }
 #lab-notice > * {
-  position: static !important;
   margin: 0 auto;
   max-width: 1180px;
 }
