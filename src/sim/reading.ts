@@ -68,7 +68,7 @@ export function confidenceOf(p: Person, c: Clarity): number {
   return clamp(c.felt * (1.15 - 0.55 * em) - 0.2 * c.fear);
 }
 
-const DIGITS = ['nought', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+const DIGITS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 
 /** "four point three" for 4.3. */
 export function spoken(x: number): string {
@@ -78,7 +78,7 @@ export function spoken(x: number): string {
   return `${DIGITS[a] ?? String(a)} point ${DIGITS[b] ?? String(b)}`;
 }
 
-/** A weir figure in two places, digit by digit: 1.98 is "one point nine eight", 0.52 "nought point five two". */
+/** A weir figure in two places, digit by digit: 1.98 is "one point nine eight", 0.52 "zero point five two". */
 export function spokenFine(x: number): string {
   const [a = '0', b = '00'] = Math.max(0, x).toFixed(2).split('.');
   const say = (d: string) => DIGITS[Number(d)] ?? d;
@@ -103,7 +103,7 @@ export function hedge(id: KeeperId, conf: number, fig: string, k: number): strin
       ]);
     return pick([
       `I read ${fig}… I think.`,
-      `I read about ${fig}. The torch is fading.`,
+      `I read about ${fig}. The flashlight is getting dim.`,
       `I read ${fig}. Wait a moment. Yes, I read ${fig}.`,
     ]);
   }

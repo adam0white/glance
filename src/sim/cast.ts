@@ -114,7 +114,7 @@ export function talk(s: GameState, id: CastId): void {
       at: s.minute,
       who: 'narrator',
       kind: 'journal',
-      text: `${CAST[id].name} is not available for a private conversation. I did not ask any further.`,
+      text: `${CAST[id].name} is not available for a private conversation. You leave it for now.`,
     });
     return;
   }

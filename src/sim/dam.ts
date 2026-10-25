@@ -243,7 +243,7 @@ export const PLANS: NightPlan[] = [
         who: 'dai',
         text: 'You’re the new person, then. Where has Morgan gone? He worked at that desk for twelve years.',
       },
-      { at: 250, who: 'radio', text: 'The Met Office expects heavy rain over the hills until first light.' },
+      { at: 250, who: 'radio', text: 'The weather service expects heavy rain over the hills until dawn.' },
     ],
   },
   {
@@ -260,12 +260,12 @@ export const PLANS: NightPlan[] = [
       {
         at: 8,
         who: 'nerys',
-        text: 'This is the Bridge Inn. Are you the new person at the authority? Ring if you need me to look at the river, love.',
+        text: 'This is the Bridge Inn. Are you the new person at the authority? Call if you need me to look at the river.',
       },
       {
         at: 120,
         who: 'dai',
-        text: 'Morgan used to ring at one for the level whether I’d said it or not. It was his habit.',
+        text: 'Morgan used to call at one in the morning for the level, whether I’d reported it or not. It was his habit.',
       },
       { at: 200, who: 'dai', text: 'The ground is full of water. Any more rain runs straight down.' },
       {
@@ -291,7 +291,7 @@ export const PLANS: NightPlan[] = [
       {
         at: 90,
         who: 'dai',
-        text: 'Callum has mixed up which way to turn the wheel. I’ll not say anything.',
+        text: 'Callum has mixed up which way to turn the wheel. I won’t say anything.',
       },
       { at: 150, who: 'callum', text: 'I’m sorry, sir. The baby is teething. I’m fine.', if: 'callum' },
       { at: 260, who: 'callum', text: 'Is it always like this, sir? Mr Pugh doesn’t say much.' },
@@ -323,7 +323,7 @@ export const PLANS: NightPlan[] = [
     keepers: ['dai', 'callum'],
     storm: { peakAt: 280, peak: 12, width: 90, base: 3 },
     intro: [
-      'This is the wettest night of the week. The ground is wetter than on any earlier night this week. A painted mark high on the dam wall reads “’79”.',
+      'This is the wettest night of the week. The ground is wetter than on any earlier night this week. A painted mark high on the dam wall reads “’79”, meaning 1979.',
       'Keep the dam and the town safe until morning.',
     ],
     weir: true,
@@ -332,10 +332,10 @@ export const PLANS: NightPlan[] = [
       {
         at: 60,
         who: 'dai',
-        text: 'The water reached that mark in seventy-nine. I was sixteen. My dad turned this wheel.',
+        text: 'The water reached that mark in 1979. I was sixteen. My dad turned this wheel then.',
       },
       { at: 150, who: 'nerys', text: 'The river is loud tonight. I’ve moved the chairs upstairs.' },
-      { at: 240, who: 'callum', text: 'Sir, my partner rang. She says our lane is full of water.' },
+      { at: 240, who: 'callum', text: 'Sir, my partner called. She says our lane is full of water.' },
     ],
   },
 ];
@@ -859,8 +859,8 @@ function apply(s: GameState, inp: Input) {
         s,
         'narrator',
         late
-          ? 'I rang the warden about Mill Lane again. He said they’d heard that warning before, but he would knock on their doors.'
-          : 'I rang the warden. He is knocking on doors in Mill Lane, telling people to get their things upstairs.',
+          ? 'I called the warden about Mill Lane again. He said they’d heard that warning before, but he would knock on their doors.'
+          : 'I called the warden. He is knocking on doors in Mill Lane, telling people to get their things upstairs.',
         'journal',
       );
       return;
@@ -879,7 +879,7 @@ function ringInn(s: GameState) {
     say(
       s,
       'nerys',
-      'I am finishing my own routine away from the river steps. Ring after half past the hour. My partner is looking after the inn.',
+      'I am finishing my own routine away from the river steps. Call after half past the hour. My partner is looking after the inn.',
       'answer',
     );
     return;
@@ -907,12 +907,12 @@ function ringInn(s: GameState) {
       ? ([
           'Mm? What time is it… Wait a moment. I’ll look.',
           'You’re calling again. Wait a moment.',
-          'I was just falling asleep. Wait a moment, love.',
+          'I was just falling asleep. Wait a moment.',
           'All right. I’ll put my coat on.',
         ][Math.min(3, s.nerys.calls - 1)] ?? 'Wait a moment.')
       : s.nerys.calls > 1
         ? 'Are you calling again? All right, I’ll look.'
-        : 'Wait a moment, love. I’ll go and look.',
+        : 'Wait a moment. I’ll go and look.',
     'answer',
   );
 }
@@ -940,7 +940,7 @@ function innAnswers(s: GameState) {
       : step === 2
         ? 'It’s at the second step. The water is a bit brown.'
         : step === 3
-          ? 'It’s at the third step, love. The water is moving.'
+          ? 'It’s at the third step. The water is moving.'
           : step === 4
             ? 'It’s at the fourth step. That’s high. Mill Lane floods at the fifth step.'
             : step === 5

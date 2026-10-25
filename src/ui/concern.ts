@@ -2,16 +2,16 @@ import { clock, type GameState, type Job, keeperOf, personOf, planOf, walkMinute
 import { NAMES } from '../sim/keepers.ts';
 import { CREST, LIP } from '../sim/water.ts';
 
-const jobs: Record<Job, string> = {
-  level: 'reading the level',
-  weir: 'reading the weir',
-  gate: 'turning the gate',
-  stove: 'resting by the stove',
-  nap: 'sleeping',
-  clear: 'clearing the debris screen',
+const jobs: Record<Job, { doing: string; request: string }> = {
+  level: { doing: 'reading the level', request: 'read the level' },
+  weir: { doing: 'reading the weir', request: 'read the weir' },
+  gate: { doing: 'turning the gate', request: 'turn the gate' },
+  stove: { doing: 'resting by the stove', request: 'rest by the stove' },
+  nap: { doing: 'sleeping', request: 'take a nap' },
+  clear: { doing: 'clearing the debris screen', request: 'clear the debris screen' },
 };
 
-const expected = (minute: number) => `~${clock(Math.round(minute / 5) * 5)}`;
+const expected = (minute: number) => `about ${clock(Math.round(minute / 5) * 5)}`;
 
 /** Nominal desk estimates must not reveal a skipped walk, true gate setting or bodily capacity. */
 export function concernLines(s: GameState): string[] {
@@ -24,32 +24,32 @@ export function concernLines(s: GameState): string[] {
     if (a?.affordanceId === 'doze') words = 'He is not answering';
     else if (a?.affordanceId === 'nap') words = 'He is asleep, as you asked';
     else if (j) {
-      words = `He is ${jobs[j.job]}`;
+      words = `He is ${jobs[j.job].doing}`;
       if (j.job === 'level' || j.job === 'weir') {
         const destination = j.job === 'level' ? 'staff' : 'weir';
         const due = j.startedAt + walkMinutes(j.from, destination) + 3;
-        words += `. His report is expected at ${expected(due)}`;
+        words += `. His report is expected ${expected(due)}`;
       } else if (j.job === 'gate') {
         const reported = s.board.gate?.value;
         if (reported === undefined) words += '. His report is expected after the walk and work';
         else {
           const turns = Math.abs((j.target ?? reported) - reported);
           const due = j.startedAt + walkMinutes(j.from, 'gate') + Math.max(2, turns * 7);
-          words += `. His report is expected at ${expected(due)}`;
+          words += `. His report is expected ${expected(due)}`;
         }
       } else if (a) {
-        words += `. He is expected to finish at ${expected(a.endsAt)}`;
+        words += `. He is expected to finish ${expected(a.endsAt)}`;
       }
     }
     const request = queued.findLast((input) => input.kind === 'ask' && input.keeper === id);
     const pendingJob = request?.kind === 'ask' ? request.job : k.pending?.job;
-    if (pendingJob) words += `. Your ${pendingJob} request is waiting for an answer`;
+    if (pendingJob) words += `. Your request to ${jobs[pendingJob].request} is waiting for an answer`;
     else if (k.deferred && s.minute <= k.deferred.until)
-      words += `. Your ${k.deferred.job} request is waiting for him to reconsider`;
+      words += `. Your request to ${jobs[k.deferred.job].request} is waiting for him to reconsider`;
     return `${NAMES[id]}: ${words}.`;
   });
   if (s.nerys.ringing !== null)
-    lines.push(`Nerys: Her river report is expected at ${expected(s.nerys.ringing)}.`);
+    lines.push(`Nerys: Her river report is expected ${expected(s.nerys.ringing)}.`);
   else if (queued.some((input) => input.kind === 'ring'))
     lines.push('Nerys: Your call is waiting for an answer.');
   if (s.radioOut) lines.push('Radio: There is static. Keeper requests and reports cannot get through.');

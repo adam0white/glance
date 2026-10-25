@@ -446,14 +446,14 @@ function showAbout() {
   about.id = 'about';
   let heading = 'The night desk';
   let words =
-    "You work at the river authority's night desk. One old dam stands above a town. A keeper reads the gauges with a torch and reports the readings by radio. Every reading on your board is what he saw. Tap a gauge to choose a job. Tap the job to ask him. Hold the job button to insist. You work five nights. The week ends at Friday's first light, or when water comes over the top of the dam.";
+    "You work at the river authority's night desk. One old dam stands above a town. A keeper reads the gauges with a flashlight and reports the readings by radio. Every reading on your board is what he saw. Tap a gauge to choose a job. Tap the job to ask him. Hold the job button to insist. You work five nights. The week ends at Friday's first light, or when water comes over the top of the dam.";
   if (screen === 'watch') {
     heading = 'Reading the desk';
     words =
       'The level is the height of water behind the dam. The spillway lip is where water starts to overflow into the spillway. The crest is the top of the dam. The dial marks both heights. More gate turns lower the water behind the dam. The river through town rises about forty minutes later. “Read” is the time he wrote down. “Reported” is when the report reached you. Each job shows his answer and roughly how long it takes. Time stops while an inspection is open. Let him rest between jobs.';
     if (s && s.night >= 2)
       words +=
-        ' The weir is a low barrier upstream. Its gauge shows how much water is coming in. It is a long walk away. Ring Nerys at the Bridge Inn to ask about the river. Hold Warn Mill Lane to send the warden to knock on doors. A false warning makes Nerys less willing to help you.';
+        ' The weir is a low barrier upstream. Its gauge shows how much water is coming in. It is a long walk away. Call Nerys at the Bridge Inn to ask about the river. Hold Warn Mill Lane to send the warden to knock on doors. A false warning makes Nerys less willing to help you.';
     if (s && s.night >= 3)
       words +=
         ' Choose who does the job in each inspection. The other keeper can rest. Two men can read the same gauge differently.';
@@ -987,7 +987,7 @@ function drawSheet() {
     const warned = s.warnedAt !== null;
     const html = `<div class="who"><b>Bridge Inn</b><span class="soft">Nerys, by the river stairs</span><button class="x" id="x" aria-label="Close inspection">×</button></div>
       <div class="verbs two">
-        <button id="ring" ${ringing ? 'disabled' : ''}><span>Ring Nerys</span><span class="h">${ringing ? 'She has gone to look.' : 'Ask how high the river is.'}</span></button>
+        <button id="ring" ${ringing ? 'disabled' : ''}><span>Call Nerys</span><span class="h">${ringing ? 'She has gone to look.' : 'Ask how high the river is.'}</span></button>
         <button id="warn" ${warned ? 'disabled' : ''}><span class="fill"></span><span>Warn Mill Lane</span><span class="h">${warned ? `The warning was sent at ${clock(s.warnedAt ?? 0)}.` : 'Hold to send the warden to warn people.'}</span></button>
       </div>${castConversations(['nerys', 'bilal', 'wren'])}`;
     if (!patchSheet(el, html, previousKey === structureKey)) return;
@@ -1037,7 +1037,7 @@ function drawSheet() {
     const hs = opts.map((t) => deskHint(s as GameState, who, 'gate', t));
     const next = deskHint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
     head = `<b>Gate</b><span class="soft">${report ? `The last gate reading was ${reported}/${TURNS}, ${readingTime(report)}.` : 'Nobody has read the gate setting.'}</span>`;
-    body = `<details class="fore"><summary>${NAMES[who]}, after this job</summary><span class="hand">${next.forecast ? `“${esc(next.forecast)}”` : 'He has not said how he will feel afterwards.'}</span></details>
+    body = `<details class="fore"><summary>How ${NAMES[who]} expects to feel after this job</summary><span class="hand">${next.forecast ? `“${esc(next.forecast)}”` : 'He has not said how he expects to feel.'}</span></details>
       <div class="verbs turns">${hs
         .map(
           (h) =>
@@ -1054,7 +1054,7 @@ function drawSheet() {
     const firstReading = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
       ${job === 'level' ? observation(s) : ''}
-      <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">${NAMES[who]}, after this job:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'He has not said how he will feel afterwards.'}</span></p>
+      <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">How ${NAMES[who]} expects to feel after this job:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'He has not said how he expects to feel.'}</span></p>
       <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every reading is what a keeper saw. It may be wrong.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
     head = `<b>${NAMES[who]}</b><span class="soft">${esc(concernLines(s).find((line) => line.startsWith(`${NAMES[who]}:`)) ?? whereWords(who))}</span>`;
@@ -1135,7 +1135,7 @@ function observation(st: GameState): string {
 function castConversations(ids: CastId[]): string {
   if (!s) return '';
   const available = discoveriesFor(s);
-  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask whether they want to continue'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. Close this inspection to let the shift continue. Dam requests still go to the keepers.</p></details>`;
+  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. Close this inspection to let the shift continue. Dam requests still go to the keepers.</p></details>`;
 }
 function bindConversations(el: HTMLElement) {
   el.querySelectorAll<HTMLButtonElement>('[data-talk]').forEach((button) => {

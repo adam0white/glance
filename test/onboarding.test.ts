@@ -127,7 +127,7 @@ describe('title and first call', () => {
     expect(document.querySelector('.first-call')).toBeNull();
     expect(document.querySelector('#concern')?.textContent).toContain('waiting for an answer');
     debug.step(1);
-    expect(document.querySelector('#concern')?.textContent).toMatch(/Dai.*level.*~22:/);
+    expect(document.querySelector('#concern')?.textContent).toMatch(/Dai.*level.*about 22:/);
   });
   it('asks before discarding a saved week and resumes the old fingerprint', async () => {
     const expected = newGame(7);

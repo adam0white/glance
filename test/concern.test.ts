@@ -13,13 +13,13 @@ describe('the desk concern', () => {
   it('shows the latest queued request before the next simulation minute', () => {
     const s = newGame(7);
     queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level' });
-    expect(concernLines(s).join(' ')).toMatch(/level request is waiting for an answer/);
+    expect(concernLines(s).join(' ')).toMatch(/request to read the level is waiting for an answer/);
     queueInput(s, { kind: 'ask', keeper: 'dai', job: 'weir' });
     const words = concernLines(s).join(' ');
-    expect(words).toContain('weir request is waiting for an answer');
-    expect(words).not.toContain('level request');
+    expect(words).toContain('request to read the weir is waiting for an answer');
+    expect(words).not.toContain('request to read the level');
     s.inputs.push({ kind: 'ask', keeper: 'dai', job: 'gate', at: s.minute + 20 });
-    expect(concernLines(s).join(' ')).not.toContain('gate request');
+    expect(concernLines(s).join(' ')).not.toContain('request to turn the gate');
   });
 
   it('shows a queued inn call without promising a river report before she answers', () => {
@@ -30,7 +30,7 @@ describe('the desk concern', () => {
   });
 
   it('names the current reading and approximate report time without claiming a return walk', () => {
-    expect(concernLines(reading()).join(' ')).toMatch(/Dai.*level.*~22:10/);
+    expect(concernLines(reading()).join(' ')).toMatch(/Dai.*level.*about 22:10/);
     expect(concernLines(reading()).join(' ')).not.toMatch(/return|back at/);
   });
 
@@ -46,7 +46,7 @@ describe('the desk concern', () => {
     activity.endsAt = job.startedAt + 4;
     expect(concernLines(s)).toEqual(before);
     job.job = 'weir';
-    expect(concernLines(s).join(' ')).toMatch(/weir.*~22:15/);
+    expect(concernLines(s).join(' ')).toMatch(/weir.*about 22:15/);
   });
 
   it('estimates gate work from the reported setting without revealing true gate or capacity', () => {
@@ -60,7 +60,7 @@ describe('the desk concern', () => {
     s.board.gate.value = 1;
     activity.endsAt = 1341;
     const words = concernLines(s);
-    expect(words.join(' ')).toMatch(/Dai.*gate.*~22:15/);
+    expect(words.join(' ')).toMatch(/Dai.*gate.*about 22:15/);
     s.water.gate = 6;
     activity.endsAt = 1387;
     expect(concernLines(s)).toEqual(words);
@@ -74,7 +74,7 @@ describe('the desk concern', () => {
     job.target = 3;
     s.board.gate = null;
     expect(concernLines(s).join(' ')).toMatch(/gate.*report is expected after.*work/);
-    expect(concernLines(s).join(' ')).not.toMatch(/~/);
+    expect(concernLines(s).join(' ')).not.toMatch(/about \d/);
   });
 
   it('distinguishes pending requests from unexpired deferred requests', () => {
@@ -89,13 +89,45 @@ describe('the desk concern', () => {
     expect(concernLines(s).join(' ')).not.toContain('reconsider');
   });
 
+  it.each([
+    ['level', 'read the level'],
+    ['weir', 'read the weir'],
+    ['gate', 'turn the gate'],
+    ['stove', 'rest by the stove'],
+    ['nap', 'take a nap'],
+    ['clear', 'clear the debris screen'],
+  ] as const)('names the requested work instead of the %s job key', (job, words) => {
+    const s = newGame(7);
+    queueInput(s, { kind: 'ask', keeper: 'dai', job });
+    const before = structuredClone(s);
+    expect(concernLines(s).join(' ')).toContain(`Your request to ${words} is waiting for an answer.`);
+    expect(s).toEqual(before);
+    s.inputs = [];
+    keeperOf(s, 'dai').deferred = {
+      s: { voiceId: 'engineer', strength: 0.6 },
+      job,
+      until: s.minute + 5,
+    };
+    expect(concernLines(s).join(' ')).toContain(`Your request to ${words} is waiting for him to reconsider.`);
+  });
+
+  it('writes an estimated finish time as a sentence without a space before its period', () => {
+    const s = reading();
+    const job = keeperOf(s, 'dai').job;
+    const activity = personOf(s, 'dai').activity;
+    if (!job || !activity) throw new Error('Missing activity fixture');
+    job.job = 'stove';
+    activity.endsAt = 1340;
+    expect(concernLines(s)[0]).toBe('Dai: He is resting by the stove. He is expected to finish about 22:20.');
+  });
+
   it('shows sleep without promising a wake time or an active reading', () => {
     const s = reading();
     const activity = personOf(s, 'dai').activity;
     if (!activity) throw new Error('Missing activity fixture');
     activity.affordanceId = 'doze';
     expect(concernLines(s).join(' ')).toMatch(/Dai.*not answering/);
-    expect(concernLines(s).join(' ')).not.toMatch(/~|reading|wake/);
+    expect(concernLines(s).join(' ')).not.toMatch(/about \d|reading|wake/);
     activity.affordanceId = 'nap';
     expect(concernLines(s).join(' ')).toContain('asleep, as you asked');
   });
@@ -106,7 +138,7 @@ describe('the desk concern', () => {
     s.radioOut = true;
     const words = concernLines(s).join(' ');
     expect(words).toMatch(/Dai.*available/);
-    expect(words).toMatch(/Nerys.*river report.*~/);
+    expect(words).toMatch(/Nerys.*river report.*about/);
     expect(words).toMatch(/Radio.*static/);
   });
 

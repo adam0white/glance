@@ -14,7 +14,7 @@ Keep the setting, places and personal names. Every sentence must be understandab
 
 ## Completion and acceptance
 
-This pass ends with source rewrites, a comparison of seeded full runs with only known prose fields blanked, current-export replay checks, a ten-minute browser text dump, phone and desktop layout checks, one independent Codex review, a signed commit, green CI on that commit, and a deployed `/release.json` with that commit and `dirty:false`. The evidence is in `~/code/.lab-scratch/plain2/glance-report.md`. The owner accepts the reading quality after playing it; the next scheduled owner review is 2026-11-03.
+This pass ends with source rewrites, a comparison of seeded full runs with only known prose fields blanked, current-export replay checks, a ten-minute browser text dump, phone and desktop layout checks, one independent Codex review, a signed commit, green CI on that commit, and a deployed `/release.json` with that commit and `dirty:false`. The evidence is in `~/code/.lab-scratch/plain3/glance-report.md`. The owner accepts the reading quality after playing it; the next scheduled owner review is 2026-11-03.
 
 ## HF adoption lesson (2026-10-25)
 
@@ -33,3 +33,13 @@ Check for alias collisions before comparing hashes.
 Never erase a whole history to make an upgrade pass.
 Retain host wording that identifies the keeper or explains dam work.
 The adoption evidence is in `~/code/.lab-scratch/hfadopt/glance-report.md`.
+
+## Second reading pass (2026-10-25)
+
+Use zero in spoken figures. Use plain English for weather notices and forms of address.
+Write the full year when a character recalls 1979.
+Describe approximate times with “about”, and keep the estimate separate from a promise.
+Use character pronouns or repeat a name for one named person.
+Keep developer diagnostics behind `?lab=1`.
+The source and browser evidence must cover each line quoted by reading audit 2.
+The completion and owner acceptance boundary above also applies to this pass.

@@ -11,7 +11,7 @@ const CAUSE: Record<string, string> = {
   sleepy: 'He had less sleep than he needed and was more tired than he felt',
   trough: 'It was the early morning, when people are least alert',
   spent: 'Turning the wheel had exhausted him',
-  weather: 'Rain was in his face and his torch was weak',
+  weather: 'Rain was in his face and his flashlight was dim',
   afraid: 'He was frightened',
   skipped: 'He never walked there. He gave you the last reading',
   gossip: '',
