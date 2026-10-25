@@ -1426,3 +1426,24 @@ input[type="text"],
     aspect-ratio: 360 / 236;
   }
 }
+
+.desk-reminder {
+  flex: none;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--ink-soft);
+  font-size: var(--small-size);
+}
+.desk-reminder p {
+  margin: 0 0 4px;
+}
+.desk-reminder button {
+  width: 100%;
+}
+#observation svg {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  font-size: 13px;
+  fill: var(--ink);
+}

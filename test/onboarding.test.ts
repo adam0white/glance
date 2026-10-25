@@ -606,3 +606,36 @@ it('resumes an old paused chapter through the ordinary Resume button', async () 
   expect(state(debug).chapterPaused).toBe(false);
   expect(state(debug).inputs.at(-1)?.kind).toBe('resume');
 });
+
+it('keeps the town goal beside gate orders and offers the saved lightning comparison', async () => {
+  const debug = await boot();
+  await click('new');
+  chooseGauge('gate');
+  expect(document.querySelector('#desk-goal')?.textContent).toContain('town dry');
+  expect(document.querySelector('#desk-goal')?.textContent).toContain("Friday's first light");
+  expect(document.querySelector('#sheet #desk-goal')).toBeNull();
+  await click('compare-observations');
+  expect(document.querySelector('#observation')?.textContent).toContain('next lightning flash');
+  await click('x');
+  tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
+  // Use an actual seeded first flash, then let its scene ghost expire.
+  const run = state(debug);
+  while (!run.flashes.length) debug.step(1);
+  const flash = { ...run.flashes.at(-1)! };
+  debug.step(31);
+  const before = fingerprint(run);
+  await click('compare-observations');
+  expect(document.querySelector('#observation svg')).not.toBeNull();
+  expect(document.querySelector('#observation')?.textContent).toContain('solid line is Dai');
+  expect(document.querySelector('#observation')?.textContent).toContain('saved image');
+  expect(document.querySelector('#observation')?.textContent).toContain('different times');
+  expect(document.querySelector('#observation')?.textContent).not.toContain(flash.level.toFixed(2));
+  debug.step(0);
+  expect(fingerprint(run)).toBe(before);
+  const exported = exportRun(run, '2.21.0');
+  expect(
+    fingerprint(
+      replay(exported.seed, exported.inputs, exported.state.minute, exported.state.chapter ?? undefined),
+    ),
+  ).toBe(before);
+});

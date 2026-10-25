@@ -681,9 +681,13 @@ function watch() {
   skipUntil = 0;
   app.innerHTML = `<div class="watch">${topbar('<span id="night"></span> · <span class="clock" id="clock"></span>')}
     <div class="state-strip"><div id="concern" class="attention keeper-chips" aria-live="polite"></div><div id="clock-rate" role="status"></div></div>
+    <div class="desk-reminder"><p id="desk-goal">Until Friday's first light: keep the dam below its crest and the town dry, or warned in time.</p><button id="compare-observations">Compare observations</button></div>
     <div class="desk-main"><div class="desk-picture"><div class="scene-zone"><canvas id="scene" class="scene" aria-label="The dam, as reported"></canvas><div id="latest-radio" class="latest-radio hand"></div></div><div class="board" id="board"></div></div>
     <div class="desk-context"><div class="sheet" id="sheet"></div>${s.dawns.length ? '<button id="mornings" class="reading-row">This week’s mornings</button>' : ''}<div class="actionbar" id="skip-bar"><button id="skip" aria-label="Skip to the next event">Skip ⏩</button><span id="skip-caption" class="soft"></span></div></div></div></div>`;
   bindTopbar();
+  document.getElementById('compare-observations')?.addEventListener('click', () => {
+    if (s) openSheet({ kind: 'gauge', gauge: 'level', who: freeKeeper(s) });
+  });
   document.getElementById('mornings')?.addEventListener('click', mornings);
   document.getElementById('skip')?.addEventListener('click', () => {
     if (!s) return;
@@ -1045,6 +1049,7 @@ function drawSheet() {
     head = `<b>${job === 'level' ? 'Level' : 'Weir'}</b><span class="soft">${job === 'level' ? 'This gauge shows the water level behind the dam.' : 'The weir is a low barrier upstream. Its gauge shows incoming water.'}</span>`;
     const firstReading = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
+      ${job === 'level' ? observation(s) : ''}
       <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">${NAMES[who]}, after this job:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'He has not said how he will feel afterwards.'}</span></p>
       <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every reading is what a keeper saw. It may be wrong.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
@@ -1100,6 +1105,27 @@ function drawSheet() {
       ask(who, job, t, insist);
     });
   });
+}
+
+/** Compare only evidence the player has already received, never the live water state. */
+function observation(st: GameState): string {
+  const flash = st.flashes.at(-1);
+  if (!flash)
+    return '<section id="observation"><p>The next lightning flash will leave a saved image here. Compare its water line with the keeper’s reading.</p></section>';
+  const report = st.board.level;
+  // This is a visual estimate on the same wall, with no extra numerical readout.
+  const y = (level: number) => Math.max(12, Math.min(148, 148 - (level - 2) * 30));
+  return `<section id="observation" aria-label="Saved lightning observation">
+    <p>Lightning at ${clock(flash.at)}: a saved image of the water against the dam wall.</p>
+    <svg viewBox="0 0 300 170" role="img" aria-label="The saved lightning water line${report ? ' beside the latest reported water line' : ''}">
+      <path d="M240 155V28H270L290 155" fill="none" stroke="currentColor"/>
+      <path d="M10 28H240" stroke="currentColor" stroke-dasharray="2 5"/><text x="12" y="22">Dam crest</text>
+      <path d="M10 ${y(flash.level)}H240" stroke="var(--rope)" stroke-width="3" stroke-dasharray="6 4"/>
+      ${report ? `<path d="M10 ${y(report.value)}H240" stroke="var(--sky)" stroke-width="2"/>` : ''}
+    </svg>
+    <p>The dashed line is the saved image. ${report ? `The solid line is ${NAMES[report.who as KeeperId] ?? 'the keeper'}’s latest reading, ${readingTime(report)}.` : 'There is no keeper reading to compare yet.'}</p>
+    <p class="hint">These observations may be from different times. The water can change between them. This image does not show the water now.</p>
+  </section>`;
 }
 
 function castConversations(ids: CastId[]): string {
