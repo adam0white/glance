@@ -50,7 +50,6 @@ import { reportBody } from './report.ts';
 import { drawScene, type SceneFx, sceneHit } from './scene.ts';
 import { tallyBody } from './tally.ts';
 import { readingTime } from './time.ts';
-import { displayWords, hintWords } from './words.ts';
 
 const labMode = () => new URLSearchParams(location.search).get('lab') === '1';
 
@@ -281,9 +280,9 @@ function title() {
     /* Explicit fresh play remains available. */
   }
   app.innerHTML = `<div class="page screen title-screen">${topbar('', true)}
-    <div class="page-body"><h1>The Glance</h1><p class="subtitle">A night desk above a valley town.</p>
+    <div class="page-body"><h1>The Glance</h1><p class="subtitle">You work at a night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
-    <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. You work five nights, Monday to Friday. The week ends at Friday's first light, or when water comes over the crest.</p>
+    <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. You work five nights, Monday to Friday. The week ends at Friday's first light, or when water comes over the top of the dam.</p>
     ${labMode() ? '<button class="reading-row" id="other">Lab tools <span>▸</span></button>' : ''}</div>
     <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
     ${labMode() ? `<p class="credit">People by the Human Framework ${FRAMEWORK_VERSION}</p>` : ''}</div></div>`;
@@ -352,12 +351,12 @@ function otherWays() {
       await continuity.recording();
       if (generation !== continuity.generation || s !== loaded) return;
       writeSave();
-      result.textContent = 'Replayed. It matches the exported run. Recording follows your menu choice.';
+      result.textContent = 'The replay matches the exported run. Recording follows your menu choice.';
       const resume = d.querySelector('#dialog-back') as HTMLButtonElement;
       resume.textContent = 'Back to the desk';
       resume.addEventListener('click', enter);
     } catch {
-      result.textContent = 'That file is not a run from this edition of The Glance. Start fresh.';
+      result.textContent = 'That file is not a saved game from this edition of The Glance. Start a new game.';
     }
   });
 }
@@ -402,7 +401,7 @@ function continuityMenu() {
   const d = dialog(
     'continuity',
     'People between chapters',
-    `<p id="continuity-status" role="status">${esc(continuity.status)}</p><p>All five allocated people are checked together before a fresh chapter starts. Loaded runs keep their pinned initial people. Local continuity, recording and character analysis are separate choices.</p><label><input type="checkbox" id="continuity-enabled" ${continuity.shelf.enabled ? 'checked' : ''}>Continue people between games</label><button id="fresh-local">Start fresh locally without browser histories</button>${s ? `<button id="departure">${s.chapterPaused ? 'Resume chapter' : 'Pause chapter for departure'}</button><p>Finish the storm week before leaving duties. Current work must reach its real boundary. Some health or obligations may still refuse travel.</p><details><summary>Save a person to browser continuity</summary>${ALLOCATION.map((c) => `<p>${c.name}<button data-checkpoint="${c.castId}">Save ${c.name}</button><button data-fork="${c.castId}">Save ${c.name} as explicit alternative branch</button></p>`).join('')}</details><p>Recorded play links across games on this device. Switch recording off in the game menu.</p><button id="continuity-export">Download run and source archive</button>` : ''}<a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">Inspect or export browser people</a>`,
+    `<p id="continuity-status" role="status">${esc(continuity.status)}</p><p>The game checks the saved histories of all five people together before a new chapter starts. A loaded game keeps the people it started with. You choose separately whether to carry people between games, record play or allow character analysis.</p><label><input type="checkbox" id="continuity-enabled" ${continuity.shelf.enabled ? 'checked' : ''}>Continue people between games</label><button id="fresh-local">Start fresh locally without browser histories</button>${s ? `<button id="departure">${s.chapterPaused ? 'Resume chapter' : 'Pause chapter for departure'}</button><p>Finish the storm week before people leave their duties. They must finish their current work before you can pause the chapter. Their health or other duties may still prevent travel.</p><details><summary>Save a person to browser continuity</summary>${ALLOCATION.map((c) => `<p>${c.name}<button data-checkpoint="${c.castId}">Save ${c.name}</button><button data-fork="${c.castId}">Save a separate history for ${c.name}</button></p>`).join('')}</details><p>Recorded play links across games on this device. Switch recording off in the game menu.</p><button id="continuity-export">Download run and source archive</button>` : ''}<a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">Inspect or export browser people</a>`,
     '<button id="dialog-back">Back</button>',
   );
   const attempt = async (action: () => Promise<unknown>) => {
@@ -447,28 +446,28 @@ function showAbout() {
   about.id = 'about';
   let heading = 'The night desk';
   let words =
-    "You work at the river authority's night desk. One old dam stands above a town. A keeper reads the gauges by torch and radios the figures in. Every figure on your board is what he saw. Tap a gauge to choose a job. Tap the job to ask him; hold the job button to insist. You work five nights. The week ends at Friday's first light, or when water comes over the crest.";
+    "You work at the river authority's night desk. One old dam stands above a town. A keeper reads the gauges with a torch and reports the readings by radio. Every reading on your board is what he saw. Tap a gauge to choose a job. Tap the job to ask him. Hold the job button to insist. You work five nights. The week ends at Friday's first light, or when water comes over the top of the dam.";
   if (screen === 'watch') {
     heading = 'Reading the desk';
     words =
-      'The level is the height of water behind the dam. The spillway lip is where water starts to overflow into the spillway. The crest is the top of the dam. The dial marks both heights. More gate turns lower the dam, but the river through town rises about forty minutes later. “read” is the time he wrote down; “reported” is when it reached you. Each job shows his answer and roughly how long it takes. Time waits while a sheet is open. Let him rest between jobs.';
+      'The level is the height of water behind the dam. The spillway lip is where water starts to overflow into the spillway. The crest is the top of the dam. The dial marks both heights. More gate turns lower the water behind the dam. The river through town rises about forty minutes later. “Read” is the time he wrote down. “Reported” is when the report reached you. Each job shows his answer and roughly how long it takes. Time stops while an inspection is open. Let him rest between jobs.';
     if (s && s.night >= 2)
       words +=
-        ' The weir is a low barrier upstream. Its gauge shows how much water is coming in. It is a long walk away. Ring Nerys at the Bridge Inn for the river. Hold Warn Mill Lane and the warden knocks doors; a warning for nothing costs her goodwill.';
+        ' The weir is a low barrier upstream. Its gauge shows how much water is coming in. It is a long walk away. Ring Nerys at the Bridge Inn to ask about the river. Hold Warn Mill Lane to send the warden to knock on doors. A false warning makes Nerys less willing to help you.';
     if (s && s.night >= 3)
       words +=
-        ' Choose who goes in each sheet. The other can rest. Two men can read the same gauge differently.';
+        ' Choose who does the job in each inspection. The other keeper can rest. Two men can read the same gauge differently.';
     if (s && s.night >= 4)
       words +=
         ' When the radio is out, no request or report gets through. You cannot send requests or receive reports until the radio returns.';
   } else if (screen === 'dawn') {
     heading = 'The morning page';
     words =
-      'The red line is what the water did. The dots are what you were told, at the time they were really read. A wrong figure counts as caught if you had it read again within twenty minutes, or lightning showed the wall.';
+      'The red line is what the water did. The dots are what you were told, at the time they were really read. A wrong reading counts as caught if you had it read again within twenty minutes, or lightning showed the wall.';
   } else if (screen === 'end') {
     heading = 'The tally';
     words =
-      "It counts nights the dam held, nights Mill Lane stayed dry or was warned in time, and wrong figures caught. It is the game's own reckoning of the desk's record, not a measure of people.";
+      'The tally adds the nights the dam held, the nights Mill Lane stayed dry or was warned in time, and the wrong readings you caught. It counts the desk’s results. It does not rate the people.';
   }
   about.innerHTML = `<div class="dialog-head"><h2>${heading}</h2><button id="close-about" class="x" aria-label="Close information" popovertarget="about" popovertargetaction="hide">×</button></div><p>${esc(words)}</p>`;
   app.append(about);
@@ -503,7 +502,7 @@ function gameMenu() {
   const d = dialog(
     'game-menu',
     `Game menu${s ? ` · ${planOf(s).title} ${clock(s.minute)}` : ''}`,
-    `<p>The night waits while this is open.</p>
+    `<p>Time stops while this menu is open.</p>
     ${labMode() ? `<fieldset class="pace-setting"><legend>The night’s pace</legend>${['Automatic', 'Slow', 'Steady', 'Fast'].map((name) => `<button data-pace="${name}" aria-pressed="${paceChoice === name}">${name}</button>`).join('')}</fieldset><button class="reading-row" id="browser-people">People between chapters</button><button class="reading-row" id="to-title">To the title page</button>` : ''}
     <button class="reading-row" id="send-word">Feedback</button><button class="reading-row" id="fullscreen">Full screen</button><a class="reading-row" href="${GAMES}" target="_top">All games</a>${recordSwitch('record-menu')}<button id="menu-new">New game</button><div id="menu-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="menu-confirm-new">Yes, start again</button><button id="menu-cancel-new">Cancel</button></div>`,
     '<button class="primary" id="dialog-back">Resume</button>',
@@ -588,7 +587,7 @@ function sendWord() {
       .map(([id, label]) => `<button data-verdict="${id}" aria-pressed="false">${label}</button>`)
       .join('')}</div>
     <label class="feedback-note">What happened? What did you want to do? What got in the way?<textarea id="feedback-note" rows="4"></textarea></label>
-    <label>Your name (optional)<input id="feedback-name" type="text" maxlength="60" value="${esc(feedbackName())}" autocomplete="name"></label><p class="soft">A name links this device’s past and future play history. Leave it empty to stay pseudonymous.</p>
+    <label>Your name (optional)<input id="feedback-name" type="text" maxlength="60" value="${esc(feedbackName())}" autocomplete="name"></label><p class="soft">A name links this device’s past and future play history. Leave it empty to avoid linking a name to your play history.</p>
     <p class="soft">We send your note, verdict and optional name. With recording off, we send no run or linked history unless you choose to share it below. <a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a></p><p id="feedback-result" role="status"></p>`,
     '<button id="feedback-back">← Back</button><button class="primary" id="feedback-send">Submit</button>',
   );
@@ -648,7 +647,7 @@ function sendWord() {
       send.textContent = 'Back to the desk';
       send.disabled = false;
     } catch {
-      d.querySelector('#feedback-result')!.textContent = 'Could not send. Please try again.';
+      d.querySelector('#feedback-result')!.textContent = 'We could not send your feedback. Please try again.';
       update();
     }
   });
@@ -890,7 +889,7 @@ function drawLog() {
     const report = s.reports.findLast((r) => r.who === newest.who && r.at <= newest.at);
     setHtml(
       latest,
-      `${who ? `<b>${who}:</b> ` : ''}${hand(displayWords(newest.text), report ? 1 - report.clarity : 0, newest.at)}`,
+      `${who ? `<b>${who}:</b> ` : ''}${hand(newest.text, report ? 1 - report.clarity : 0, newest.at)}`,
     );
   }
   const el = document.getElementById('log');
@@ -907,7 +906,7 @@ function drawLog() {
           ? [...(s?.reports ?? [])].reverse().find((q) => q.who === x.who && q.at <= x.at)
           : undefined;
       const loose = r ? 1 - r.clarity : 0;
-      const body = sayClass(x) === 'p' ? hand(displayWords(x.text), loose, x.at) : esc(displayWords(x.text));
+      const body = sayClass(x) === 'p' ? hand(x.text, loose, x.at) : esc(x.text);
       // Tree notices can be stamped before delivery; only reading reports certify arrival here.
       const readingArrival = x.kind === 'report' && !x.text.includes('tree');
       const time = `${readingArrival ? 'reported ' : ''}${clock(x.at)}`;
@@ -938,9 +937,7 @@ function openSheet(sh: Sheet) {
 }
 
 function shortConcern(line: string) {
-  return line
-    .replace(/^[^:]+: /, '')
-    .replace(/^(available|not answering|asleep|reading|turning|resting|sleeping)/, 'He is $1');
+  return line.replace(/^[^:]+: /, '');
 }
 function drawConcern() {
   if (!s) return;
@@ -948,7 +945,7 @@ function drawConcern() {
   if (!el) return;
   const lines = concernLines(s);
   const ids = planOf(s).keepers;
-  const body = `${s.radioOut ? '<span class="radio-chip">Radio · static</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: free.'))}</button>` : ''}`;
+  const body = `${s.radioOut ? '<span class="radio-chip">The radio has static.</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: She is available.'))}</button>` : ''}`;
   if (!setHtml(el, body)) return;
   el.querySelectorAll<HTMLElement>('[data-k]').forEach((b) => {
     b.addEventListener('click', () => openSheet({ kind: 'keeper', who: b.dataset.k as KeeperId }));
@@ -984,7 +981,7 @@ function drawSheet() {
     const html = `<div class="who"><b>Bridge Inn</b><span class="soft">Nerys, by the river stairs</span><button class="x" id="x" aria-label="Close inspection">×</button></div>
       <div class="verbs two">
         <button id="ring" ${ringing ? 'disabled' : ''}><span>Ring Nerys</span><span class="h">${ringing ? 'She has gone to look.' : 'Ask how high the river is.'}</span></button>
-        <button id="warn" ${warned ? 'disabled' : ''}><span class="fill"></span><span>Warn Mill Lane</span><span class="h">${warned ? `warned at ${clock(s.warnedAt ?? 0)}` : 'Hold to send the warden to warn people.'}</span></button>
+        <button id="warn" ${warned ? 'disabled' : ''}><span class="fill"></span><span>Warn Mill Lane</span><span class="h">${warned ? `The warning was sent at ${clock(s.warnedAt ?? 0)}.` : 'Hold to send the warden to warn people.'}</span></button>
       </div>${castConversations(['nerys', 'bilal', 'wren'])}`;
     if (!patchSheet(el, html, previousKey === structureKey)) return;
     bindConversations(el);
@@ -1032,24 +1029,24 @@ function drawSheet() {
     for (let t = 0; t <= TURNS; t++) if (t !== reported) opts.push(t);
     const hs = opts.map((t) => deskHint(s as GameState, who, 'gate', t));
     const next = deskHint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
-    head = `<b>Gate</b><span class="soft">${report ? `last gate ${reported}/${TURNS}, ${readingTime(report)}` : 'gate not read'}</span>`;
-    body = `<details class="fore"><summary>${NAMES[who]}, after this job</summary><span class="hand">${next.forecast ? `“${esc(displayWords(next.forecast))}”` : 'No word yet.'}</span></details>
+    head = `<b>Gate</b><span class="soft">${report ? `The last gate reading was ${reported}/${TURNS}, ${readingTime(report)}.` : 'Nobody has read the gate setting.'}</span>`;
+    body = `<details class="fore"><summary>${NAMES[who]}, after this job</summary><span class="hand">${next.forecast ? `“${esc(next.forecast)}”` : 'He has not said how he will feel afterwards.'}</span></details>
       <div class="verbs turns">${hs
         .map(
           (h) =>
-            `<button data-job="gate" data-t="${h.target}"><span class="fill"></span><span>${h.target === 0 ? 'Shut' : `${h.target} ${h.target === 1 ? 'turn' : 'turns'}`}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(hintWords(h.short))}${h.minutes ? ` · ~${h.minutes}m` : ''}</span></button>`,
+            `<button data-job="gate" data-t="${h.target}"><span class="fill"></span><span>${h.target === 0 ? 'Shut' : `${h.target} ${h.target === 1 ? 'turn' : 'turns'}`}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)}${h.minutes ? ` · ~${h.minutes}m` : ''}</span></button>`,
         )
         .join(
           '',
-        )}</div><p class="hint">The gate opens from 0 to ${TURNS} turns. More turns lower the dam level; the town river rises later. ${seen.hold ? '' : 'Hold a button to insist.'}</p>`;
+        )}</div><p class="hint">The gate opens from 0 to ${TURNS} turns. More turns lower the water behind the dam. The river through town rises later. ${seen.hold ? '' : 'Hold a button to insist.'}</p>`;
   } else if (sheet.kind === 'gauge') {
     const job: Job = sheet.gauge === 'weir' ? 'weir' : 'level';
     const h = deskHint(s, who, job);
     const hi = deskHint(s, who, job, undefined, true);
-    head = `<b>${job === 'level' ? 'Level' : 'Weir'}</b><span class="soft">${job === 'level' ? 'water held behind the dam' : 'the upstream weir gauge; it shows incoming water'}</span>`;
+    head = `<b>${job === 'level' ? 'Level' : 'Weir'}</b><span class="soft">${job === 'level' ? 'This gauge shows the water level behind the dam.' : 'The weir is a low barrier upstream. Its gauge shows incoming water.'}</span>`;
     const firstReading = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
-      <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">${NAMES[who]}, after this job:</span> <span class="hand">${h.forecast ? `“${esc(displayWords(h.forecast))}”` : 'No word yet.'}</span></p>
+      <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">${NAMES[who]}, after this job:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'He has not said how he will feel afterwards.'}</span></p>
       <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every reading is what a keeper saw. It may be wrong.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
     head = `<b>${NAMES[who]}</b><span class="soft">${esc(concernLines(s).find((line) => line.startsWith(`${NAMES[who]}:`)) ?? whereWords(who))}</span>`;
@@ -1073,7 +1070,7 @@ function drawSheet() {
   const callAdvice = s.radioOut
     ? 'Requests cannot get through. Call again when the radio clears.'
     : activity === 'doze' || activity === 'nap'
-      ? 'Wait for his answer. If no answer, call again.'
+      ? 'Wait for his answer. If he does not answer, call again.'
       : '';
   if (sheet.kind === 'keeper') body += castConversations([who]);
   body += `<p class="hint call-advice" ${callAdvice ? '' : 'hidden'}>${callAdvice}</p>`;
@@ -1109,7 +1106,7 @@ function drawSheet() {
 function castConversations(ids: CastId[]): string {
   if (!s) return '';
   const available = discoveriesFor(s);
-  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(displayWords(CAST[id].role))}</p>${s?.discoveries[id] ? `<p class="hand">${esc(displayWords(rememberedConversation(s as GameState, id) ?? ''))}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask whether they want to continue'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. Close this inspection to let the shift continue. Dam requests still go to the keepers.</p></details>`;
+  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask whether they want to continue'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. Close this inspection to let the shift continue. Dam requests still go to the keepers.</p></details>`;
 }
 function bindConversations(el: HTMLElement) {
   el.querySelectorAll<HTMLButtonElement>('[data-talk]').forEach((button) => {
@@ -1161,9 +1158,9 @@ function patchSheet(el: HTMLElement, html: string, stable: boolean) {
 function deskHint(st: GameState, who: KeeperId, job: Job, target?: number, insist = false): Hint {
   const h = hint(st, who, job, target, insist);
   const activity = personOf(st, who).activity?.affordanceId;
-  if (st.radioOut) return { ...h, short: 'radio out', minutes: 0, forecast: '' };
+  if (st.radioOut) return { ...h, short: 'The radio is out.', minutes: 0, forecast: '' };
   if (activity === 'doze' || activity === 'nap')
-    return { ...h, short: 'call; wait', minutes: 0, forecast: '' };
+    return { ...h, short: 'Call and wait for his answer.', minutes: 0, forecast: '' };
   return h;
 }
 
@@ -1171,7 +1168,7 @@ function verbButtons(items: { h: Hint; label: string; insist: Hint | undefined }
   return `<div class="verbs ${grid ? 'grid' : 'one'}">${items
     .map(
       ({ h, label, insist }) =>
-        `<button data-job="${h.job}"><span class="fill"></span><span>${esc(label)}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(hintWords(h.short))}${h.minutes && h.job !== 'stove' && h.job !== 'nap' ? ` · ~${h.minutes} min` : ''}${insist && insist.verdict !== h.verdict ? ` · held: ${esc(hintWords(insist.short))}` : ''}</span></button>`,
+        `<button data-job="${h.job}"><span class="fill"></span><span>${esc(label)}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)}${h.minutes && h.job !== 'stove' && h.job !== 'nap' ? ` · ~${h.minutes} min` : ''}${insist && insist.verdict !== h.verdict ? ` · If you hold: ${esc(insist.short)}` : ''}</span></button>`,
     )
     .join('')}</div>`;
 }
@@ -1180,34 +1177,39 @@ function lastWords(st: GameState, g: Gauge): string {
   const r = st.board[g];
   if (!r) return 'Nobody has read it yet tonight.';
   const who = r.who === 'nerys' ? 'Nerys' : NAMES[r.who as KeeperId];
-  return `Last: ${who}, ${readingTime(r)}: “${esc(displayWords(reportWords(st, r)))}”`;
+  return `${who} last reported this, ${readingTime(r)}: “${esc(reportWords(st, r))}”`;
 }
 
 function whereWords(id: KeeperId): string {
   if (!s) return '';
   const k = keeperOf(s, id);
   const a = personOf(s, id).activity?.affordanceId;
-  if (a === 'doze' || a === 'nap') return a === 'nap' ? 'asleep, as you said' : 'not answering';
+  if (a === 'doze' || a === 'nap')
+    return a === 'nap' ? 'He is asleep, as you asked.' : 'He is not answering.';
   const j = k.job;
   if (j) {
     const reading = j.job === 'level' || j.job === 'weir';
     const walking =
       s.minute < j.startedAt + (reading ? walkMinutes(j.from, j.job === 'level' ? 'staff' : 'weir') : j.walk);
     const where = {
-      level: 'the staff gauge',
+      level: 'the level gauge',
       weir: 'the weir',
       gate: 'the wheel',
       stove: 'the hut',
       nap: 'the hut',
-      clear: 'the screen',
+      clear: 'the debris screen',
     }[j.job];
-    return walking ? `walking to ${where}` : j.job === 'stove' ? 'by the stove' : `at ${where}`;
+    return walking
+      ? `He is walking to ${where}.`
+      : j.job === 'stove'
+        ? 'He is by the stove.'
+        : `He is at ${where}.`;
   }
   return {
-    hut: 'in the hut',
-    gate: 'at the wheel',
-    staff: 'on the dam face',
-    weir: 'at the weir',
+    hut: 'He is in the hut.',
+    gate: 'He is at the wheel.',
+    staff: 'He is on the dam face.',
+    weir: 'He is at the weir.',
   }[k.place];
 }
 
@@ -1263,7 +1265,7 @@ function dawn() {
   lab.milestone(`night ${d.night} done`);
   screen = 'dawn';
   app.innerHTML = `<div class="page screen dawn">${topbar(`${planOf(s).title} · first light`)}<div class="page-body">
-    ${s.phase === 'end' ? `<p class="week-end" role="status">${d.overtopped ? 'The week ends here. Water came over the crest.' : 'First light after Friday night. The week is over; your watch is done.'}</p>` : ''}
+    ${s.phase === 'end' ? `<p class="week-end" role="status">${d.overtopped ? 'The week ends here. Water came over the top of the dam.' : 'It is first light after Friday night. The week is over. Your watch is done.'}</p>` : ''}
     ${reportBody(d, planOf(s).keepers.length > 1)}
     </div><div class="actionbar">
       ${s.phase === 'dawn' && next ? `<button class="primary" id="next">${esc(next.title)} night</button>` : ''}
@@ -1313,8 +1315,8 @@ function ending() {
           `<li><b>${PLANS[d.night - 1]?.title}</b> ${d.overtopped ? 'Water came over the dam.' : d.spilled ? 'Water flowed into the spillway.' : 'The dam held.'} Mill Lane ${d.overtopped || d.mill === 'flooded' ? 'flooded without warning' : d.mill === 'saved' ? 'flooded after a warning' : 'stayed dry'}. You caught ${d.misses.filter((m) => m.caught).length} of ${d.misses.length} wrong readings.</li>`,
       )
       .join('')}</ul>
-    <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong figures during the week.` : ''}</p>
-    ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(displayWords(l.aboutYou))}</p></div>`).join('')}
+    <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong readings during the week.` : ''}</p>
+    ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(l.aboutYou)}</p></div>`).join('')}
     <div id="closing-tally"></div><button class="reading-row" id="back">${PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
     <div class="actionbar ending-actions"><div><button id="send">Feedback</button>${labMode() ? '<button id="export">Download this run</button>' : ''}</div><button class="primary" id="again">New game</button></div></div>`;
   bindTopbar();

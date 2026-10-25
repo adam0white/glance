@@ -1,7 +1,7 @@
 {
   "name": "The Glance",
   "short_name": "The Glance",
-  "description": "A storm week on the radio to a small dam. Every reading is what a tired keeper saw.",
+  "description": "You spend a stormy week taking radio reports from a small dam. Every reading is what a tired keeper saw.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

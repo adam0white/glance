@@ -164,7 +164,7 @@ describe('desk sheets and reading labels', () => {
     expect(document.querySelector('.topbar')).toBe(top);
     expect(document.querySelector('[data-g="gate"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(document.querySelectorAll('.turns [data-job="gate"]')).toHaveLength(6);
-    expect(document.querySelector('#clock-rate')?.textContent).toBe('Time waits while you look');
+    expect(document.querySelector('#clock-rate')?.textContent).toBe('Time stops while you look.');
     expect(document.getElementById('skip-bar')?.hidden).toBe(true);
     const before = state(debug).inputs.length;
     await click('x');
@@ -202,13 +202,17 @@ describe('desk sheets and reading labels', () => {
     chooseGauge('level');
     const words = document.querySelector('.sheet [data-job="level"] .h')?.textContent;
     expect(words).toBe('Call and wait for his answer.');
-    expect(document.querySelector('.call-advice')?.textContent).toContain('If no answer, call again.');
+    expect(document.querySelector('.call-advice')?.textContent).toContain(
+      'If he does not answer, call again.',
+    );
     expect(words).not.toContain('min');
     chooseGauge('gate');
     expect(document.querySelector('.turns .h')?.textContent).toBe('Call and wait for his answer.');
     activity.affordanceId = 'nap';
     debug.step(0);
-    expect(document.querySelector('.call-advice')?.textContent).toContain('If no answer, call again.');
+    expect(document.querySelector('.call-advice')?.textContent).toContain(
+      'If he does not answer, call again.',
+    );
     run.radioOut = true;
     debug.step(0);
     expect(document.querySelector('.turns .h')?.textContent).toBe('The radio is out.');
@@ -234,7 +238,7 @@ describe('desk sheets and reading labels', () => {
     expect(document.querySelector('#log .line:last-child .t')?.textContent).toBe('reported 23:20');
     chooseGauge('level');
     expect(document.querySelector('.sheet .hint')?.textContent).toContain('read 22:30 (as written)');
-    expect(document.querySelector('#threshold')?.textContent).toContain('read 60 min ago (as written)');
+    expect(document.querySelector('#threshold')?.textContent).toContain('read it 60 min ago (as written)');
     expect(
       reportBody(
         {
@@ -374,7 +378,7 @@ it('uses phase information and keeps the final tally below people and closed', a
   expect(document.querySelector('#about')?.textContent).toContain('red line');
   await click('end');
   expect(document.querySelector('#tally-result')?.hasAttribute('hidden')).toBe(true);
-  expect(document.querySelector('#about')?.textContent).toContain('own reckoning');
+  expect(document.querySelector('#about')?.textContent).toContain('It does not rate the people');
   const ended = JSON.stringify(state(debug));
   await click('see-tally');
   expect(document.querySelector('#tally-result')?.hasAttribute('hidden')).toBe(false);

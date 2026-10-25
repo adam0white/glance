@@ -276,9 +276,12 @@ button[aria-pressed="true"] {
 #concern button,
 #concern .chip {
   min-height: 44px;
+  max-width: 100%;
   padding: 4px 8px;
   font-size: 13px;
   flex: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 #concern .radio-out,
 .not-answering {

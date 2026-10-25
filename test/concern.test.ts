@@ -13,10 +13,10 @@ describe('the desk concern', () => {
   it('shows the latest queued request before the next simulation minute', () => {
     const s = newGame(7);
     queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level' });
-    expect(concernLines(s).join(' ')).toMatch(/level request waiting for an answer/);
+    expect(concernLines(s).join(' ')).toMatch(/level request is waiting for an answer/);
     queueInput(s, { kind: 'ask', keeper: 'dai', job: 'weir' });
     const words = concernLines(s).join(' ');
-    expect(words).toContain('weir request waiting for an answer');
+    expect(words).toContain('weir request is waiting for an answer');
     expect(words).not.toContain('level request');
     s.inputs.push({ kind: 'ask', keeper: 'dai', job: 'gate', at: s.minute + 20 });
     expect(concernLines(s).join(' ')).not.toContain('gate request');
@@ -73,7 +73,7 @@ describe('the desk concern', () => {
     job.job = 'gate';
     job.target = 3;
     s.board.gate = null;
-    expect(concernLines(s).join(' ')).toMatch(/gate.*report expected after.*work/);
+    expect(concernLines(s).join(' ')).toMatch(/gate.*report is expected after.*work/);
     expect(concernLines(s).join(' ')).not.toMatch(/~/);
   });
 
@@ -84,7 +84,7 @@ describe('the desk concern', () => {
     expect(concernLines(s).join(' ')).toMatch(/weir.*waiting for.*answer/);
     k.pending = null;
     k.deferred = { s: { voiceId: 'engineer', strength: 0.6 }, job: 'gate', until: s.minute + 5 };
-    expect(concernLines(s).join(' ')).toMatch(/gate.*waiting to reconsider/);
+    expect(concernLines(s).join(' ')).toMatch(/gate.*waiting for him to reconsider/);
     s.minute += 6;
     expect(concernLines(s).join(' ')).not.toContain('reconsider');
   });
@@ -97,7 +97,7 @@ describe('the desk concern', () => {
     expect(concernLines(s).join(' ')).toMatch(/Dai.*not answering/);
     expect(concernLines(s).join(' ')).not.toMatch(/~|reading|wake/);
     activity.affordanceId = 'nap';
-    expect(concernLines(s).join(' ')).toContain('asleep, as you said');
+    expect(concernLines(s).join(' ')).toContain('asleep, as you asked');
   });
 
   it('names idle availability, an inn report and radio trouble separately', () => {
@@ -117,15 +117,15 @@ describe('the desk concern', () => {
     r.value = 4.8;
     r.at = s.minute - 12;
     r.wrote = r.at;
-    expect(thresholdWords(s)).toMatch(/4\.80 m.*12 min.*lip 5\.0 m/);
+    expect(thresholdWords(s)).toMatch(/4\.80 m.*12 min.*lip.*5\.0 m/);
     const words = thresholdWords(s);
     s.water.level = 6.2;
     expect(thresholdWords(s)).toBe(words);
     r.value = 5;
-    expect(thresholdWords(s)).toContain('crest 6.0 m');
+    expect(thresholdWords(s)).toContain('crest, or top of the dam, is at 6.0 m');
     r.value = 6.1;
-    expect(thresholdWords(s)).toContain('above crest 6.0 m');
+    expect(thresholdWords(s)).toContain('above the crest');
     s.board.level = null;
-    expect(thresholdWords(s)).toMatch(/not read.*crest 6\.0 m/);
+    expect(thresholdWords(s)).toMatch(/not been read.*crest.*6\.0 m/);
   });
 });

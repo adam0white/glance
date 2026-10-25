@@ -229,21 +229,21 @@ export const PLANS: NightPlan[] = [
     keepers: ['dai'],
     storm: { peakAt: 300, peak: 9, width: 70, base: 2.5 },
     intro: [
-      'First week on the night desk. One dam in my valley, one keeper on it, rain on the way.',
-      'Every figure on this board is what Dai saw. Tap a gauge to ask him for it.',
+      'This is my first week on the night desk. There is one dam in my valley, and one keeper works there. Rain is coming.',
+      'Every reading on this board is what Dai saw. Tap a gauge to choose a job, then ask him to read it.',
     ],
     weir: false,
     inn: false,
     firstFlash: 34,
     beats: [
-      { at: 95, who: 'dai', text: 'Kettle’s on. Shout if you want me.' },
-      { at: 140, who: 'dai', text: 'Coming down heavier up here now.' },
+      { at: 95, who: 'dai', text: 'The kettle is heating. Call me if you need me.' },
+      { at: 140, who: 'dai', text: 'The rain is heavier up here now.' },
       {
         at: 190,
         who: 'dai',
-        text: 'You’re the new one, then. Where’s Morgan gone? Twelve years on that desk.',
+        text: 'You’re the new person, then. Where has Morgan gone? He worked at that desk for twelve years.',
       },
-      { at: 250, who: 'radio', text: 'Met Office: heavy rain over the hills until first light.' },
+      { at: 250, who: 'radio', text: 'The Met Office expects heavy rain over the hills until first light.' },
     ],
   },
   {
@@ -251,8 +251,8 @@ export const PLANS: NightPlan[] = [
     keepers: ['dai'],
     storm: { peakAt: 240, peak: 11, width: 80, base: 2.5, second: { at: 420, peak: 5, width: 40 } },
     intro: [
-      'Someone has pencilled a note in the margin of the log, years old: “Dai reads low after three. —M.”',
-      'The weir upstream is on the board tonight, and the Bridge Inn has a phone.',
+      'Someone wrote a note in pencil in the log’s margin years ago: “Dai’s readings are too low after three in the morning. —M.”',
+      'Tonight the board also shows readings from the weir, a low barrier across the water upstream. The Bridge Inn has a phone.',
     ],
     weir: true,
     inn: true,
@@ -260,18 +260,18 @@ export const PLANS: NightPlan[] = [
       {
         at: 8,
         who: 'nerys',
-        text: 'Bridge Inn. You’re the new one at the authority? Ring if you need eyes on the river, love.',
+        text: 'This is the Bridge Inn. Are you the new person at the authority? Ring if you need me to look at the river, love.',
       },
       {
         at: 120,
         who: 'dai',
-        text: 'Morgan used to ring at one for the level whether I’d said it or not. Habit.',
+        text: 'Morgan used to ring at one for the level whether I’d said it or not. It was his habit.',
       },
-      { at: 200, who: 'dai', text: 'Ground’s full. Whatever falls now comes straight down.' },
+      { at: 200, who: 'dai', text: 'The ground is full of water. Any more rain runs straight down.' },
       {
         at: 285,
         who: 'nerys',
-        text: 'Bridge Inn again. The cellar’s weeping, which it does when she’s up. Just so you know.',
+        text: 'This is the Bridge Inn again. Water is seeping into the cellar. That happens when the river is high. I thought you should know.',
       },
     ],
   },
@@ -280,16 +280,20 @@ export const PLANS: NightPlan[] = [
     keepers: ['dai', 'callum'],
     storm: { peakAt: 330, peak: 10, width: 80, base: 2.5 },
     intro: [
-      'The agency has sent a second keeper. Callum, twenty-four, his second week. Dai has not said a word about him.',
-      'Two men, one wheel. Who walks and who sleeps is up to you.',
+      'The agency has sent a second keeper. Callum is twenty-four, and this is his second week. Dai has not said anything about him.',
+      'Two men share one gate wheel. You decide who walks and who sleeps.',
     ],
     weir: true,
     inn: true,
     beats: [
-      { at: 3, who: 'callum', text: 'Callum here, sir. Ready for anything.' },
+      { at: 3, who: 'callum', text: 'This is Callum, sir. I’m ready for anything.' },
       { at: 6, who: 'dai', text: 'He’ll learn.' },
-      { at: 90, who: 'dai', text: 'Lad’s got the wheel the wrong way round in his head. I’ll not say.' },
-      { at: 150, who: 'callum', text: 'Sorry, sir. The baby’s teething. I’m fine.', if: 'callum' },
+      {
+        at: 90,
+        who: 'dai',
+        text: 'Callum has mixed up which way to turn the wheel. I’ll not say anything.',
+      },
+      { at: 150, who: 'callum', text: 'I’m sorry, sir. The baby is teething. I’m fine.', if: 'callum' },
       { at: 260, who: 'callum', text: 'Is it always like this, sir? Mr Pugh doesn’t say much.' },
     ],
   },
@@ -298,8 +302,8 @@ export const PLANS: NightPlan[] = [
     keepers: ['dai', 'callum'],
     storm: { peakAt: 200, peak: 10, width: 60, base: 3, second: { at: 400, peak: 8, width: 45 } },
     intro: [
-      'Gales with the rain tonight. The radio mast on the ridge drops out in the gusts.',
-      'When the radio is dead, they work from what they last heard from you.',
+      'There are gales and rain tonight. The radio mast on the ridge loses its signal in strong gusts.',
+      'When the radio loses its signal, they work from what they last heard from you.',
     ],
     weir: true,
     inn: true,
@@ -310,8 +314,8 @@ export const PLANS: NightPlan[] = [
     ],
     tree: 175,
     beats: [
-      { at: 125, who: 'radio', text: 'Wind’s getting up on the ridge. The line crackles.' },
-      { at: 300, who: 'dai', text: 'Line’s back. Did you hear any of that? Never mind.' },
+      { at: 125, who: 'radio', text: 'The wind is getting stronger on the ridge. The radio crackles.' },
+      { at: 300, who: 'dai', text: 'The radio is back. Did you hear any of that? Never mind.' },
     ],
   },
   {
@@ -319,8 +323,8 @@ export const PLANS: NightPlan[] = [
     keepers: ['dai', 'callum'],
     storm: { peakAt: 280, peak: 12, width: 90, base: 3 },
     intro: [
-      'The wettest night of the week, on the wettest ground. There is a painted mark high on the dam wall: ’79.',
-      'Bring the dam and the town to the morning.',
+      'This is the wettest night of the week. The ground is wetter than on any earlier night this week. A painted mark high on the dam wall reads “’79”.',
+      'Keep the dam and the town safe until morning.',
     ],
     weir: true,
     inn: true,
@@ -328,10 +332,10 @@ export const PLANS: NightPlan[] = [
       {
         at: 60,
         who: 'dai',
-        text: 'She was at the mark in seventy-nine. I was sixteen. My dad had this wheel.',
+        text: 'The water reached that mark in seventy-nine. I was sixteen. My dad turned this wheel.',
       },
-      { at: 150, who: 'nerys', text: 'River’s talking tonight. I’ve moved the chairs upstairs.' },
-      { at: 240, who: 'callum', text: 'Sir, my partner rang. She says the lane’s full of water. Our lane.' },
+      { at: 150, who: 'nerys', text: 'The river is loud tonight. I’ve moved the chairs upstairs.' },
+      { at: 240, who: 'callum', text: 'Sir, my partner rang. She says our lane is full of water.' },
     ],
   },
 ];
@@ -433,7 +437,7 @@ export function newGame(seed: number, chapter?: Chapter): GameState {
       const input = chapter.inputs.find((i) => i.parent.castId === c.castId);
       const expected = input ? admitResident(input, p) : p;
       if (canonicalPersona(chapter.initial[c.castId]) !== canonicalPersona(expected))
-        throw new Error('Pinned actor differs from semantic admission.');
+        throw new Error('The saved character differs from the character admitted from the source.');
       if (input) {
         const facts = lifeAdmission(input, 'glance');
         s.life[c.id] = facts;
@@ -544,7 +548,7 @@ function startNight(s: GameState, night: number) {
   say(
     s,
     lead,
-    `Evening. Level’s ${spoken(levelR.value)}, gate’s on ${turnWords(w.gate)}. ${night === 1 ? 'Raining up top.' : 'Still raining.'}`,
+    `Good evening. The level is ${spoken(levelR.value)}, and the gate is ${turnWords(w.gate)}. ${night === 1 ? 'It is raining up here.' : 'It is still raining.'}`,
     'report',
   );
   s.board.level = levelR;
@@ -575,7 +579,7 @@ function handover(s: GameState, who: KeeperId, gauge: Gauge, truth: number): Rep
 // ---------- offers ----------
 
 const turnWords = (n: number) =>
-  n === 0 ? 'nothing, shut' : n === 1 ? 'one turn' : `${spoken(n).split('-')[0]} turns`;
+  n === 0 ? 'shut' : n === 1 ? 'open by one turn' : `open by ${spoken(n).split(' point ')[0]} turns`;
 
 /**
  * Where a night keeper's forecast starts to bite (HF 2.8.0 `forecastAt`): sleepiness in the small hours sits at
@@ -641,7 +645,7 @@ export function offersFor(s: GameState, id: KeeperId, target?: number): Affordan
   if (s.treeKnown && s.water.blocked)
     list.push(
       work('clear', {
-        label: 'clear the screen',
+        label: 'clear the debris screen',
         duration: walkMinutes(k.place, 'gate') + 22,
         effort: 0.9,
         skill: { id: 'gate', difficulty: 0.6 },
@@ -659,7 +663,7 @@ export function offersFor(s: GameState, id: KeeperId, target?: number): Affordan
     list.push(
       offer('nap', {
         action: 'sleep',
-        label: 'get my head down',
+        label: 'take a nap',
         mode: 'sleep',
         duration: walkMinutes(k.place, 'hut') + 30,
         effort: 0,
@@ -725,30 +729,37 @@ export function forecastWords(p: Person, aff: Affordance): string {
   const worst = Math.max(...spans.map((x) => x.worst));
   const at = forecastThresholds(aff);
   const dai = p.id === 'dai';
-  if (worst < at.comfortAt) return dai ? 'Easy. I’ll have plenty for the next round.' : 'No problem, sir.';
+  if (worst < at.comfortAt)
+    return dai
+      ? 'That is easy. I’ll have plenty of energy for the next round of checks.'
+      : 'I can do that, sir.';
   if (worst < (at.comfortAt + at.spentAt) / 2)
     return dai
-      ? 'I can, but the next round will be slow.'
-      : 'I can do it, sir. The next round might be slow.';
-  return dai ? 'I’ll do it. Don’t ask me for much after.' : 'I’ll do it, sir. I’ll be done in after.';
+      ? 'I can do it, but the next round of checks will be slow.'
+      : 'I can do it, sir. The next round of checks might be slow.';
+  return dai
+    ? 'I’ll do it. Don’t ask me to do much afterwards.'
+    : 'I’ll do it, sir. I’ll be exhausted afterwards.';
 }
 
 function shortOf(r: SuggestionResolution): string {
   switch (r.verdict) {
     case 'assented':
-      return 'yes';
+      return 'He agrees.';
     case 'complied':
-      return 'if I must';
+      return 'He agrees reluctantly.';
     case 'deferred':
       // The stove is where he already is: "after I sit by the stove" read as a loop.
-      if (/sit by the stove/.test(r.counterOffer?.label ?? '')) return 'in a bit, once I’m warm';
-      return r.counterOffer?.label ? `after I ${r.counterOffer.label.replace(/^after I /, '')}` : 'not now';
+      if (/sit by the stove/.test(r.counterOffer?.label ?? '')) return 'He wants to warm up first.';
+      return r.counterOffer?.label
+        ? `He says, “I can do it after I ${r.counterOffer.label.replace(/^after I /, '')}.”`
+        : 'He wants to wait.';
     case 'modified':
       return r.counterOffer?.label
-        ? `rather ${r.counterOffer.label.replace(/^after I /, '')}`
-        : 'something else';
+        ? `He would rather ${r.counterOffer.label.replace(/^after I /, '')}.`
+        : 'He wants another job.';
     case 'refused':
-      return r.kind === 'cannot' ? "can't" : 'no';
+      return r.kind === 'cannot' ? 'He cannot do it.' : 'He refuses.';
     default:
       return '';
   }
@@ -779,7 +790,7 @@ function apply(s: GameState, inp: Input) {
       say(
         s,
         'narrator',
-        'Departure requested. Finish current work. Nerys’s partner confirms inn cover during this bounded chapter pause; an outstanding river call must finish first. Dam and contractor duties still bind until the week closes.',
+        'You have asked to leave. Everyone must finish their current work. Nerys’s partner will run the inn during this chapter’s pause. She must answer any river call already in progress first. The dam keepers and contractors still have their duties until the week ends.',
         'journal',
       );
       return;
@@ -794,7 +805,7 @@ function apply(s: GameState, inp: Input) {
       const k = keeperOf(s, inp.keeper);
       if (!k.on) return;
       if (s.radioOut) {
-        say(s, 'radio', `Static. ${NAMES[k.id]} can’t hear you.`, 'radio');
+        say(s, 'radio', `The radio has only static. ${NAMES[k.id]} can’t hear you.`, 'radio');
         return;
       }
       if (s.life[inp.keeper] && !s.life[inp.keeper]?.availableForExtraWork && s.minute < watchFrom(1) + 30) {
@@ -811,11 +822,16 @@ function apply(s: GameState, inp: Input) {
         const dozing = p.activity.affordanceId === 'doze';
         k.unanswered += 1;
         if (k.unanswered < 2 && dozing) {
-          say(s, 'radio', `No answer from ${NAMES[k.id]}.`, 'radio');
+          say(s, 'radio', `${NAMES[k.id]} does not answer.`, 'radio');
           return;
         }
         k.unanswered = 0;
-        say(s, k.id, k.id === 'dai' ? 'Aye. Aye, I’m here.' : 'Sorry, sir! Sorry. I’m here.', 'answer');
+        say(
+          s,
+          k.id,
+          k.id === 'dai' ? 'Yes. Yes, I’m here.' : 'I’m sorry, sir! I’m sorry. I’m here.',
+          'answer',
+        );
       }
       k.night.asked += 1;
       if (inp.insist) k.night.insisted += 1;
@@ -843,8 +859,8 @@ function apply(s: GameState, inp: Input) {
         s,
         'narrator',
         late
-          ? 'I rang the warden. Mill Lane again. He said they’d heard that one before, but he would knock.'
-          : 'I rang the warden. He is knocking on Mill Lane, telling them to get their things upstairs.',
+          ? 'I rang the warden about Mill Lane again. He said they’d heard that warning before, but he would knock on their doors.'
+          : 'I rang the warden. He is knocking on doors in Mill Lane, telling people to get their things upstairs.',
         'journal',
       );
       return;
@@ -863,7 +879,7 @@ function ringInn(s: GameState) {
     say(
       s,
       'nerys',
-      'I am finishing my own routine away from the river steps. Ring after half past; my partner has the inn covered.',
+      'I am finishing my own routine away from the river steps. Ring after half past the hour. My partner is looking after the inn.',
       'answer',
     );
     return;
@@ -874,10 +890,10 @@ function ringInn(s: GameState) {
   if (s.nerys.goodwill < 0.2 || (late && s.nerys.goodwill < 0.35)) {
     const why =
       s.falseAlarms > 0 && s.nerys.calls <= 2
-        ? 'The phone at the Bridge Inn rings out. After the knocking for nothing, she has taken it off the hook.'
+        ? 'Nobody answers the phone at the Bridge Inn. After the warning that proved unnecessary, she has taken the phone off the hook.'
         : s.nerys.calls <= 2
-          ? 'The phone at the Bridge Inn rings out. Lights off over the bar.'
-          : 'The phone at the Bridge Inn rings out.';
+          ? 'Nobody answers the phone at the Bridge Inn. The lights over the bar are off.'
+          : 'Nobody answers the phone at the Bridge Inn.';
     say(s, 'radio', why, 'radio');
     return;
   }
@@ -889,14 +905,14 @@ function ringInn(s: GameState) {
     'nerys',
     late
       ? ([
-          'Mm? What time is it… Hang on, I’ll look.',
-          'You again. Hold on.',
-          'I was just dropping off. Hang on, love.',
-          'Right. I’ll put my coat on.',
-        ][Math.min(3, s.nerys.calls - 1)] ?? 'Hang on.')
+          'Mm? What time is it… Wait a moment. I’ll look.',
+          'You’re calling again. Wait a moment.',
+          'I was just falling asleep. Wait a moment, love.',
+          'All right. I’ll put my coat on.',
+        ][Math.min(3, s.nerys.calls - 1)] ?? 'Wait a moment.')
       : s.nerys.calls > 1
-        ? 'Again? Go on, I’ll look.'
-        : 'Hang on, love, I’ll go and look.',
+        ? 'Are you calling again? All right, I’ll look.'
+        : 'Wait a moment, love. I’ll go and look.',
     'answer',
   );
 }
@@ -920,16 +936,16 @@ function innAnswers(s: GameState) {
   s.board.bridge = r;
   const words =
     step <= 1
-      ? 'Down at the bottom step. Nothing to worry about.'
+      ? 'The river is at the bottom step. There is nothing to worry about.'
       : step === 2
-        ? 'It’s at the second step. Bit brown.'
+        ? 'It’s at the second step. The water is a bit brown.'
         : step === 3
-          ? 'Third step, love. It’s moving.'
+          ? 'It’s at the third step, love. The water is moving.'
           : step === 4
-            ? 'Fourth step. That’s high. Mill Lane gets it at five.'
+            ? 'It’s at the fourth step. That’s high. Mill Lane floods at the fifth step.'
             : step === 5
-              ? 'It’s at the top step! It’s in the lane!'
-              : 'It’s over the steps. It’s in the square.';
+              ? 'The river is at the top step! The water is in the lane!'
+              : 'The river is above the steps. The water is in the square.';
   say(s, 'nerys', words, 'report');
   s.nerys.ringing = null;
 }
@@ -959,14 +975,14 @@ export function step(s: GameState): void {
       say(
         s,
         'narrator',
-        'Lightning over the valley. For a moment the camera on the dam showed the wall.',
+        'Lightning flashed over the valley. For a moment the camera on the dam showed the wall.',
         'journal',
       );
   }
   const out = (plan.radio ?? []).some(([a, z]) => m >= a && m < z);
   if (out !== s.radioOut) {
     s.radioOut = out;
-    say(s, 'radio', out ? 'The radio goes to static.' : 'The radio comes back.', 'radio');
+    say(s, 'radio', out ? 'The radio has only static.' : 'The radio signal returns.', 'radio');
     if (!out) deliverHeld(s);
   }
   for (const beat of plan.beats)
@@ -981,7 +997,7 @@ export function step(s: GameState): void {
   s.minute += 1;
   if (s.pauseRequested && s.people.every((p) => !p.activity)) s.chapterPaused = true;
   if (s.water.overtopped) {
-    say(s, 'narrator', 'Water came over the crest of the dam.', 'journal');
+    say(s, 'narrator', 'Water came over the top of the dam.', 'journal');
     closeNight(s, true);
     return;
   }
@@ -1107,14 +1123,29 @@ function idleOffers(s: GameState, k: KeeperState): Affordance[] {
 /** HF's answer, in his voice where HF's words are generic. The pick is keyed by seed and minute, so replay holds. */
 const LINES: Record<KeeperId, Record<'assented' | 'complied' | 'cannot', string[]>> = {
   dai: {
-    assented: ['Aye.', 'Right you are.', 'Going now.', 'Aye, I’ll look.', 'On my way.', 'Fair enough.'],
-    complied: ['If you say so.', 'You’re the desk.', 'Aye. If that’s what you want.', 'Your call.'],
-    cannot: ['I can’t. I’m done in. Give me twenty.', 'Not yet. I’ve nothing left in me. Twenty minutes.'],
+    assented: [
+      'Yes, I’ll do that.',
+      'I’ll do that.',
+      'I’m going now.',
+      'Yes, I’ll look.',
+      'I’m on my way.',
+      'That is reasonable.',
+    ],
+    complied: [
+      'I’ll do it if you say so.',
+      'You’re in charge at the desk.',
+      'Yes. I’ll do it if that’s what you want.',
+      'You decide.',
+    ],
+    cannot: [
+      'I can’t. I’m exhausted. Give me twenty minutes.',
+      'I can’t do it yet. I have no energy left. Give me twenty minutes.',
+    ],
   },
   callum: {
-    assented: ['On it, sir.', 'Going, sir.', 'Right away.', 'Yes! On it.', 'I’ll go now.'],
-    complied: ['Yes, sir.', 'If you think so, sir.', 'OK. OK, going.'],
-    cannot: ['I… I can’t, sir. Sorry. I need a minute.', 'I’m done in, sir. Give me a bit.'],
+    assented: ['I’ll do it, sir.', 'I’m going, sir.', 'I’ll do it now.', 'Yes! I’ll do it.', 'I’ll go now.'],
+    complied: ['Yes, I’ll do it, sir.', 'I’ll do it if you think so, sir.', 'OK. OK, I’m going.'],
+    cannot: ['I… I can’t, sir. I’m sorry. I need a minute.', 'I’m exhausted, sir. Give me a little time.'],
   },
 };
 function flavour(s: GameState, id: KeeperId, r: SuggestionResolution): string {
@@ -1129,11 +1160,11 @@ function flavour(s: GameState, id: KeeperId, r: SuggestionResolution): string {
   if (r.verdict === 'deferred' && /sit by the stove/.test(r.counterOffer?.label ?? ''))
     return id === 'dai'
       ? pick([
-          'Not yet. Let me get the cold out of my hands.',
+          'I can’t do it yet. Let me warm my hands first.',
           'Give me a minute by the stove first.',
-          'In a bit. Kettle’s nearly on.',
+          'I’ll do it in a little while. The kettle is nearly boiling.',
         ])
-      : pick(['Can I just warm up a minute, sir?', 'Two minutes, sir. I’m frozen.']);
+      : pick(['Can I just warm up a minute, sir?', 'Give me two minutes, sir. I’m very cold.']);
   return r.says;
 }
 
@@ -1232,11 +1263,11 @@ function completeJob(s: GameState, k: KeeperState, p: Person) {
     const short = j.target !== undefined && g !== j.target;
     const words = short
       ? k.id === 'dai'
-        ? `She stuck. Got her to ${turnWords(g)}.`
-        : `Sorry, sir, she won't go further. She's on ${turnWords(g)}.`
+        ? `The gate stuck. I got it ${turnWords(g)}.`
+        : `I’m sorry, sir. The gate will not go further. It is ${turnWords(g)}.`
       : k.id === 'dai'
-        ? `Gate’s on ${turnWords(g)}.`
-        : `Done, sir. Gate's on ${turnWords(g)}.`;
+        ? `The gate is ${turnWords(g)}.`
+        : `I have finished, sir. The gate is ${turnWords(g)}.`;
     if (s.radioOut) s.held.push(r);
     else {
       s.board.gate = r;
@@ -1249,7 +1280,9 @@ function completeJob(s: GameState, k: KeeperState, p: Person) {
     say(
       s,
       k.id,
-      k.id === 'dai' ? 'Screen’s clear. Took the skin off my hands.' : 'Got it off, sir! It’s clear.',
+      k.id === 'dai'
+        ? 'The debris screen is clear. I scraped the skin off my hands.'
+        : 'I got the tree off, sir! The debris screen is clear.',
       'report',
     );
     strain(s, k, p, a);
@@ -1293,8 +1326,8 @@ function notice(s: GameState, k: KeeperState, p: Person) {
     s.treeKnown = true;
     const text =
       k.id === 'dai'
-        ? 'There’s a tree down on the screen. She’s choking.'
-        : 'Sir, there’s a whole tree on the screen!';
+        ? 'There’s a tree on the debris screen. It is blocking the water.'
+        : 'Sir, there’s a whole tree on the debris screen!';
     if (s.radioOut) s.said.push({ at, who: k.id, text, kind: 'report' });
     else say(s, k.id, text, 'report');
   }
@@ -1360,12 +1393,12 @@ function deliverHeld(s: GameState) {
     const who = r.who as KeeperId;
     const t = clock(r.wrote);
     if (r.gauge === 'gate')
-      say(s, who, `Radio’s back. Gate’s on ${turnWords(r.value)} since ${t}.`, 'report');
+      say(s, who, `The radio is back. The gate has been ${turnWords(r.value)} since ${t}.`, 'report');
     else
       say(
         s,
         who,
-        `Radio’s back. ${r.gauge === 'level' ? 'Level' : 'Weir'} at ${t}: ${reportWords(s, r)}`,
+        `The radio is back. This ${r.gauge === 'level' ? 'level' : 'weir'} reading was written at ${t}. ${reportWords(s, r)}`,
         'report',
       );
   }
@@ -1378,7 +1411,8 @@ export function reportWords(_s: GameState, r: Report): string {
   const who = r.who as KeeperId;
   const fig = r.gauge === 'level' ? spoken(r.value) : spokenFine(r.value);
   const k = r.at + KEEPERS.indexOf(who) * 7;
-  const lead = r.gauge === 'weir' ? (who === 'dai' ? 'Weir’s ' : 'Weir board, ') : '';
+  const lead =
+    r.gauge === 'weir' ? (who === 'dai' ? 'This is the weir reading. ' : 'I read the weir board. ') : '';
   const yawn = r.clarity < 0.35 && k % 3 === 0 ? (who === 'dai' ? '(a long yawn) ' : '') : '';
   return `${yawn}${lead}${hedge(who, r.conf, fig, k)}`;
 }
@@ -1418,39 +1452,50 @@ function say(s: GameState, who: Said['who'], text: string, kind: Said['kind']) {
 function aboutYou(s: GameState, k: KeeperState, overtopped: boolean): string {
   if (overtopped)
     return k.id === 'dai'
-      ? 'She went over. Thirty years on this dam and she went over.'
-      : 'I’m sorry, sir. I didn’t see it coming. Nobody told me.';
+      ? 'Water came over the dam. I have worked here for thirty years, and water came over the dam.'
+      : 'I’m sorry, sir. I didn’t expect the water to come over the dam. Nobody told me.';
   const p = personOf(s, k.id);
   const dt = trustOf(p) - k.trustAtOpen;
   const n = k.night;
   const dai = k.id === 'dai';
   if (n.complied >= 2)
     return dai
-      ? `You pushed me ${n.complied} times. I don’t forget.`
-      : 'I did everything you said, sir. Everything.';
+      ? `You insisted ${n.complied} times. I don’t forget that.`
+      : 'I did everything you said, sir. I did everything.';
   if (n.complied === 1)
-    return dai ? 'You leaned on me once. Once is enough.' : 'You had to tell me twice once. Sorry, sir.';
+    return dai
+      ? 'You insisted once. Once is enough.'
+      : 'You had to ask me twice for one job. I’m sorry, sir.';
   // Drawing her down before the storm is the whole job, and a keeper says so.
   const from = watchFrom(s.night);
   const early = s.series.some((x) => x.m >= from && x.m - from < planOf(s).storm.peakAt - 120 && x.gate >= 2);
   if (early && n.turns > 0)
     return dai
-      ? 'You let her down before it came. That’s the job. Morgan did that.'
+      ? 'You lowered the water level at the dam before the rainwater arrived. That’s the job. Morgan did that.'
       : 'Mr Pugh said opening early was right, sir. He said it to me, not to you.';
-  if (n.naps > 0 && dai) return 'You sent me to sleep on watch. Thirty years nobody did that.';
+  if (n.naps > 0 && dai) return 'You sent me to sleep on watch. Nobody did that in thirty years.';
   if (n.naps > 0) return 'Thank you for the sleep, sir. I didn’t say, but I needed it.';
   if (n.asked === 0)
-    return dai ? 'Quiet on the radio tonight. Were you even there?' : 'You didn’t need me tonight, sir?';
+    return dai
+      ? 'You were quiet on the radio tonight. Were you even there?'
+      : 'You didn’t need me tonight, sir?';
   if (n.asked > 14)
     return dai
-      ? 'You had me up and down those steps all night.'
-      : 'Lot of walking tonight, sir. Fine. It’s fine.';
-  if (dt > 0.01) return dai ? 'You asked proper. Not many do.' : 'You listen, sir. My last place didn’t.';
-  if (n.refused >= 1) return dai ? 'I said no once. You took it. Good.' : 'Sorry I couldn’t, earlier.';
+      ? 'You had me walk up and down those steps all night.'
+      : 'I did a lot of walking tonight, sir. It’s fine. It’s fine.';
+  if (dt > 0.01)
+    return dai
+      ? 'You asked me properly. Not many people do.'
+      : 'You listen, sir. The people at my last workplace didn’t listen.';
+  if (n.refused >= 1)
+    return dai ? 'I said no once. You accepted it. That was good.' : 'I’m sorry I couldn’t do it earlier.';
   const pick = (xs: string[]) => xs[(s.night + KEEPERS.indexOf(k.id)) % xs.length] as string;
   return dai
-    ? pick(['Long night. You were there for it.', 'Old dam held. She usually does.'])
-    : pick(['Good night, sir. I mean, good morning.', 'I think I’m getting the hang of the wheel.']);
+    ? pick(['It was a long night. You were there for it.', 'The old dam held. It usually does.'])
+    : pick([
+        'I wish you a good night, sir. I mean, a good morning.',
+        'I think I’m learning how to use the wheel.',
+      ]);
 }
 
 /**
@@ -1460,16 +1505,16 @@ function aboutYou(s: GameState, k: KeeperState, overtopped: boolean): string {
 function ownWatchLine(s: GameState, id: KeeperId, line: string): string {
   if (!/didn't keep my watch/i.test(line)) return line.replace(/^Today/, 'Tonight');
   const dai = [
-    'I dropped off by the stove. I know I did.',
-    'Shut my eyes for a minute. It was longer than a minute.',
-    'Thirty years I never slept on watch. Now look.',
-    'I nodded off. Don’t put that in the book.',
-    'Slept in the chair. My dad would have had words.',
+    'I fell asleep by the stove. I know I did.',
+    'I shut my eyes for a minute. It was longer than a minute.',
+    'I never slept on watch in thirty years. Now look at me.',
+    'I fell asleep. Don’t write that in the log.',
+    'I slept in the chair. My dad would have scolded me.',
   ];
   const callum = [
     'I fell asleep, sir. I’m sorry. It won’t happen again.',
     'I only sat down for a second.',
-    'I was out like a light. The baby had me up all day.',
+    'I fell asleep at once. The baby kept me awake all day.',
   ];
   const xs = id === 'dai' ? dai : callum;
   return xs[(s.night + s.seed) % xs.length] ?? line;

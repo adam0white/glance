@@ -41,9 +41,9 @@ export function admitResident(input: LifePreparation, opening: Person): Person {
     p.castRevision !== cast.revision ||
     p.terminal
   )
-    throw new Error('Unsupported identity, edition or closed branch.');
+    throw new Error('This identity or edition is not supported, or this branch is closed.');
   if (!same(preparePersonaLife(p, input.clockMs).life, input.life))
-    throw new Error('Pinned life result differs.');
+    throw new Error('The life result differs from the saved result.');
   const peerRole = ['hf.cast.dai.glance', 'hf.cast.nerys.glance'].includes(p.castId) ? p.castId : null;
   const forwarded = p.source.game === 'glance' && p.source.rules === RULES;
   const peer =
@@ -57,10 +57,12 @@ export function admitResident(input: LifePreparation, opening: Person): Person {
     p.transfer.castPassport === DIALECT &&
     p.transfer.sourceRole === opening.id;
   if (!peer && !native)
-    throw new Error('No registered Glance semantic adapter for this source. Export or start fresh locally.');
+    throw new Error(
+      'The Glance cannot interpret a character from this source. Export the character or start a new local game.',
+    );
   if (peer && opening.id === 'dai')
     throw new Error(
-      'Commonstead archive does not certify current dam operating skills. Use Nerys or fresh local play.',
+      'The Commonstead archive does not certify current dam operating skills. Use Nerys or start a new local game.',
     );
   const portable = validateCalendarPersona(p.transfer.person);
   const sourceId = peer ? String(peerRole) : opening.id;
@@ -71,7 +73,7 @@ export function admitResident(input: LifePreparation, opening: Person): Person {
     portable.person.source.engine !== '2.17.0' ||
     portable.person.name !== cast.name
   )
-    throw new Error('Source role, mapping, engine or name differs.');
+    throw new Error('The source role, mapping, engine or name differs from the required value.');
   const receipt = p.transfer.checkpoint as Record<string, unknown> | undefined;
   if (
     !receipt ||
@@ -81,15 +83,17 @@ export function admitResident(input: LifePreparation, opening: Person): Person {
     typeof receipt.sha256 !== 'string' ||
     !/^[a-f0-9]{64}$/.test(receipt.sha256)
   )
-    throw new Error('Missing full-source checkpoint receipt.');
+    throw new Error('The receipt for the full source checkpoint is missing or invalid.');
   if (portable.calendar.norms.some((norm) => !DEFAULT_NORMS.some((known) => same(known, norm))))
-    throw new Error('Unknown norm meanings.');
+    throw new Error('The source includes a norm whose meaning is unknown here.');
   if (
     [...portable.calendar.commitments, ...portable.calendar.owed].some((c) =>
       [...c.actions, ...(c.violatedBy ?? [])].some((a) => !supportedActions.has(a)),
     )
   )
-    throw new Error('A source obligation has no supported action here. Keep it at source.');
+    throw new Error(
+      'An obligation from the source requires an action that is not supported here. Keep that obligation at the source.',
+    );
   const target = restore(snapshot(opening));
   const shifted = structuredClone(portable);
   const offset = target.now - portable.person.source.now;
@@ -106,7 +110,8 @@ export function admitResident(input: LifePreparation, opening: Person): Person {
   }
   if (shifted.calendar.lapse) shifted.calendar.lapse.since += offset;
   const age = portable.person.source.now - portable.person.life.bornAt;
-  if (age < cast.age * 525600) throw new Error('Canonical age provenance differs.');
+  if (age < cast.age * 525600)
+    throw new Error('The recorded age does not match the character’s required age.');
   target.life.bornAt = portable.person.life.bornAt + offset;
   target.body.fitness = portable.person.health.fitness;
   target.body.circadianPeak = portable.person.health.circadianPeak;
@@ -116,7 +121,7 @@ export function admitResident(input: LifePreparation, opening: Person): Person {
     shifted.person.skills = {};
     if (skills.length)
       shifted.person.limitations.push(
-        `Commonstead skills stay in source archive: ${skills.join(', ')}. No dam qualification inferred.`,
+        `These Commonstead skills stay in the source archive: ${skills.join(', ')}. They do not establish any dam qualification.`,
       );
   }
   const hostCommitments = target.agenda.commitments;
@@ -128,7 +133,7 @@ export function admitResident(input: LifePreparation, opening: Person): Person {
     targetNorms: DEFAULT_NORMS,
   }).person;
   if (hostCommitments.some((c) => admitted.agenda.commitments.some((other) => other.id === c.id)))
-    throw new Error('Source and target duty calendars overlap.');
+    throw new Error('The source and target duty calendars overlap.');
   admitted.agenda.commitments.push(...hostCommitments);
   return admitted;
 }
@@ -143,7 +148,7 @@ export function checkChapter(chapter: Chapter) {
     new Set(chapter.inputs.map((i) => i.parent.castId)).size !== chapter.inputs.length ||
     !same(Object.keys(chapter.initial).sort(), CAST.map((c) => c.castId).sort())
   )
-    throw new Error('Invalid complete initial cast.');
+    throw new Error('The complete starting cast is invalid.');
   for (const input of chapter.inputs) {
     const claim = chapter.claims.find((p) => p.castId === input.parent.castId);
     if (
@@ -157,7 +162,7 @@ export function checkChapter(chapter: Chapter) {
       claim.source.rules !== RULES ||
       !same(claim.transfer, { ...input.parent.transfer, life: input.life })
     )
-      throw new Error('Invalid pinned claim.');
+      throw new Error('The saved character claim is invalid.');
   }
 }
 
@@ -207,7 +212,7 @@ export async function residentTransfer(person: Person) {
     },
     limitations: [
       ...projection.person.limitations,
-      'Dam geometry, weather, source tasks, fictional discoveries, source social memories and transient body/needs remain in the full source archive. Zero-duration calendar adaptation is not travel, healing, payment or qualification.',
+      'The dam’s shape and size, weather, source tasks, fictional discoveries, source social memories, and temporary body states and needs remain in the full source archive. Adapting the calendar takes no time. It does not represent travel, healing, payment or qualification.',
     ],
   };
 }

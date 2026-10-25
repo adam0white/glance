@@ -70,12 +70,12 @@ export function confidenceOf(p: Person, c: Clarity): number {
 
 const DIGITS = ['nought', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 
-/** "four-three" for 4.3. */
+/** "four point three" for 4.3. */
 export function spoken(x: number): string {
   const tenths = Math.round(x * 10);
   const a = Math.floor(tenths / 10);
   const b = tenths % 10;
-  return `${DIGITS[a] ?? String(a)}-${DIGITS[b] ?? String(b)}`;
+  return `${DIGITS[a] ?? String(a)} point ${DIGITS[b] ?? String(b)}`;
 }
 
 /** A weir figure in two places, digit by digit: 1.98 is "one point nine eight", 0.52 "nought point five two". */
@@ -89,11 +89,29 @@ export function spokenFine(x: number): string {
 export function hedge(id: KeeperId, conf: number, fig: string, k: number): string {
   const pick = (xs: string[]) => xs[Math.abs(k) % xs.length] as string;
   if (id === 'dai') {
-    if (conf > 0.62) return pick([`${fig}, bang on.`, `${fig}. Steady as you like.`, `${fig}. Grand.`]);
-    if (conf > 0.45) return pick([`${fig}, near enough.`, `Call it ${fig}.`, `${fig}, give or take.`]);
-    return pick([`${fig}… I think.`, `About ${fig}. Torch is going.`, `${fig}. Hang on. Aye, ${fig}.`]);
+    if (conf > 0.62)
+      return pick([
+        `I read ${fig}. I’m sure of it.`,
+        `I read ${fig}. It looks steady.`,
+        `I read ${fig}. It looks fine.`,
+      ]);
+    if (conf > 0.45)
+      return pick([
+        `I read ${fig}, or close to it.`,
+        `I would call it ${fig}.`,
+        `I read approximately ${fig}.`,
+      ]);
+    return pick([
+      `I read ${fig}… I think.`,
+      `I read about ${fig}. The torch is fading.`,
+      `I read ${fig}. Wait a moment. Yes, I read ${fig}.`,
+    ]);
   }
-  if (conf > 0.55) return pick([`${fig}, sir. Definitely.`, `It's ${fig}. I checked twice.`]);
-  if (conf > 0.38) return pick([`${fig}, sir. I think it's ${fig}.`, `${fig}? Yes. ${fig}.`]);
-  return pick([`It's… ${fig}? It could be higher, sir.`, `${fig}, maybe more. It's hard to see.`]);
+  if (conf > 0.55) return pick([`I read ${fig}, sir. I’m sure.`, `It's ${fig}. I checked twice.`]);
+  if (conf > 0.38)
+    return pick([`I read ${fig}, sir. I think it is ${fig}.`, `Is it ${fig}? Yes, I read ${fig}.`]);
+  return pick([
+    `It's… ${fig}? It could be higher, sir.`,
+    `I read ${fig}, or maybe higher. It is hard to see.`,
+  ]);
 }
