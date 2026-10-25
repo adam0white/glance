@@ -1,5 +1,5 @@
 // The Glance service worker: offline play. The page is network-first (so a new build arrives), everything else
-// (hashed assets, fonts) is cache-first and stored as it is fetched.
+// same-origin game assets are cache-first and stored as they are fetched.
 const CACHE = 'glance-v1';
 const SHELL = ['/', '/manifest.webmanifest', '/icon.svg', '/icon-192.png'];
 
@@ -25,6 +25,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  // The browser owns cross-origin CORS, integrity checks and third-party caching.
+  if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
   const isPage = req.mode === 'navigate';
   if (isPage) {
