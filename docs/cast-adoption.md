@@ -49,3 +49,11 @@ Pause chapter is a logged gameplay input. Current activities finish before pausi
 Recording is closed before hooks. All pinned historical branches must permit one unchanged opaque epoch or receive explicit complete-group approval. Identity/recording/continuity/load changes invalidate the generation. File imports never inherit source ownership, authorship or automatic recording permission. Character-analysis consent stays separate. Local play/export remains possible when recording is denied.
 
 Technical verification and genuine browser journey receipts are recorded in /Users/abdul/code/.lab-scratch/cast/glance.md; no synthetic control is a human playtest or a cross-origin journey.
+
+## Published plain narration adoption, 2026-10-25
+
+The current host pins HF package and engine 2.21.0, including lab-client's nested dependency.
+Fresh original people and new admitted chapters use persisted plain English narration.
+Current exports replay their complete pinned chapter state; incompatible older files are refused.
+The source mappings and admission qualifications remain unchanged.
+See the upgrade lesson in `docs/lab/plain-english.md` and the delivery evidence in `~/code/.lab-scratch/hfadopt/glance-report.md`.

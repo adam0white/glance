@@ -43,7 +43,7 @@ export class Continuity {
     return {
       game: 'glance',
       build: `${String(this.lab.build().c ?? 'local')}.run-${this.runId}`,
-      engine: '2.17.0',
+      engine: '2.21.0',
       rules: RULES,
     };
   }

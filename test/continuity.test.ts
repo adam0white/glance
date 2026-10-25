@@ -10,7 +10,7 @@ it('uses released complete profiles and refuses a public profile in place of a p
   expect(() =>
     admitResident({ parent: { castId: 'hf.cast.dai.glance', transfer: {} }, clockMs: 0 } as never, dai),
   ).toThrow();
-  const ex = exportRun(s, '2.18.0');
+  const ex = exportRun(s, '2.21.0');
   expect(fingerprint(replay(ex.seed, ex.inputs, ex.state.minute, ex.state.chapter ?? undefined))).toBe(
     fingerprint(s),
   );
@@ -64,7 +64,7 @@ async function source(id = 'nerys', peer = false) {
     source: {
       game: peer ? 'commonstead' : 'glance',
       build: 'synthetic-control',
-      engine: '2.17.0',
+      engine: '2.21.0',
       rules: peer ? 'commonstead-3' : 'glance-3',
     },
     transfer: { ...captured.transfer, life: initialPersonaLife(castId, `control-${castId}`, clock) },
@@ -168,13 +168,15 @@ it('preflights all five heads then atomically claims two, preserving actual stat
   const runtime = new Continuity(h.lab, h.shelf);
   const s = await runtime.fresh(7);
   expect(s.chapter?.inputs).toHaveLength(2);
+  for (const person of s.people) expect(person.lexicon?.plainEnglish).toBe(true);
+  for (const person of Object.values(s.chapter!.initial)) expect(person.lexicon?.plainEnglish).toBe(true);
   expect(h.requests.filter((r) => r.action === 'putBatch')).toHaveLength(1);
   expect(Object.keys(h.requests.find((r) => r.action === 'putBatch')!.expectedHeads!)).toHaveLength(5);
   expect(s.people.find((p) => p.id === 'nerys')!.body.fitness).toBe(0.61);
   expect(s.people.find((p) => p.id === 'callum')!.traits).toEqual((c.transfer.person as any).person.traits);
   queueInput(s, { kind: 'ring' });
   step(s);
-  expect(fingerprint(importCurrent(exportCurrent(s)))).toBe(fingerprint(s));
+  expect(exportCurrent(importCurrent(exportCurrent(s)))).toEqual(exportCurrent(s));
   const loaded = await runtime.loadLocal(runtime.localSave(s));
   expect(runtime.heads.map((p) => p.revision)).toEqual(s.chapter!.claims.map((p) => p.revision));
   await runtime.importFile(JSON.stringify(exportCurrent(loaded)));

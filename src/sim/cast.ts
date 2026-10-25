@@ -54,6 +54,7 @@ export function makeVisitor(id: 'nerys' | 'bilal' | 'wren', seed: number, now: n
     bornAt: now - c.age * MINUTES_PER_YEAR,
     sex: id === 'bilal' ? 'male' : 'female',
     ...canonicalSpec(id),
+    lexicon: { plainEnglish: true },
   });
 }
 

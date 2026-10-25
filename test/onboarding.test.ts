@@ -43,7 +43,7 @@ vi.mock('@adam0white/lab-client', async (importOriginal) => ({
   watchPersonaCheckpoint: () => () => {},
 }));
 function localFixture(s: GameState) {
-  return { run: exportRun(s, '2.18.0'), runId: 'test-run', heads: [], fileOrigin: false, sources: [] };
+  return { run: exportRun(s, '2.21.0'), runId: 'test-run', heads: [], fileOrigin: false, sources: [] };
 }
 async function click(id: string) {
   const button = document.getElementById(id);
@@ -147,7 +147,7 @@ describe('title and first call', () => {
     const run = newGame(7);
     for (let i = 0; i < 20; i++) step(run);
     const debug = await boot();
-    await importRun(exportRun(run, 'test'));
+    await importRun(exportRun(run, '2.21.0'));
     expect(fingerprint(state(debug))).toBe(fingerprint(run));
     expect(alert).not.toHaveBeenCalled();
   });

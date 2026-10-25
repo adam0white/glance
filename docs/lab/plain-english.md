@@ -15,3 +15,21 @@ Keep the setting, places and personal names. Every sentence must be understandab
 ## Completion and acceptance
 
 This pass ends with source rewrites, a comparison of seeded full runs with only known prose fields blanked, current-export replay checks, a ten-minute browser text dump, phone and desktop layout checks, one independent Codex review, a signed commit, green CI on that commit, and a deployed `/release.json` with that commit and `dirty:false`. The evidence is in `~/code/.lab-scratch/plain2/glance-report.md`. The owner accepts the reading quality after playing it; the next scheduled owner review is 2026-11-03.
+
+## HF adoption lesson (2026-10-25)
+
+Pin the published framework and any nested framework dependency to exactly 2.21.0.
+The package and engine versions are both 2.21.0 in this release.
+Set `lexicon: { plainEnglish: true }` when creating each original person.
+A new chapter admits histories into that opening person and saves the admitted state.
+Loading a run must replay its pinned chapter without changing its narration choice.
+Refuse an incompatible export with a message that tells the player to start a new game.
+
+An HF narration upgrade also changes text inside decision traces and episode summaries.
+For a state comparison, blank only named presentation fields.
+Keep episode IDs, actions, times, ordering, tags, recall data, history and `usedLines`.
+Map changed episode sentences only through exact, activity-preserving aliases.
+Check for alias collisions before comparing hashes.
+Never erase a whole history to make an upgrade pass.
+Retain host wording that identifies the keeper or explains dam work.
+The adoption evidence is in `~/code/.lab-scratch/hfadopt/glance-report.md`.
