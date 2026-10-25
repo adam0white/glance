@@ -1,5 +1,41 @@
 # Handoff
 
+## Current state — 2026-10-25
+
+Remaining: Adam’s readiness decision and recorded F492/F465/F491 owner retests, target 2026-11-03. The playtest director may run the authorized HF3 lab panel. Friends’ playtests and Show HN remain paused. This documentation task runs no rounds. Games-deferred owns design/Deferred reconciliation; plain4 owns gameplay wording. This handoff does not close those tasks or the other games.
+
+### Source and deployed receipt
+
+Current gameplay source is signed `c8804a5d89b9a8cac6f6b8c49a79014630f4149a`, signature G with Codex trailer. Exact CI [40239951618](https://github.com/adam0white/glance/actions/runs/40239951618) succeeded. The v3 report records a normal 94-test lane and fresh clean deployment `829e924a-dab4-43e2-a381-528ab2e78969`. The live `/release.json`, rechecked for this documentation task, reports that commit, framework `3.0.0`, app `0.1.0` and `dirty:false`. Documentation-only commits do not require an app deployment; this is the gameplay deployment receipt, not a receipt for later documentation commits.
+
+Source pins: HF package `3.0.0`, engine `2.23.0`, lab-client `0.4.10`, lab-kit `0.5.11`, TypeScript `7.0.2`. TypeScript support is 7+. Lab SDKs remain immutable artifacts. Released client `0.4.11` / kit `0.5.12` and their new Feedback choices are not adopted by this host.
+
+### Replay and continuation evidence
+
+The reviewed deterministic-water fix is part of this source. Current exports are `glance@4-deterministic-water`; person-transfer rules are `glance-4`. Current replay checks the complete state. Old-version exports receive the existing start-fresh refusal. The Sun source notice and public `THIRD-PARTY-NOTICES.txt` remain in place.
+
+The v3 delivery retained an actual signed native Nerys export from normal host inputs, including raw state, source notebook, RNG and exact replay. Glance admits the actual current Commonstead Nerys fixture through finite metadata/body/calendar/norm checks. The final signed Glance envelope was also admitted read-only by actual Commonstead source `db10f23`, with three retained claims and exact full receiving-notebook replays. Raw state and portable person match the reviewed candidate. Whole-transfer equality is not claimed: the legal regenerated run changed hostRun and life clock seed/watermark.
+
+These are source fixture and admission proofs using a synthetic shelf sink. They do not prove an ordinary played cross-host ownership journey. File import does not acquire ownership. New chapters check all five saved people together; loaded chapters keep their pinned people. Ordinary recording and linkage follow the menu switch. Diagnostic controls require `?lab=1`.
+
+### Browser evidence and limits
+
+The v3 worker verified the production manifest in existing signed-in Chrome. Its proposed safety isolation was rejected before game navigation. The accepted fallback checked an exact served-byte local mirror in existing Chrome, plus actual live WebKit 27.2, at 360×690, 1280×800 and 768×1024. Checks covered the received-report note, removal, persistent goal, loaded fonts, overflow and app errors. The report records 28 captured served assets and the production HTML font rewrite.
+
+This does not prove production Chrome persistence, owner-save behavior, offline behavior, shared-shelf ownership or a human journey. Owner storage was preserved. Do not turn the three-size bounded v3 evidence into an unqualified four-size Chromium/WebKit completion claim.
+
+### Documentation scope and next work
+
+README now explains the literal objective, controls, local save, recording, diagnostic replay and HF’s contribution. The existing information popover explains screens and gameplay; no explanatory app change is needed here. No standalone Credits surface exists. Per-person information is gameplay and remains outside this task.
+
+Historical design claims about speed controls, uniform bias and a missing reading flag need reconciliation with current source by games-deferred. The personal “another check” note is not a new dawn-scoring rule. Preserve the old requests and owner quotes until that owner resolves them.
+
+Full v3 evidence: `/Users/abdul/code/.lab-scratch/v3/glance/report.md` and `STATUS` (`LIVE_VERIFIED_CLEANED`). That worker removed its own source/deploy trees and branches, stopped its servers and closed its tabs; no production Chrome persistence claim was made. Current docs delivery receipts belong in `/Users/abdul/code/.lab-scratch/docsweb/glance-report.md`.
+
+## Historical handoff — 2026-10-24
+
+The records below describe earlier simplify candidates and interrupted delivery gates. Their “current”, “pending” and no-new-round statements apply to those dated stages. The current source, authorized lab-panel policy and v3 evidence above supersede those state claims. Original receipt identifiers and owner instructions are retained.
+
 ## 2026-10-24 simplify stopped at disk threshold
 
 Goal: finish the owner's15-game simplify direction in /Users/abdul/code/.lab-scratch/simplify/owner-request.md. Technical done is reviewed source, signed/rebased commits, exact green CI, fresh clean deployment and both-engine four-size live checks; Adam accepts game readiness.

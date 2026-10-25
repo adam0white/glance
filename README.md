@@ -1,16 +1,45 @@
 # The Glance
 
-A storm week on the night desk of a river authority. Up the valley an old dam stands above a town. On it a keeper has a torch and a radio. Every figure on your board is what he saw, read through his own tiredness.
+[Play The Glance](https://glance.adamwhite.work).
 
-Play: https://glance.adamwhite.work
+You work at the river authority’s night desk. Keep water below the top of the dam. Keep the town dry, or warn people before it floods. You work five nights, Monday to Friday. The week ends at Friday’s first light, or when water comes over the dam.
 
-The keepers are people from the [Human Framework](https://github.com/adam0white/human-framework) (`@adam0white/human-framework`, pinned exactly). Their sleepiness, fatigue, fear, trust and answers come from it. The water, the gauges and the town belong to the game.
+Every reading on the board is a keeper’s report. It can be wrong. “Read” is the time he wrote down, including any mistake. “Reported” is when his report reached you.
+
+## How to play
+
+- Tap a gauge to inspect it and choose a job. Tap the job button to ask the keeper. Hold it to insist.
+- Ask for readings, change the gate opening and let the keeper rest between jobs. Opening the gate lowers the reservoir, but raises the river through town later.
+- When available, call Nerys at the Bridge Inn for another observation. Hold Warn Mill Lane to send the warden to knock on doors.
+- Compare observations. You can mark a received reading for another check. This is your note; it does not tell the keeper or establish that the reading is wrong.
+- Time runs automatically. Inspections, information and the menu stop time. Skip ⏩ advances toward a pending event; it is unavailable during radio silence.
+- At dawn, compare the actual water curve with the reported readings. Earlier morning pages remain available at the desk. The tally is optional at the end.
+
+The information button explains the current screen. The menu offers Resume, Feedback, Full screen, All games, one recording switch and New game with confirmation.
+
+## Saves, recording and replay
+
+The game saves progress in this browser. If saving fails, keep the page open while it retries. New game replaces the saved week only after the new week is ready.
+
+Recording links recorded play across games on this device. Use “Record play for the lab” in the menu to switch it off. Feedback sends a note; it is separate from saving progress. The current host has not adopted the newer “I’m stopping” and “I’m confused” Feedback choices.
+
+Ordinary new chapters automatically check browser histories for the five cast members. A loaded chapter keeps its admitted people. Continuation depends on compatible source histories and successful admission; it is not a shared multiplayer world or cross-device save.
+
+With `?lab=1`, the title/menu expose diagnostic import/export, browser-person controls and Automatic / Slow / Steady / Fast pacing. Downloaded runs include their source archive. Import replays the seed, inputs and pinned chapter, then checks the complete state. Current exports use `glance@4-deterministic-water`, with person-transfer rules `glance-4`. Files from other versions receive a start-fresh refusal. Importing a file does not take ownership of the people in it.
+
+## Human Framework and development
+
+The [Human Framework](https://github.com/adam0white/human-framework) supplies the people’s bodily state, fatigue, perception, fear, trust and responses to requests. Glance uses those states to produce uncertain keeper reports. Glance owns the water model, weather, gauges, dam, jobs, town warning and outcomes.
+
+The exact package pin is `@adam0white/human-framework@3.0.0`; its simulation engine is `2.23.0`. Glance’s package version is `0.1.0`, distinct from its export edition. The immutable lab artifacts are client `0.4.10` and kit `0.5.11`. Newer SDK artifacts are not installed here.
+
+Use Node 24 or later and TypeScript 7 or later.
 
 - `npm run dev`: play locally.
-- `npm run check`: lint, typecheck and tests.
-- `npm run measure`: headless policies over seeded weeks.
-- `npm run deploy`: check, build, Cloudflare deploy.
+- `npm run check:lane`: run this repository’s full lint, typecheck and locked test lane before a commit.
+- `npm run measure`: run headless policies over seeded weeks.
+- `npm run deploy`: check, build and deploy to Cloudflare.
 
-Design: [docs/design.md](docs/design.md). Playtests: [docs/playtests/](docs/playtests/). Framework requests: [docs/hf-requests.md](docs/hf-requests.md).
+Design: [docs/design.md](docs/design.md). Playtests: [docs/playtests/](docs/playtests/). Framework requests: [docs/hf-requests.md](docs/hf-requests.md). Delivery evidence and limits: [HANDOFF.md](HANDOFF.md).
 
-MIT licence.
+MIT licence. The water model also preserves the [Sun fdlibm notice](public/THIRD-PARTY-NOTICES.txt).
