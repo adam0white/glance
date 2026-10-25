@@ -35,6 +35,7 @@ import {
   tick,
 } from '@adam0white/human-framework';
 import { canonicalPersona } from '@adam0white/lab-client';
+import { required } from '../required.ts';
 import { ALLOCATION, type CastId, lifeReady, makeVisitor, talk } from './cast.ts';
 import { ENGINEER, KEEPERS, type KeeperId, makeKeeper, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
 import { admitResident, type Chapter, checkChapter, lifeAdmission } from './passport.ts';
@@ -66,7 +67,7 @@ import {
   weirOf,
 } from './water.ts';
 
-export const GAME_VERSION = 'glance@3-cast-life';
+export const GAME_VERSION = 'glance@4-deterministic-water';
 export const NIGHTS = 5;
 
 export type Gauge = 'level' | 'weir' | 'gate' | 'bridge';
@@ -76,6 +77,7 @@ export type Job = 'level' | 'weir' | 'gate' | 'stove' | 'nap' | 'clear';
 export type Input =
   | { at: number; kind: 'ask'; keeper: KeeperId; job: Job; target?: number; insist?: boolean }
   | { at: number; kind: 'talk'; person: CastId }
+  | { at: number; kind: 'doubt'; report: number; marked: boolean }
   | { at: number; kind: 'pause' | 'resume' }
   | { at: number; kind: 'ring' }
   | { at: number; kind: 'warn' }
@@ -99,6 +101,8 @@ export interface Report {
   skipped: boolean;
   /** Held back by a dead radio, delivered late. */
   late?: boolean;
+  /** A player note, never a claim that the reading is wrong. */
+  doubted?: boolean;
 }
 
 export interface Said {
@@ -433,7 +437,7 @@ export function newGame(seed: number, chapter?: Chapter): GameState {
   if (chapter) {
     checkChapter(chapter);
     s.people = s.people.map((p) => {
-      const c = ALLOCATION.find((c) => c.id === p.id)!;
+      const c = required(ALLOCATION.find((c) => c.id === p.id));
       const input = chapter.inputs.find((i) => i.parent.castId === c.castId);
       const expected = input ? admitResident(input, p) : p;
       if (canonicalPersona(chapter.initial[c.castId]) !== canonicalPersona(expected))
@@ -784,6 +788,12 @@ function applyPending(s: GameState) {
 function apply(s: GameState, inp: Input) {
   if (s.chapterPaused && inp.kind !== 'resume') return;
   switch (inp.kind) {
+    case 'doubt': {
+      const report = Number.isInteger(inp.report) ? s.reports[inp.report] : undefined;
+      if (report && Object.values(s.board).includes(report) && typeof inp.marked === 'boolean')
+        report.doubted = inp.marked;
+      return;
+    }
     case 'pause': {
       s.pauseRequested = true;
       s.chapterPaused = s.people.every((p) => !p.activity);

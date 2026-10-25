@@ -2,15 +2,16 @@ import { castForGame } from '@adam0white/lab-client';
 import { expect, it } from 'vitest';
 import { exportRun, fingerprint, newGame, replay } from '../src/sim/dam.ts';
 import { admitResident } from '../src/sim/passport.ts';
+import { required } from './required.ts';
 
 it('uses released complete profiles and refuses a public profile in place of a passport', () => {
   const s = newGame(7);
-  const dai = s.people[0]!;
-  expect(dai.traits).toEqual(castForGame('glance').find((c) => c.name === 'Dai')!.traits);
+  const dai = required(s.people[0]);
+  expect(dai.traits).toEqual(required(castForGame('glance').find((c) => c.name === 'Dai')).traits);
   expect(() =>
     admitResident({ parent: { castId: 'hf.cast.dai.glance', transfer: {} }, clockMs: 0 } as never, dai),
   ).toThrow();
-  const ex = exportRun(s, '2.21.0');
+  const ex = exportRun(s, '2.23.0');
   expect(fingerprint(replay(ex.seed, ex.inputs, ex.state.minute, ex.state.chapter ?? undefined))).toBe(
     fingerprint(s),
   );
@@ -64,8 +65,8 @@ async function source(id = 'nerys', peer = false) {
     source: {
       game: peer ? 'commonstead' : 'glance',
       build: 'synthetic-control',
-      engine: '2.21.0',
-      rules: peer ? 'commonstead-3' : 'glance-3',
+      engine: '2.23.0',
+      rules: peer ? 'commonstead-3' : 'glance-4',
     },
     transfer: { ...captured.transfer, life: initialPersonaLife(castId, `control-${castId}`, clock) },
     limitations: captured.limitations,
@@ -116,7 +117,7 @@ function harness(initial: PersonaEnvelope[] = [], now = clock) {
         return null as T;
       }
       if (request.action === 'put') {
-        data = acceptPersona(data, request.envelope!, request.fork);
+        data = acceptPersona(data, required(request.envelope), request.fork);
         return null as T;
       }
       if (request.action === 'recordingBatch') {
@@ -169,16 +170,21 @@ it('preflights all five heads then atomically claims two, preserving actual stat
   const s = await runtime.fresh(7);
   expect(s.chapter?.inputs).toHaveLength(2);
   for (const person of s.people) expect(person.lexicon?.plainEnglish).toBe(true);
-  for (const person of Object.values(s.chapter!.initial)) expect(person.lexicon?.plainEnglish).toBe(true);
+  for (const person of Object.values(required(s.chapter).initial))
+    expect(person.lexicon?.plainEnglish).toBe(true);
   expect(h.requests.filter((r) => r.action === 'putBatch')).toHaveLength(1);
-  expect(Object.keys(h.requests.find((r) => r.action === 'putBatch')!.expectedHeads!)).toHaveLength(5);
-  expect(s.people.find((p) => p.id === 'nerys')!.body.fitness).toBe(0.61);
-  expect(s.people.find((p) => p.id === 'callum')!.traits).toEqual((c.transfer.person as any).person.traits);
+  expect(
+    Object.keys(required(required(h.requests.find((r) => r.action === 'putBatch')).expectedHeads)),
+  ).toHaveLength(5);
+  expect(required(s.people.find((p) => p.id === 'nerys')).body.fitness).toBe(0.61);
+  expect(required(s.people.find((p) => p.id === 'callum')).traits).toEqual(
+    (c.transfer.person as Awaited<ReturnType<typeof residentTransfer>>['transfer']['person']).person.traits,
+  );
   queueInput(s, { kind: 'ring' });
   step(s);
   expect(exportCurrent(importCurrent(exportCurrent(s)))).toEqual(exportCurrent(s));
   const loaded = await runtime.loadLocal(runtime.localSave(s));
-  expect(runtime.heads.map((p) => p.revision)).toEqual(s.chapter!.claims.map((p) => p.revision));
+  expect(runtime.heads.map((p) => p.revision)).toEqual(required(s.chapter).claims.map((p) => p.revision));
   await runtime.importFile(JSON.stringify(exportCurrent(loaded)));
   expect(runtime.heads).toHaveLength(0);
   expect(runtime.fileOrigin).toBe(true);
@@ -203,11 +209,11 @@ it('consumes seeded away-life through actual extra-work availability and preserv
     const h = harness([n], clock + days * 86400000);
     const runtime = new Continuity(h.lab, h.shelf);
     const s = await runtime.fresh(7);
-    const life = s.life.nerys!;
+    const life = required(s.life.nerys);
     expect(life).toBeDefined();
     if (!life.availableForExtraWork) {
       found = true;
-      expect(s.chapter!.inputs[0]!.clockMs).toBeGreaterThan(clock);
+      expect(required(required(s.chapter).inputs[0]).clockMs).toBeGreaterThan(clock);
       expect((await runtime.loadLocal(runtime.localSave(s))).life.nerys).toEqual(life);
       break;
     }
@@ -227,14 +233,14 @@ it('continues its exact accepted head after local reload, and refuses a competin
   expect(s.chapterPaused).toBe(true);
   await runtime.checkpoint(n.castId);
   const saved = runtime.localSave(s),
-    own = runtime.heads[0]!.revision;
+    own = required(runtime.heads[0]).revision;
   await runtime.loadLocal(saved);
   await runtime.checkpoint(n.castId);
-  expect(runtime.heads[0]!.parentRevision).toBe(own);
+  expect(required(runtime.heads[0]).parentRevision).toBe(own);
   const rival = new Continuity(h.lab, h.shelf);
   await rival.fresh(8);
   await expect(runtime.checkpoint(n.castId)).rejects.toThrow();
-  expect(runtime.heads[0]!.revision).not.toBe(h.data.heads[n.castId]);
+  expect(required(runtime.heads[0]).revision).not.toBe(h.data.heads[n.castId]);
 });
 
 it('terminal closure prevents another fresh admission and remains run-owned on reload', async () => {
@@ -244,9 +250,9 @@ it('terminal closure prevents another fresh admission and remains run-owned on r
   const s = await runtime.fresh(7);
   queueInput(s, { kind: 'ring' });
   step(s);
-  s.people.find((p) => p.id === 'nerys')!.body.alive = false; // synthetic actual-owned-death protocol control
+  required(s.people.find((p) => p.id === 'nerys')).body.alive = false; // synthetic actual-owned-death protocol control
   await runtime.checkpoint(n.castId);
-  expect(runtime.heads[0]!.terminal).toBeDefined();
+  expect(required(runtime.heads[0]).terminal).toBeDefined();
   const other = new Continuity(h.lab, h.shelf);
   await expect(other.fresh(8)).rejects.toThrow();
 });
@@ -366,3 +372,40 @@ it.each(['prepareBatch', 'putBatch'])(
     expect(runtime.busy).toBe(false);
   },
 );
+
+it('receives actual paused Commonstead Nerys and replays the complete current notebook', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { createHash } = await import('node:crypto');
+  const { canonicalPersona } = await import('@adam0white/lab-client');
+  const fixture = JSON.parse(
+    readFileSync(new URL('./fixtures/commonstead-nerys-hf3.json', import.meta.url), 'utf8'),
+  );
+  const parent = fixture.envelope as PersonaEnvelope;
+  expect(parent.source).toMatchObject({ game: 'commonstead', rules: 'commonstead-3', engine: '2.23.0' });
+  expect(createHash('sha256').update(canonicalPersona(fixture.raw)).digest('hex')).toBe(
+    (parent.transfer.checkpoint as { sha256: string }).sha256,
+  );
+  expect(fixture.raw.activity).toBeNull();
+  const h = harness(
+    [parent],
+    (parent.transfer.life as import('@adam0white/lab-client').PersonaLife).clock.watermark * 3_600_000,
+  );
+  const runtime = new Continuity(h.lab, h.shelf);
+  const s = await runtime.fresh(42);
+  expect(s.chapter?.inputs).toHaveLength(1);
+  expect(s.chapter?.inputs[0]?.parent.revision).toBe(parent.revision);
+  queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level' });
+  for (let i = 0; i < 60; i++) step(s);
+  expect(exportCurrent(importCurrent(exportCurrent(s)))).toEqual(exportCurrent(s));
+  const input = preparePersonaLife(
+    parent,
+    (parent.transfer.life as import('@adam0white/lab-client').PersonaLife).clock.watermark * 3_600_000,
+  );
+  const opening = newGame(42).people.find((p) => p.id === 'nerys');
+  if (!opening) throw new Error('Missing Nerys');
+  for (const field of ['rules', 'engine'] as const) {
+    const wrong = structuredClone(input);
+    wrong.parent.source[field] = 'unsupported';
+    expect(() => admitResident(wrong, opening)).toThrow();
+  }
+});

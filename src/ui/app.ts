@@ -5,6 +5,7 @@ import {
   telemetryNotice,
   telemetryOn,
 } from '@adam0white/lab-kit';
+import { required } from '../required.ts';
 /**
  * The Glance UI: DOM for the board, the radio log and the sheets; one canvas for the dam. The UI reads state and
  * queues inputs; it never changes the sim directly. Real time drives sim minutes, continuously, slowing while a
@@ -18,12 +19,10 @@ import { ALLOCATION, CAST, type CastId, discoveriesFor, rememberedConversation }
 import {
   clock,
   exportRun,
-  fingerprint,
   type GameState,
   type Gauge,
   type Hint,
   hint,
-  type Input,
   type Job,
   keeperOf,
   NIGHTS,
@@ -316,16 +315,16 @@ function title() {
   document.getElementById('new')?.addEventListener('click', () => {
     if (!save) beginWeek();
     else {
-      document.getElementById('restart-confirm')!.hidden = false;
-      document.getElementById('new')!.hidden = true;
+      required(document.getElementById('restart-confirm')).hidden = false;
+      required(document.getElementById('new')).hidden = true;
     }
   });
   document.getElementById('confirm-new')?.addEventListener('click', () => {
     void beginWeek();
   });
   document.getElementById('cancel-new')?.addEventListener('click', () => {
-    document.getElementById('restart-confirm')!.hidden = true;
-    document.getElementById('new')!.hidden = false;
+    required(document.getElementById('restart-confirm')).hidden = true;
+    required(document.getElementById('new')).hidden = false;
   });
   document.getElementById('other')?.addEventListener('click', otherWays);
 }
@@ -508,10 +507,10 @@ function gameMenu() {
     '<button class="primary" id="dialog-back">Resume</button>',
   );
   d.querySelector('#menu-new')?.addEventListener('click', () => {
-    d.querySelector<HTMLElement>('#menu-confirm')!.hidden = false;
+    required(d.querySelector<HTMLElement>('#menu-confirm')).hidden = false;
   });
   d.querySelector('#menu-cancel-new')?.addEventListener('click', () => {
-    d.querySelector<HTMLElement>('#menu-confirm')!.hidden = true;
+    required(d.querySelector<HTMLElement>('#menu-confirm')).hidden = true;
   });
   d.querySelector('#menu-confirm-new')?.addEventListener('click', () => void beginWeek());
   d.querySelector('#dialog-back')?.addEventListener('click', () => {
@@ -523,7 +522,7 @@ function gameMenu() {
   bindRecord(d, 'record-menu');
   d.querySelectorAll<HTMLButtonElement>('[data-pace]').forEach((b) => {
     b.addEventListener('click', () => {
-      paceChoice = b.dataset.pace!;
+      paceChoice = required(b.dataset.pace);
       selectedRate = ({ Slow: 0.8, Steady: 1.4, Fast: 2.4 } as Record<string, number>)[paceChoice] ?? 1.4;
       d.querySelectorAll('[data-pace]').forEach((x) => {
         x.setAttribute('aria-pressed', String(x === b));
@@ -613,7 +612,7 @@ function sendWord() {
   d.querySelector('#keep-copy')?.addEventListener('click', download);
   d.querySelectorAll<HTMLButtonElement>('[data-verdict]').forEach((b) => {
     b.addEventListener('click', () => {
-      verdict = verdict === b.dataset.verdict ? '' : b.dataset.verdict!;
+      verdict = verdict === b.dataset.verdict ? '' : required(b.dataset.verdict);
       d.querySelectorAll<HTMLButtonElement>('[data-verdict]').forEach((x) => {
         x.setAttribute('aria-pressed', String(x.dataset.verdict === verdict));
       });
@@ -642,11 +641,12 @@ function sendWord() {
         /* The note was stored even when this device cannot remember its name. */
       }
       sent = true;
-      d.querySelector('#feedback-result')!.textContent = sentMessage;
+      required(d.querySelector('#feedback-result')).textContent = sentMessage;
       send.textContent = 'Back to the desk';
       send.disabled = false;
     } catch {
-      d.querySelector('#feedback-result')!.textContent = 'We could not send your feedback. Please try again.';
+      required(d.querySelector('#feedback-result')).textContent =
+        'We could not send your feedback. Please try again.';
       update();
     }
   });
@@ -850,7 +850,7 @@ function drawBoard() {
         <span class="lab">${g.label}</span>
         <span class="num">${printed(r, g.id)}</span>
         <span class="by hand">${r ? `${hand(`${who} · read ${clock(r.wrote)}`, r.who === 'nerys' ? 0 : 1 - r.clarity, r.at)}<span class="as-written"> (as written)</span>` : 'not read'}</span>
-        ${wasLine(r, g.id)}
+        ${wasLine(r, g.id)}${r?.doubted ? '<span class="soft">Marked for another check</span>' : ''}
       </button>`;
     })
     .join('');
@@ -989,9 +989,10 @@ function drawSheet() {
       <div class="verbs two">
         <button id="ring" ${ringing ? 'disabled' : ''}><span>Call Nerys</span><span class="h">${ringing ? 'She has gone to look.' : 'Ask how high the river is.'}</span></button>
         <button id="warn" ${warned ? 'disabled' : ''}><span class="fill"></span><span>Warn Mill Lane</span><span class="h">${warned ? `The warning was sent at ${clock(s.warnedAt ?? 0)}.` : 'Hold to send the warden to warn people.'}</span></button>
-      </div>${castConversations(['nerys', 'bilal', 'wren'])}`;
+      </div>${readingNote(s, s.board.bridge)}${castConversations(['nerys', 'bilal', 'wren'])}`;
     if (!patchSheet(el, html, previousKey === structureKey)) return;
     bindConversations(el);
+    bindReadingNote(el);
     document.getElementById('x')?.addEventListener('click', () => openSheet(null));
     document.getElementById('ring')?.addEventListener('click', () => {
       if (!s) return;
@@ -1081,6 +1082,7 @@ function drawSheet() {
       ? 'Wait for his answer. If he does not answer, call again.'
       : '';
   if (sheet.kind === 'keeper') body += castConversations([who]);
+  if (sheet.kind === 'gauge') body += readingNote(s, s.board[sheet.gauge]);
   body += `<p class="hint call-advice" ${callAdvice ? '' : 'hidden'}>${callAdvice}</p>`;
   const forecastOpen = el.querySelector<HTMLDetailsElement>('details.fore')?.open ?? false;
   if (
@@ -1092,6 +1094,7 @@ function drawSheet() {
   )
     return;
   bindConversations(el);
+  bindReadingNote(el);
   const forecast = el.querySelector<HTMLDetailsElement>('details.fore');
   if (forecast) forecast.open = forecastOpen;
   document.getElementById('x')?.addEventListener('click', () => openSheet(null));
@@ -1108,6 +1111,25 @@ function drawSheet() {
       const t = btn.dataset.t !== undefined ? Number(btn.dataset.t) : undefined;
       ask(who, job, t, insist);
     });
+  });
+}
+
+/** A personal desk note. It does not tell the keeper or reveal whether a report is right. */
+function readingNote(st: GameState, report: GameState['board'][Gauge]): string {
+  if (!report) return '';
+  return `<div class="reading-note"><button id="reading-note" data-report="${st.reports.indexOf(report)}" aria-pressed="${report.doubted === true}">${report.doubted ? 'Remove the check mark' : 'Mark this reading for another check'}</button><p class="hint">${report.doubted ? 'You marked this reading for another check. Ask for a new reading when you are ready.' : 'This adds your own note. It does not say whether the reading is right.'}</p></div>`;
+}
+function bindReadingNote(el: HTMLElement) {
+  const button = el.querySelector<HTMLButtonElement>('#reading-note');
+  button?.addEventListener('click', () => {
+    if (!s || !button) return;
+    queueInput(s, {
+      kind: 'doubt',
+      report: Number(button.dataset.report),
+      marked: button.getAttribute('aria-pressed') !== 'true',
+    });
+    writeSave();
+    openSheet(null);
   });
 }
 

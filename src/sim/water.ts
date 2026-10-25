@@ -11,6 +11,7 @@
  * Units are engineering stand-ins tuned by `scripts/measure.ts`, not hydrology: levels in metres on the staff
  * gauge, flows in cumecs, the bridge in steps of the inn's river stairs.
  */
+import { dexp } from './exp.ts';
 import { DRAW, hashUnit } from './rng.ts';
 
 export const SILL = 2.0;
@@ -68,7 +69,7 @@ export function newWater(): Water {
 
 /** Rain at the dam (mm/h) in minute `m` after 22:00: the night's storm shape times a keyed burst per 10 minutes. */
 export function rainAt(seed: number, night: number, m: number, st: Storm): number {
-  const g = (at: number, w: number) => Math.exp(-(((m - at) / w) ** 2) / 2);
+  const g = (at: number, w: number) => dexp(-(((m - at) / w) ** 2) / 2);
   let r = st.base + st.peak * g(st.peakAt, st.width);
   if (st.second) r += st.second.peak * g(st.second.at, st.second.width);
   const block = Math.floor(m / 10);
@@ -113,7 +114,7 @@ export function stepWater(w: Water, rain: number): void {
  */
 export function dayWater(w: Water, dryHours: number): void {
   w.wet = Math.max(0.15, w.wet - 0.012 * dryHours);
-  w.store *= Math.exp((-dryHours * 60) / TAU);
+  w.store *= dexp((-dryHours * 60) / TAU);
   w.level = Math.max(SILL, Math.min(w.level, 3.9 + 0.7 * w.wet));
   w.gate = 1;
   w.blocked = false;

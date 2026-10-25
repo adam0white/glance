@@ -1,0 +1,2725 @@
+{
+  "provenance": {
+    "tree": "/Users/abdul/code/.lab-scratch/wt/commonstead/v3-commonstead",
+    "seed": 42,
+    "producer": "Continuity.fresh(localOnly=true), apply(order wood), step, apply(pause-chapter), step until chapterPaused, Continuity.checkpoint",
+    "syntheticShelf": true,
+    "notBrowserOwnershipReceipt": true
+  },
+  "raw": {
+    "schema": "human/person@1",
+    "engine": "2.23.0",
+    "id": "hf.cast.nerys.glance",
+    "name": "Nerys",
+    "now": 483,
+    "rng": {
+      "a": -729603367,
+      "b": 574056851,
+      "c": 2720519917,
+      "d": 2484161474
+    },
+    "life": {
+      "bornAt": -24702720,
+      "sex": "female"
+    },
+    "body": {
+      "satiety": 0.9474494947148078,
+      "hydration": 0.9774194887702762,
+      "sleepPressure": 0.053448272069217095,
+      "exertion": 0.0027165298758279263,
+      "circadianPeak": 960,
+      "pain": 0,
+      "health": 1,
+      "fitness": 0.3499983955055097,
+      "sleepDebt": 0,
+      "alive": true,
+      "asleep": false,
+      "since": 480,
+      "injuries": [],
+      "illnesses": [],
+      "nextId": 0
+    },
+    "needs": {
+      "safety": 0.8,
+      "belonging": 0.6991581402751268,
+      "esteem": 0.5999278232286634,
+      "autonomy": 0.7,
+      "competence": 0.5999278232286634,
+      "leisure": 0.6,
+      "meaning": 0.5998267382260457
+    },
+    "traits": {
+      "honesty": 0.75,
+      "emotionality": 0.55,
+      "extraversion": 0.75,
+      "agreeableness": 0.6,
+      "conscientiousness": 0.7,
+      "openness": 0.65
+    },
+    "values": {
+      "benevolence": 0.5,
+      "universalism": 0.5,
+      "tradition": 0.5,
+      "conformity": 0.5,
+      "security": 0.5,
+      "achievement": 0.5,
+      "power": 0.5,
+      "hedonism": 0.5,
+      "stimulation": 0.5,
+      "selfDirection": 0.5
+    },
+    "conscience": {
+      "norms": [
+        {
+          "normId": "salah",
+          "standing": "obligatory",
+          "conviction": 0.475
+        },
+        {
+          "normId": "sawm-ramadan",
+          "standing": "obligatory",
+          "conviction": 0.475
+        },
+        {
+          "normId": "zakat",
+          "standing": "obligatory",
+          "conviction": 0.475
+        },
+        {
+          "normId": "charity",
+          "standing": "recommended",
+          "conviction": 0.475
+        },
+        {
+          "normId": "lying",
+          "standing": "forbidden",
+          "conviction": 0.75
+        },
+        {
+          "normId": "theft",
+          "standing": "forbidden",
+          "conviction": 0.75
+        },
+        {
+          "normId": "keep-promise",
+          "standing": "obligatory",
+          "conviction": 0.75
+        },
+        {
+          "normId": "kindness-to-parents",
+          "standing": "obligatory",
+          "conviction": 0.6000000000000001
+        },
+        {
+          "normId": "backbiting",
+          "standing": "forbidden",
+          "conviction": 0.6000000000000001
+        },
+        {
+          "normId": "help-neighbor",
+          "standing": "recommended",
+          "conviction": 0.6000000000000001
+        },
+        {
+          "normId": "gratitude",
+          "standing": "recommended",
+          "conviction": 0.6000000000000001
+        },
+        {
+          "normId": "harm-others",
+          "standing": "forbidden",
+          "conviction": 0.75
+        },
+        {
+          "normId": "intoxicants",
+          "standing": "forbidden",
+          "conviction": 0.475
+        },
+        {
+          "normId": "forbidden-food",
+          "standing": "forbidden",
+          "conviction": 0.475
+        },
+        {
+          "normId": "fairness",
+          "standing": "obligatory",
+          "conviction": 0.6000000000000001
+        },
+        {
+          "normId": "care-dependents",
+          "standing": "obligatory",
+          "conviction": 0.6000000000000001
+        },
+        {
+          "normId": "punctuality",
+          "standing": "recommended",
+          "conviction": 0.6000000000000001
+        },
+        {
+          "normId": "eid-prayer",
+          "standing": "recommended",
+          "conviction": 0.475
+        }
+      ],
+      "breaches": [],
+      "intentions": [],
+      "nextBreach": 0
+    },
+    "affect": {
+      "mood": {
+        "valence": 0.0013715514621219782,
+        "arousal": 0.3
+      },
+      "emotions": [],
+      "regulation": 0.3,
+      "lastUpdated": 483
+    },
+    "skills": {},
+    "habits": [],
+    "memory": {
+      "episodes": [],
+      "beliefs": [],
+      "expectations": [],
+      "sourceTrust": {},
+      "nextEpisode": 0
+    },
+    "social": {
+      "relationships": []
+    },
+    "agenda": {
+      "commitments": [],
+      "goals": [],
+      "nextId": 1,
+      "lastProposalDay": -1
+    },
+    "will": {
+      "voices": [
+        {
+          "voiceId": "commander",
+          "trust": 0.7,
+          "pressure": 0,
+          "accepted": 0,
+          "refused": 0,
+          "history": [],
+          "seeded": true
+        }
+      ],
+      "precommitments": [],
+      "switchMargin": 0.15,
+      "temperature": 0,
+      "suggestionReasons": true
+    },
+    "activity": null,
+    "trace": [],
+    "nextDecision": 0,
+    "lexicon": {
+      "plainEnglish": true
+    }
+  },
+  "envelope": {
+    "format": "hf-persona/1",
+    "castId": "hf.cast.nerys.glance",
+    "castRevision": "1",
+    "branchId": "85b586b7-56df-442b-b3db-4bbc69574712",
+    "parentRevision": null,
+    "source": {
+      "game": "commonstead",
+      "build": "0b38224a92e2",
+      "engine": "2.23.0",
+      "rules": "commonstead-3"
+    },
+    "transfer": {
+      "castPassport": "commonstead-cast/1",
+      "sourceRole": "hf.cast.nerys.glance",
+      "person": {
+        "format": "hf-persona-calendar/1",
+        "person": {
+          "format": "hf-persona-state/1",
+          "mappingVersion": "commonstead-calendar/1",
+          "source": {
+            "schema": "human/person@1",
+            "engine": "2.23.0",
+            "id": "hf.cast.nerys.glance",
+            "now": 483
+          },
+          "name": "Nerys",
+          "life": {
+            "bornAt": -24702720,
+            "sex": "female"
+          },
+          "rng": {
+            "a": -729603367,
+            "b": 574056851,
+            "c": 2720519917,
+            "d": 2484161474
+          },
+          "traits": {
+            "honesty": 0.75,
+            "emotionality": 0.55,
+            "extraversion": 0.75,
+            "agreeableness": 0.6,
+            "conscientiousness": 0.7,
+            "openness": 0.65
+          },
+          "values": {
+            "benevolence": 0.5,
+            "universalism": 0.5,
+            "tradition": 0.5,
+            "conformity": 0.5,
+            "security": 0.5,
+            "achievement": 0.5,
+            "power": 0.5,
+            "hedonism": 0.5,
+            "stimulation": 0.5,
+            "selfDirection": 0.5
+          },
+          "health": {
+            "health": 1,
+            "fitness": 0.3499983955055097,
+            "circadianPeak": 960
+          },
+          "family": null,
+          "bonds": null,
+          "skills": {},
+          "skillRetention": null,
+          "episodes": [],
+          "commitments": [],
+          "limitations": [
+            "source transient body/needs/affect/ambient omitted; target arrival policy",
+            "source habits/methods/beliefs/social and conscience breaches omitted; target authored state; held norms transported",
+            "source optional behaviour stores and decision history omitted; target authored state",
+            "family/bonds provenance checked; target authored state"
+          ]
+        },
+        "calendar": {
+          "offset": 0,
+          "commitments": [],
+          "owed": [],
+          "lapse": null,
+          "heldNorms": [
+            {
+              "normId": "salah",
+              "standing": "obligatory",
+              "conviction": 0.475
+            },
+            {
+              "normId": "sawm-ramadan",
+              "standing": "obligatory",
+              "conviction": 0.475
+            },
+            {
+              "normId": "zakat",
+              "standing": "obligatory",
+              "conviction": 0.475
+            },
+            {
+              "normId": "charity",
+              "standing": "recommended",
+              "conviction": 0.475
+            },
+            {
+              "normId": "lying",
+              "standing": "forbidden",
+              "conviction": 0.75
+            },
+            {
+              "normId": "theft",
+              "standing": "forbidden",
+              "conviction": 0.75
+            },
+            {
+              "normId": "keep-promise",
+              "standing": "obligatory",
+              "conviction": 0.75
+            },
+            {
+              "normId": "kindness-to-parents",
+              "standing": "obligatory",
+              "conviction": 0.6000000000000001
+            },
+            {
+              "normId": "backbiting",
+              "standing": "forbidden",
+              "conviction": 0.6000000000000001
+            },
+            {
+              "normId": "help-neighbor",
+              "standing": "recommended",
+              "conviction": 0.6000000000000001
+            },
+            {
+              "normId": "gratitude",
+              "standing": "recommended",
+              "conviction": 0.6000000000000001
+            },
+            {
+              "normId": "harm-others",
+              "standing": "forbidden",
+              "conviction": 0.75
+            },
+            {
+              "normId": "intoxicants",
+              "standing": "forbidden",
+              "conviction": 0.475
+            },
+            {
+              "normId": "forbidden-food",
+              "standing": "forbidden",
+              "conviction": 0.475
+            },
+            {
+              "normId": "fairness",
+              "standing": "obligatory",
+              "conviction": 0.6000000000000001
+            },
+            {
+              "normId": "care-dependents",
+              "standing": "obligatory",
+              "conviction": 0.6000000000000001
+            },
+            {
+              "normId": "punctuality",
+              "standing": "recommended",
+              "conviction": 0.6000000000000001
+            },
+            {
+              "normId": "eid-prayer",
+              "standing": "recommended",
+              "conviction": 0.475
+            }
+          ],
+          "norms": [
+            {
+              "id": "salah",
+              "label": "Perform the daily prayers",
+              "standing": "obligatory",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 2:43"
+                },
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 4:103 (prayer at prescribed times)"
+                },
+                {
+                  "kind": "interpretation",
+                  "ref": "A missed prayer is still owed (qada); sleep, forgetting and unconsciousness lift the blame, not the debt; the debt for a stretch of unconsciousness beyond five prayer times drops (Hanafi count, kept as the default): research/capacity-and-excuse-sources.md §0, §2, §4; research/decisions.md"
+                },
+                {
+                  "kind": "assumption",
+                  "ref": "Window boundaries (Fajr until sunrise, one-shadow Asr, red-twilight Maghrib) are the most common positions, chosen in research/decisions.md; agenda/prayer.ts"
+                }
+              ]
+            },
+            {
+              "id": "sawm-ramadan",
+              "label": "Fast in Ramadan",
+              "standing": "obligatory",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 2:183"
+                },
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 2:185 (the month of Ramadan)"
+                },
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 2:187 (eat and drink until dawn, then complete the fast until nightfall)"
+                }
+              ],
+              "exemptions": [
+                {
+                  "when": "illness",
+                  "makeUp": true,
+                  "sources": [
+                    {
+                      "kind": "revelation",
+                      "ref": "Qur'an 2:184 (whoever is ill or on a journey: an equal number of days after)"
+                    },
+                    {
+                      "kind": "revelation",
+                      "ref": "Qur'an 2:185 (repeated; Allah intends ease, not hardship)"
+                    },
+                    {
+                      "kind": "assumption",
+                      "ref": "Which illness qualifies is the person’s judgment; the severity threshold is an engineering stand-in"
+                    },
+                    {
+                      "kind": "interpretation",
+                      "ref": "Qur'an 2:184 continues: 'For those who can only fast with extreme difficulty, compensation can be made by feeding a needy person' (quran.com, checked 2026-10-03). Commonly read as covering chronic illness with no expected recovery (fidya instead of make-up); NOT modelled: every qualifying illness, chronic or acute, owes a make-up, because whether a condition is beyond recovery cannot be derived from body state"
+                    }
+                  ]
+                },
+                {
+                  "when": "travel",
+                  "makeUp": true,
+                  "sources": [
+                    {
+                      "kind": "revelation",
+                      "ref": "Qur'an 2:184 (whoever is ill or on a journey: an equal number of days after)"
+                    },
+                    {
+                      "kind": "revelation",
+                      "ref": "Qur'an 2:185"
+                    },
+                    {
+                      "kind": "assumption",
+                      "ref": "What counts as a journey is supplied by the host as a traveling flag"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "zakat",
+              "label": "Pay zakat",
+              "standing": "obligatory",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 2:43"
+                }
+              ]
+            },
+            {
+              "id": "charity",
+              "label": "Give voluntary charity (sadaqah)",
+              "standing": "recommended",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 2:261"
+                }
+              ]
+            },
+            {
+              "id": "lying",
+              "label": "Lying (truthfulness is required)",
+              "standing": "forbidden",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 22:30 (shun words of falsehood; quran.com, checked 2026-10-03)"
+                },
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 9:119 (be with the truthful)"
+                }
+              ]
+            },
+            {
+              "id": "theft",
+              "label": "Theft",
+              "standing": "forbidden",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 5:38"
+                },
+                {
+                  "kind": "assumption",
+                  "ref": "Listed in CONSCIENCE_DEFAULTS.necessityEligible: taking food in extremity is a juristic extension of the 2:173 necessity exception by analogy (2:173 itself names forbidden food); not yet sourced in research/, recorded as an engineering assumption pending a Hanafi source"
+                }
+              ]
+            },
+            {
+              "id": "keep-promise",
+              "label": "Keep promises and commitments",
+              "standing": "obligatory",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 17:34"
+                }
+              ]
+            },
+            {
+              "id": "kindness-to-parents",
+              "label": "Kindness to parents",
+              "standing": "obligatory",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 17:23"
+                }
+              ]
+            },
+            {
+              "id": "backbiting",
+              "label": "Backbiting",
+              "standing": "forbidden",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 49:12"
+                }
+              ]
+            },
+            {
+              "id": "help-neighbor",
+              "label": "Help and be good to neighbours",
+              "standing": "recommended",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 4:36 (be kind to neighbours; a command)"
+                },
+                {
+                  "kind": "interpretation",
+                  "ref": "Standing recorded as recommended for everyday help beyond basic kindness is an engineering simplification; the verse itself is a command"
+                }
+              ]
+            },
+            {
+              "id": "gratitude",
+              "label": "Gratitude",
+              "standing": "recommended",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 2:152 (thank Me, and never be ungrateful)"
+                },
+                {
+                  "kind": "interpretation",
+                  "ref": "Standing as recommended for expressed gratitude toward people is an engineering simplification"
+                }
+              ]
+            },
+            {
+              "id": "harm-others",
+              "label": "Harming others without right",
+              "standing": "forbidden",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 33:58 (abusing believers unjustifiably)"
+                },
+                {
+                  "kind": "interpretation",
+                  "ref": "General prohibition of unjust harm to any person, extended from specific texts; scope of \"without right\" left to the host"
+                }
+              ]
+            },
+            {
+              "id": "intoxicants",
+              "label": "Intoxicants",
+              "standing": "forbidden",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 5:90"
+                }
+              ]
+            },
+            {
+              "id": "forbidden-food",
+              "label": "Eating forbidden food (carrion, blood, swine)",
+              "standing": "forbidden",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 2:173 ('if someone is compelled by necessity—neither driven by desire nor exceeding immediate need—they will not be sinful'; quran.com, checked 2026-10-03)"
+                }
+              ]
+            },
+            {
+              "id": "fairness",
+              "label": "Deal fairly (no cheating in trade)",
+              "standing": "obligatory",
+              "sources": [
+                {
+                  "kind": "revelation",
+                  "ref": "Qur'an 83:1-3 (woe to the defrauders)"
+                },
+                {
+                  "kind": "assumption",
+                  "ref": "Generalised to fair dealing for secular hosts"
+                }
+              ]
+            },
+            {
+              "id": "care-dependents",
+              "label": "Care for those who depend on you",
+              "standing": "obligatory",
+              "sources": [
+                {
+                  "kind": "interpretation",
+                  "ref": "Obligations toward family alongside those toward Allah and oneself (Bukhari 1968, as cited in research/islamic-foundations.md §2); extending it to every dependent’s urgent needs is the host’s reading"
+                },
+                {
+                  "kind": "assumption",
+                  "ref": "Standing obligatory for secular hosts as a shared caregiving norm; engineering default"
+                }
+              ]
+            },
+            {
+              "id": "punctuality",
+              "label": "Be on time",
+              "standing": "recommended",
+              "sources": [
+                {
+                  "kind": "assumption",
+                  "ref": "Secular social norm; engineering default"
+                }
+              ]
+            },
+            {
+              "id": "eid-prayer",
+              "label": "Pray the Eid prayer in congregation",
+              "standing": "recommended",
+              "sources": [
+                {
+                  "kind": "interpretation",
+                  "ref": "Strongly emphasised in every school: wajib for Hanafis, sunnah mu'akkada (Maliki), sunnah (Shafi'i), fard kifaya (Hanbali), per TDV \"Bayram\" in research/eid-and-mourning-sources.md §1"
+                },
+                {
+                  "kind": "assumption",
+                  "ref": "Recorded as recommended (the most common standing overall, research/decisions.md), so missing it is no breach; congregational, with no individual make-up (eid-and-mourning-sources.md §1)"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "checkpoint": {
+        "schema": "human/person@1",
+        "sourceMinute": 483,
+        "rng": {
+          "a": -729603367,
+          "b": 574056851,
+          "c": 2720519917,
+          "d": 2484161474
+        },
+        "sha256": "5b9afcc373c7caa7ef3cb16b64d9a4d762710dab11c1b0ed31d1b9c321731ec8"
+      },
+      "life": {
+        "version": "hf-coarse-life/1",
+        "clock": {
+          "version": "hf-chapter-clock/1",
+          "watermark": 498045,
+          "seed": 2637805885
+        },
+        "assignment": 0,
+        "work": "own-routine",
+        "place": "home",
+        "notices": [],
+        "events": [],
+        "skipped": 0
+      },
+      "hostRun": "f23ccf38-c7ce-485d-9c6d-1ce8074c7b93"
+    },
+    "limitations": [
+      "source transient body/needs/affect/ambient omitted; target arrival policy",
+      "source habits/methods/beliefs/social and conscience breaches omitted; target authored state; held norms transported",
+      "source optional behaviour stores and decision history omitted; target authored state",
+      "family/bonds provenance checked; target authored state",
+      "The complete source save keeps the layout, supplies, shared building work, story discoveries, social memories and temporary physical states and needs from that game. Transferring the calendar takes no simulation time. It does not count as travel, healing, payment or a qualification."
+    ],
+    "revision": "b87f8bc53156667f721f185a2c4a3604a0be490f441538d0eb3c0e8f81a2f113"
+  },
+  "notebook": {
+    "schema": 3,
+    "framework": "3.0.0",
+    "chapter": null,
+    "seed": 42,
+    "tick": 6,
+    "inputs": [
+      {
+        "tick": 0,
+        "command": {
+          "kind": "order",
+          "ids": [
+            "v1"
+          ],
+          "target": "wood"
+        }
+      },
+      {
+        "tick": 1,
+        "command": {
+          "kind": "pause-chapter"
+        }
+      }
+    ],
+    "state": {
+      "seed": 42,
+      "chapter": null,
+      "pauseRequested": true,
+      "chapterPaused": true,
+      "trainingUntil": null,
+      "tick": 6,
+      "resources": {
+        "food": 100,
+        "wood": 80,
+        "stone": 0
+      },
+      "villagers": [
+        {
+          "id": "v1",
+          "name": "Nora",
+          "assignment": "She designs repairs and makes things.",
+          "lifeLine": "",
+          "availableAt": 0,
+          "role": "She lives here.",
+          "family": "She has an older brother, but they no longer have a close relationship.",
+          "discovery": 0,
+          "invitedBreak": false,
+          "breakStarted": -1,
+          "x": 231.7269131202576,
+          "y": 202.15833724992072,
+          "person": {
+            "schema": "human/person@1",
+            "engine": "2.23.0",
+            "id": "hf.cast.nora.smallworks",
+            "name": "Nora",
+            "now": 483,
+            "rng": {
+              "a": 257526061,
+              "b": 1659388064,
+              "c": 75401980,
+              "d": 2003539586
+            },
+            "life": {
+              "bornAt": -14716320,
+              "sex": "female"
+            },
+            "body": {
+              "satiety": 0.9471365999286755,
+              "hydration": 0.9770461767685286,
+              "sleepPressure": 0.053448272069217095,
+              "exertion": 0.0081495896274838,
+              "circadianPeak": 960,
+              "pain": 0,
+              "health": 1,
+              "fitness": 0.3499983955055097,
+              "sleepDebt": 0,
+              "alive": true,
+              "asleep": false,
+              "since": 480,
+              "injuries": [],
+              "illnesses": [],
+              "nextId": 0
+            },
+            "needs": {
+              "safety": 0.8,
+              "belonging": 0.6993600942260577,
+              "esteem": 0.5999278232286634,
+              "autonomy": 0.7,
+              "competence": 0.5999278232286634,
+              "leisure": 0.6,
+              "meaning": 0.5998267382260457
+            },
+            "traits": {
+              "honesty": 0.7,
+              "emotionality": 0.5,
+              "extraversion": 0.45,
+              "agreeableness": 0.5,
+              "conscientiousness": 0.6,
+              "openness": 0.85
+            },
+            "values": {
+              "benevolence": 0.5,
+              "universalism": 0.5,
+              "tradition": 0.5,
+              "conformity": 0.5,
+              "security": 0.5,
+              "achievement": 0.5,
+              "power": 0.5,
+              "hedonism": 0.5,
+              "stimulation": 0.8,
+              "selfDirection": 0.9
+            },
+            "conscience": {
+              "norms": [
+                {
+                  "normId": "salah",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "sawm-ramadan",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "zakat",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "charity",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "lying",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "theft",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "keep-promise",
+                  "standing": "obligatory",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "kindness-to-parents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "backbiting",
+                  "standing": "forbidden",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "help-neighbor",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "gratitude",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "harm-others",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "intoxicants",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "forbidden-food",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "fairness",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "care-dependents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "punctuality",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "eid-prayer",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                }
+              ],
+              "breaches": [],
+              "intentions": [
+                {
+                  "at": 483,
+                  "action": "move",
+                  "intention": "I am doing this because it suits me."
+                }
+              ],
+              "nextBreach": 0
+            },
+            "affect": {
+              "mood": {
+                "valence": 0.001370664663773391,
+                "arousal": 0.3
+              },
+              "emotions": [],
+              "regulation": 0.3,
+              "lastUpdated": 483
+            },
+            "skills": {},
+            "habits": [],
+            "memory": {
+              "episodes": [
+                {
+                  "at": 483,
+                  "kind": "outcome",
+                  "action": "move",
+                  "actorId": "hf.cast.nora.smallworks",
+                  "valence": 0,
+                  "summary": "I changed my task.",
+                  "tags": [
+                    "interrupted"
+                  ],
+                  "id": "e0",
+                  "salience": 0.3
+                }
+              ],
+              "beliefs": [],
+              "expectations": [],
+              "sourceTrust": {},
+              "nextEpisode": 1
+            },
+            "social": {
+              "relationships": []
+            },
+            "agenda": {
+              "commitments": [],
+              "goals": [],
+              "nextId": 1,
+              "lastProposalDay": -1
+            },
+            "will": {
+              "voices": [
+                {
+                  "voiceId": "commander",
+                  "trust": 0.7,
+                  "pressure": 0,
+                  "accepted": 0,
+                  "refused": 0,
+                  "history": [],
+                  "seeded": true
+                }
+              ],
+              "precommitments": [],
+              "switchMargin": 0.15,
+              "temperature": 0,
+              "suggestionReasons": true
+            },
+            "activity": null,
+            "trace": [
+              {
+                "id": "d0",
+                "at": 480,
+                "chosenAffordanceId": "move",
+                "chosenAction": "move",
+                "considered": [
+                  {
+                    "affordanceId": "move",
+                    "action": "move",
+                    "label": "move",
+                    "utility": -0.0277,
+                    "terms": [
+                      {
+                        "source": "effort",
+                        "value": -0.0277
+                      }
+                    ],
+                    "advertised": {},
+                    "believed": {}
+                  }
+                ],
+                "intention": "I am doing this because it suits me.",
+                "narration": "I see no reason to choose something else."
+              }
+            ],
+            "nextDecision": 1,
+            "lexicon": {
+              "plainEnglish": true
+            },
+            "chronicleDay": {
+              "day": 0,
+              "baseline": {
+                "habits": {},
+                "trust": {
+                  "commander": 0.7
+                },
+                "illnesses": {},
+                "openBreaches": []
+              },
+              "kept": [],
+              "broken": [],
+              "released": [],
+              "actions": [],
+              "verdicts": [],
+              "material": 0,
+              "moodSum": 0,
+              "moodSamples": 0,
+              "decisions": 1
+            }
+          },
+          "task": "idle",
+          "says": "I am on my way.",
+          "order": {
+            "target": "wood",
+            "x": 231.7269131202576,
+            "y": 202.15833724992072
+          },
+          "recoveryUntil": 0,
+          "actionUntil": 0,
+          "status": "chapter paused at action boundary"
+        },
+        {
+          "id": "v2",
+          "name": "Sam",
+          "assignment": "He is learning repair work. He sometimes works in a kitchen and tests games at Commonstead.",
+          "lifeLine": "",
+          "availableAt": 0,
+          "role": "He lives here.",
+          "family": "His mother and sister are part of his life.",
+          "discovery": 0,
+          "invitedBreak": false,
+          "breakStarted": -1,
+          "x": 492,
+          "y": 425,
+          "person": {
+            "schema": "human/person@1",
+            "engine": "2.23.0",
+            "id": "hf.cast.sam.smallworks",
+            "name": "Sam",
+            "now": 483,
+            "rng": {
+              "a": -1274905395,
+              "b": 1508796060,
+              "c": 1818912443,
+              "d": 273046184
+            },
+            "life": {
+              "bornAt": -9460320,
+              "sex": "male"
+            },
+            "body": {
+              "satiety": 0.9473865215129921,
+              "hydration": 0.9773557747072626,
+              "sleepPressure": 0.053448272069217095,
+              "exertion": 0.0027165298758279263,
+              "circadianPeak": 960,
+              "pain": 0,
+              "health": 1,
+              "fitness": 0.3499983955055097,
+              "sleepDebt": 0,
+              "alive": true,
+              "asleep": false,
+              "since": 480,
+              "injuries": [],
+              "illnesses": [],
+              "nextId": 0
+            },
+            "needs": {
+              "safety": 0.8,
+              "belonging": 0.6992591099597688,
+              "esteem": 0.5999278232286634,
+              "autonomy": 0.7,
+              "competence": 0.5999278232286634,
+              "leisure": 0.6,
+              "meaning": 0.5998267382260457
+            },
+            "traits": {
+              "honesty": 0.65,
+              "emotionality": 0.55,
+              "extraversion": 0.6,
+              "agreeableness": 0.65,
+              "conscientiousness": 0.5,
+              "openness": 0.8
+            },
+            "values": {
+              "benevolence": 0.5,
+              "universalism": 0.5,
+              "tradition": 0.5,
+              "conformity": 0.5,
+              "security": 0.5,
+              "achievement": 0.8,
+              "power": 0.5,
+              "hedonism": 0.5,
+              "stimulation": 0.7,
+              "selfDirection": 0.5
+            },
+            "conscience": {
+              "norms": [
+                {
+                  "normId": "salah",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "sawm-ramadan",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "zakat",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "charity",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "lying",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "theft",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "keep-promise",
+                  "standing": "obligatory",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "kindness-to-parents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "backbiting",
+                  "standing": "forbidden",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "help-neighbor",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "gratitude",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "harm-others",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "intoxicants",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "forbidden-food",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "fairness",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "care-dependents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "punctuality",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "eid-prayer",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                }
+              ],
+              "breaches": [],
+              "intentions": [],
+              "nextBreach": 0
+            },
+            "affect": {
+              "mood": {
+                "valence": 0.0013715490923829066,
+                "arousal": 0.3
+              },
+              "emotions": [],
+              "regulation": 0.3,
+              "lastUpdated": 483
+            },
+            "skills": {},
+            "habits": [],
+            "memory": {
+              "episodes": [],
+              "beliefs": [],
+              "expectations": [],
+              "sourceTrust": {},
+              "nextEpisode": 0
+            },
+            "social": {
+              "relationships": []
+            },
+            "agenda": {
+              "commitments": [],
+              "goals": [],
+              "nextId": 1,
+              "lastProposalDay": -1
+            },
+            "will": {
+              "voices": [
+                {
+                  "voiceId": "commander",
+                  "trust": 0.7,
+                  "pressure": 0,
+                  "accepted": 0,
+                  "refused": 0,
+                  "history": [],
+                  "seeded": true
+                }
+              ],
+              "precommitments": [],
+              "switchMargin": 0.15,
+              "temperature": 0,
+              "suggestionReasons": true
+            },
+            "activity": null,
+            "trace": [],
+            "nextDecision": 0,
+            "lexicon": {
+              "plainEnglish": true
+            }
+          },
+          "task": "idle",
+          "says": "We use prepared boards, small ballast bags and hand tools. We do not use powered tools or change the building structure.",
+          "order": null,
+          "recoveryUntil": 0,
+          "actionUntil": 0,
+          "status": "waiting"
+        },
+        {
+          "id": "v3",
+          "name": "Dai",
+          "assignment": "He looks after the dam and has worked there for thirty-one years.",
+          "lifeLine": "",
+          "availableAt": 0,
+          "role": "He is visiting to teach maintenance. A colleague is covering his usual work.",
+          "family": "He is separated from his partner. His adult daughter lives near his home.",
+          "discovery": 0,
+          "invitedBreak": false,
+          "breakStarted": -1,
+          "x": 534,
+          "y": 425,
+          "person": {
+            "schema": "human/person@1",
+            "engine": "2.23.0",
+            "id": "hf.cast.dai.glance",
+            "name": "Dai",
+            "now": 483,
+            "rng": {
+              "a": -1434446563,
+              "b": 983876521,
+              "c": 3532688139,
+              "d": 2275016249
+            },
+            "life": {
+              "bornAt": -33112320,
+              "sex": "male"
+            },
+            "body": {
+              "satiety": 0.9476031916023828,
+              "hydration": 0.9775749938565285,
+              "sleepPressure": 0.053448272069217095,
+              "exertion": 0.0027165298758279263,
+              "circadianPeak": 960,
+              "pain": 0,
+              "health": 1,
+              "fitness": 0.3499983955055097,
+              "sleepDebt": 0,
+              "alive": true,
+              "asleep": false,
+              "since": 480,
+              "injuries": [],
+              "illnesses": [],
+              "nextId": 0
+            },
+            "needs": {
+              "safety": 0.8,
+              "belonging": 0.699427425172205,
+              "esteem": 0.5999278232286634,
+              "autonomy": 0.7,
+              "competence": 0.5999278232286634,
+              "leisure": 0.6,
+              "meaning": 0.5998267382260457
+            },
+            "traits": {
+              "honesty": 0.7,
+              "emotionality": 0.3,
+              "extraversion": 0.35,
+              "agreeableness": 0.35,
+              "conscientiousness": 0.75,
+              "openness": 0.45
+            },
+            "values": {
+              "benevolence": 0.5,
+              "universalism": 0.5,
+              "tradition": 0.5,
+              "conformity": 0.5,
+              "security": 0.5,
+              "achievement": 0.5,
+              "power": 0.5,
+              "hedonism": 0.5,
+              "stimulation": 0.5,
+              "selfDirection": 0.5
+            },
+            "conscience": {
+              "norms": [
+                {
+                  "normId": "salah",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "sawm-ramadan",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "zakat",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "charity",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "lying",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "theft",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "keep-promise",
+                  "standing": "obligatory",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "kindness-to-parents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "backbiting",
+                  "standing": "forbidden",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "help-neighbor",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "gratitude",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "harm-others",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "intoxicants",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "forbidden-food",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "fairness",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "care-dependents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "punctuality",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "eid-prayer",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                }
+              ],
+              "breaches": [],
+              "intentions": [],
+              "nextBreach": 0
+            },
+            "affect": {
+              "mood": {
+                "valence": 0.0013716538645917598,
+                "arousal": 0.3
+              },
+              "emotions": [],
+              "regulation": 0.3,
+              "lastUpdated": 483
+            },
+            "skills": {},
+            "habits": [],
+            "memory": {
+              "episodes": [],
+              "beliefs": [],
+              "expectations": [],
+              "sourceTrust": {},
+              "nextEpisode": 0
+            },
+            "social": {
+              "relationships": []
+            },
+            "agenda": {
+              "commitments": [],
+              "goals": [],
+              "nextId": 1,
+              "lastProposalDay": -1
+            },
+            "will": {
+              "voices": [
+                {
+                  "voiceId": "commander",
+                  "trust": 0.7,
+                  "pressure": 0,
+                  "accepted": 0,
+                  "refused": 0,
+                  "history": [],
+                  "seeded": true
+                }
+              ],
+              "precommitments": [],
+              "switchMargin": 0.15,
+              "temperature": 0,
+              "suggestionReasons": true
+            },
+            "activity": null,
+            "trace": [],
+            "nextDecision": 0,
+            "lexicon": {
+              "plainEnglish": true
+            }
+          },
+          "task": "idle",
+          "says": "We use prepared boards, small ballast bags and hand tools. We do not use powered tools or change the building structure.",
+          "order": null,
+          "recoveryUntil": 0,
+          "actionUntil": 0,
+          "status": "waiting"
+        },
+        {
+          "id": "v4",
+          "name": "Nerys",
+          "assignment": "She runs an inn and observes the river level.",
+          "lifeLine": "",
+          "availableAt": 0,
+          "role": "She is visiting as a host. Someone else is covering her work at the inn.",
+          "family": "She lives with her partner of many years.",
+          "discovery": 0,
+          "invitedBreak": false,
+          "breakStarted": -1,
+          "x": 450,
+          "y": 460,
+          "person": {
+            "schema": "human/person@1",
+            "engine": "2.23.0",
+            "id": "hf.cast.nerys.glance",
+            "name": "Nerys",
+            "now": 483,
+            "rng": {
+              "a": -729603367,
+              "b": 574056851,
+              "c": 2720519917,
+              "d": 2484161474
+            },
+            "life": {
+              "bornAt": -24702720,
+              "sex": "female"
+            },
+            "body": {
+              "satiety": 0.9474494947148078,
+              "hydration": 0.9774194887702762,
+              "sleepPressure": 0.053448272069217095,
+              "exertion": 0.0027165298758279263,
+              "circadianPeak": 960,
+              "pain": 0,
+              "health": 1,
+              "fitness": 0.3499983955055097,
+              "sleepDebt": 0,
+              "alive": true,
+              "asleep": false,
+              "since": 480,
+              "injuries": [],
+              "illnesses": [],
+              "nextId": 0
+            },
+            "needs": {
+              "safety": 0.8,
+              "belonging": 0.6991581402751268,
+              "esteem": 0.5999278232286634,
+              "autonomy": 0.7,
+              "competence": 0.5999278232286634,
+              "leisure": 0.6,
+              "meaning": 0.5998267382260457
+            },
+            "traits": {
+              "honesty": 0.75,
+              "emotionality": 0.55,
+              "extraversion": 0.75,
+              "agreeableness": 0.6,
+              "conscientiousness": 0.7,
+              "openness": 0.65
+            },
+            "values": {
+              "benevolence": 0.5,
+              "universalism": 0.5,
+              "tradition": 0.5,
+              "conformity": 0.5,
+              "security": 0.5,
+              "achievement": 0.5,
+              "power": 0.5,
+              "hedonism": 0.5,
+              "stimulation": 0.5,
+              "selfDirection": 0.5
+            },
+            "conscience": {
+              "norms": [
+                {
+                  "normId": "salah",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "sawm-ramadan",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "zakat",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "charity",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "lying",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "theft",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "keep-promise",
+                  "standing": "obligatory",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "kindness-to-parents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "backbiting",
+                  "standing": "forbidden",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "help-neighbor",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "gratitude",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "harm-others",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "intoxicants",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "forbidden-food",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "fairness",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "care-dependents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "punctuality",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "eid-prayer",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                }
+              ],
+              "breaches": [],
+              "intentions": [],
+              "nextBreach": 0
+            },
+            "affect": {
+              "mood": {
+                "valence": 0.0013715514621219782,
+                "arousal": 0.3
+              },
+              "emotions": [],
+              "regulation": 0.3,
+              "lastUpdated": 483
+            },
+            "skills": {},
+            "habits": [],
+            "memory": {
+              "episodes": [],
+              "beliefs": [],
+              "expectations": [],
+              "sourceTrust": {},
+              "nextEpisode": 0
+            },
+            "social": {
+              "relationships": []
+            },
+            "agenda": {
+              "commitments": [],
+              "goals": [],
+              "nextId": 1,
+              "lastProposalDay": -1
+            },
+            "will": {
+              "voices": [
+                {
+                  "voiceId": "commander",
+                  "trust": 0.7,
+                  "pressure": 0,
+                  "accepted": 0,
+                  "refused": 0,
+                  "history": [],
+                  "seeded": true
+                }
+              ],
+              "precommitments": [],
+              "switchMargin": 0.15,
+              "temperature": 0,
+              "suggestionReasons": true
+            },
+            "activity": null,
+            "trace": [],
+            "nextDecision": 0,
+            "lexicon": {
+              "plainEnglish": true
+            }
+          },
+          "task": "idle",
+          "says": "We use prepared boards, small ballast bags and hand tools. We do not use powered tools or change the building structure.",
+          "order": null,
+          "recoveryUntil": 0,
+          "actionUntil": 0,
+          "status": "waiting"
+        },
+        {
+          "id": "v5",
+          "name": "Dilek",
+          "assignment": "She prepares cold dishes and later organises a shared kitchen.",
+          "lifeLine": "",
+          "availableAt": 0,
+          "role": "She lives here.",
+          "family": "She has a younger brother and a mother.",
+          "discovery": 0,
+          "invitedBreak": false,
+          "breakStarted": -1,
+          "x": 492,
+          "y": 460,
+          "person": {
+            "schema": "human/person@1",
+            "engine": "2.23.0",
+            "id": "hf.cast.dilek.pass",
+            "name": "Dilek",
+            "now": 483,
+            "rng": {
+              "a": -1051162101,
+              "b": 176250462,
+              "c": 1673422627,
+              "d": 598471110
+            },
+            "life": {
+              "bornAt": -17869920,
+              "sex": "female"
+            },
+            "body": {
+              "satiety": 0.9474455892956443,
+              "hydration": 0.9774155374050048,
+              "sleepPressure": 0.053448272069217095,
+              "exertion": 0.0027165298758279263,
+              "circadianPeak": 960,
+              "pain": 0,
+              "health": 1,
+              "fitness": 0.3499983955055097,
+              "sleepDebt": 0,
+              "alive": true,
+              "asleep": false,
+              "since": 480,
+              "injuries": [],
+              "illnesses": [],
+              "nextId": 0
+            },
+            "needs": {
+              "safety": 0.8,
+              "belonging": 0.6992591099597688,
+              "esteem": 0.5999278232286634,
+              "autonomy": 0.7,
+              "competence": 0.5999278232286634,
+              "leisure": 0.6,
+              "meaning": 0.5998267382260457
+            },
+            "traits": {
+              "honesty": 0.7,
+              "emotionality": 0.65,
+              "extraversion": 0.6,
+              "agreeableness": 0.5,
+              "conscientiousness": 0.55,
+              "openness": 0.5
+            },
+            "values": {
+              "benevolence": 0.5,
+              "universalism": 0.5,
+              "tradition": 0.5,
+              "conformity": 0.5,
+              "security": 0.5,
+              "achievement": 0.5,
+              "power": 0.5,
+              "hedonism": 0.5,
+              "stimulation": 0.5,
+              "selfDirection": 0.5
+            },
+            "conscience": {
+              "norms": [
+                {
+                  "normId": "salah",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "sawm-ramadan",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "zakat",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "charity",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "lying",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "theft",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "keep-promise",
+                  "standing": "obligatory",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "kindness-to-parents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "backbiting",
+                  "standing": "forbidden",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "help-neighbor",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "gratitude",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "harm-others",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "intoxicants",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "forbidden-food",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "fairness",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "care-dependents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "punctuality",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "eid-prayer",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                }
+              ],
+              "breaches": [],
+              "intentions": [],
+              "nextBreach": 0
+            },
+            "affect": {
+              "mood": {
+                "valence": 0.001371569059124278,
+                "arousal": 0.3
+              },
+              "emotions": [],
+              "regulation": 0.3,
+              "lastUpdated": 483
+            },
+            "skills": {},
+            "habits": [],
+            "memory": {
+              "episodes": [],
+              "beliefs": [],
+              "expectations": [],
+              "sourceTrust": {},
+              "nextEpisode": 0
+            },
+            "social": {
+              "relationships": []
+            },
+            "agenda": {
+              "commitments": [],
+              "goals": [],
+              "nextId": 1,
+              "lastProposalDay": -1
+            },
+            "will": {
+              "voices": [
+                {
+                  "voiceId": "commander",
+                  "trust": 0.7,
+                  "pressure": 0,
+                  "accepted": 0,
+                  "refused": 0,
+                  "history": [],
+                  "seeded": true
+                }
+              ],
+              "precommitments": [],
+              "switchMargin": 0.15,
+              "temperature": 0,
+              "suggestionReasons": true
+            },
+            "activity": null,
+            "trace": [],
+            "nextDecision": 0,
+            "lexicon": {
+              "plainEnglish": true
+            }
+          },
+          "task": "idle",
+          "says": "We use prepared boards, small ballast bags and hand tools. We do not use powered tools or change the building structure.",
+          "order": null,
+          "recoveryUntil": 0,
+          "actionUntil": 0,
+          "status": "waiting"
+        },
+        {
+          "id": "v6",
+          "name": "Burak",
+          "assignment": "He works as an accountant.",
+          "lifeLine": "",
+          "availableAt": 0,
+          "role": "He lives here and manages the shared money.",
+          "family": "He is single. His family lives elsewhere.",
+          "discovery": 0,
+          "invitedBreak": false,
+          "breakStarted": -1,
+          "x": 534,
+          "y": 460,
+          "person": {
+            "schema": "human/person@1",
+            "engine": "2.23.0",
+            "id": "hf.cast.burak.stairwell",
+            "name": "Burak",
+            "now": 483,
+            "rng": {
+              "a": 1558480732,
+              "b": 2561388661,
+              "c": 3958214648,
+              "d": 2238017709
+            },
+            "life": {
+              "bornAt": -16293120,
+              "sex": "male"
+            },
+            "body": {
+              "satiety": 0.94744272797791,
+              "hydration": 0.9774126424247088,
+              "sleepPressure": 0.053448272069217095,
+              "exertion": 0.0027165298758279263,
+              "circadianPeak": 960,
+              "pain": 0,
+              "health": 1,
+              "fitness": 0.3499983955055097,
+              "sleepDebt": 0,
+              "alive": true,
+              "asleep": false,
+              "since": 480,
+              "injuries": [],
+              "illnesses": [],
+              "nextId": 0
+            },
+            "needs": {
+              "safety": 0.8,
+              "belonging": 0.6994610930760995,
+              "esteem": 0.5999278232286634,
+              "autonomy": 0.7,
+              "competence": 0.5999278232286634,
+              "leisure": 0.6,
+              "meaning": 0.5998267382260457
+            },
+            "traits": {
+              "honesty": 0.8,
+              "emotionality": 0.5,
+              "extraversion": 0.3,
+              "agreeableness": 0.7,
+              "conscientiousness": 0.8,
+              "openness": 0.5
+            },
+            "values": {
+              "benevolence": 0.5,
+              "universalism": 0.5,
+              "tradition": 0.5,
+              "conformity": 0.5,
+              "security": 0.5,
+              "achievement": 0.5,
+              "power": 0.5,
+              "hedonism": 0.5,
+              "stimulation": 0.5,
+              "selfDirection": 0.5
+            },
+            "conscience": {
+              "norms": [
+                {
+                  "normId": "salah",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "sawm-ramadan",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "zakat",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "charity",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "lying",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "theft",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "keep-promise",
+                  "standing": "obligatory",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "kindness-to-parents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "backbiting",
+                  "standing": "forbidden",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "help-neighbor",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "gratitude",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "harm-others",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "intoxicants",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "forbidden-food",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "fairness",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "care-dependents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "punctuality",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "eid-prayer",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                }
+              ],
+              "breaches": [],
+              "intentions": [],
+              "nextBreach": 0
+            },
+            "affect": {
+              "mood": {
+                "valence": 0.0013716059281068116,
+                "arousal": 0.3
+              },
+              "emotions": [],
+              "regulation": 0.3,
+              "lastUpdated": 483
+            },
+            "skills": {},
+            "habits": [],
+            "memory": {
+              "episodes": [],
+              "beliefs": [],
+              "expectations": [],
+              "sourceTrust": {},
+              "nextEpisode": 0
+            },
+            "social": {
+              "relationships": []
+            },
+            "agenda": {
+              "commitments": [],
+              "goals": [],
+              "nextId": 1,
+              "lastProposalDay": -1
+            },
+            "will": {
+              "voices": [
+                {
+                  "voiceId": "commander",
+                  "trust": 0.7,
+                  "pressure": 0,
+                  "accepted": 0,
+                  "refused": 0,
+                  "history": [],
+                  "seeded": true
+                }
+              ],
+              "precommitments": [],
+              "switchMargin": 0.15,
+              "temperature": 0,
+              "suggestionReasons": true
+            },
+            "activity": null,
+            "trace": [],
+            "nextDecision": 0,
+            "lexicon": {
+              "plainEnglish": true
+            }
+          },
+          "task": "idle",
+          "says": "We use prepared boards, small ballast bags and hand tools. We do not use powered tools or change the building structure.",
+          "order": null,
+          "recoveryUntil": 0,
+          "actionUntil": 0,
+          "status": "waiting"
+        },
+        {
+          "id": "v7",
+          "name": "Sevim",
+          "assignment": "She is a retired teacher. She volunteers to teach reading and writing for everyday use.",
+          "lifeLine": "",
+          "availableAt": 0,
+          "role": "She is visiting to tutor people and read records.",
+          "family": "Her spouse has died. Her adult child lives in another country.",
+          "discovery": 0,
+          "invitedBreak": false,
+          "breakStarted": -1,
+          "x": 450,
+          "y": 495,
+          "person": {
+            "schema": "human/person@1",
+            "engine": "2.23.0",
+            "id": "hf.cast.sevim.stairwell",
+            "name": "Sevim",
+            "now": 483,
+            "rng": {
+              "a": 793181546,
+              "b": 1208256194,
+              "c": 1555651381,
+              "d": 714229119
+            },
+            "life": {
+              "bornAt": -36265920,
+              "sex": "female"
+            },
+            "body": {
+              "satiety": 0.9477159237930518,
+              "hydration": 0.9776890523082641,
+              "sleepPressure": 0.053448272069217095,
+              "exertion": 0.0027165298758279263,
+              "circadianPeak": 960,
+              "pain": 0,
+              "health": 1,
+              "fitness": 0.3499983955055097,
+              "sleepDebt": 0,
+              "alive": true,
+              "asleep": false,
+              "since": 480,
+              "injuries": [],
+              "illnesses": [],
+              "nextId": 0
+            },
+            "needs": {
+              "safety": 0.8,
+              "belonging": 0.6992591099597688,
+              "esteem": 0.5999278232286634,
+              "autonomy": 0.7,
+              "competence": 0.5999278232286634,
+              "leisure": 0.6,
+              "meaning": 0.5998267382260457
+            },
+            "traits": {
+              "honesty": 0.6,
+              "emotionality": 0.5,
+              "extraversion": 0.6,
+              "agreeableness": 0.35,
+              "conscientiousness": 0.85,
+              "openness": 0.4
+            },
+            "values": {
+              "benevolence": 0.5,
+              "universalism": 0.5,
+              "tradition": 0.5,
+              "conformity": 0.5,
+              "security": 0.5,
+              "achievement": 0.5,
+              "power": 0.5,
+              "hedonism": 0.5,
+              "stimulation": 0.5,
+              "selfDirection": 0.5
+            },
+            "conscience": {
+              "norms": [
+                {
+                  "normId": "salah",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "sawm-ramadan",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "zakat",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "charity",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "lying",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "theft",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "keep-promise",
+                  "standing": "obligatory",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "kindness-to-parents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "backbiting",
+                  "standing": "forbidden",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "help-neighbor",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "gratitude",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "harm-others",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "intoxicants",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "forbidden-food",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "fairness",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "care-dependents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "punctuality",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "eid-prayer",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                }
+              ],
+              "breaches": [],
+              "intentions": [],
+              "nextBreach": 0
+            },
+            "affect": {
+              "mood": {
+                "valence": 0.001371660442597622,
+                "arousal": 0.3
+              },
+              "emotions": [],
+              "regulation": 0.3,
+              "lastUpdated": 483
+            },
+            "skills": {},
+            "habits": [],
+            "memory": {
+              "episodes": [],
+              "beliefs": [],
+              "expectations": [],
+              "sourceTrust": {},
+              "nextEpisode": 0
+            },
+            "social": {
+              "relationships": []
+            },
+            "agenda": {
+              "commitments": [],
+              "goals": [],
+              "nextId": 1,
+              "lastProposalDay": -1
+            },
+            "will": {
+              "voices": [
+                {
+                  "voiceId": "commander",
+                  "trust": 0.7,
+                  "pressure": 0,
+                  "accepted": 0,
+                  "refused": 0,
+                  "history": [],
+                  "seeded": true
+                }
+              ],
+              "precommitments": [],
+              "switchMargin": 0.15,
+              "temperature": 0,
+              "suggestionReasons": true
+            },
+            "activity": null,
+            "trace": [],
+            "nextDecision": 0,
+            "lexicon": {
+              "plainEnglish": true
+            }
+          },
+          "task": "idle",
+          "says": "We use prepared boards, small ballast bags and hand tools. We do not use powered tools or change the building structure.",
+          "order": null,
+          "recoveryUntil": 0,
+          "actionUntil": 0,
+          "status": "waiting"
+        },
+        {
+          "id": "v8",
+          "name": "Oskar",
+          "assignment": "He works as a photographer and takes climbing seriously as a hobby.",
+          "lifeLine": "",
+          "availableAt": 0,
+          "role": "He is visiting.",
+          "family": "He has a younger sister.",
+          "discovery": 0,
+          "invitedBreak": false,
+          "breakStarted": -1,
+          "x": 492,
+          "y": 495,
+          "person": {
+            "schema": "human/person@1",
+            "engine": "2.23.0",
+            "id": "hf.cast.oskar.rope",
+            "name": "Oskar",
+            "now": 483,
+            "rng": {
+              "a": -1049744460,
+              "b": 2619874028,
+              "c": 2458528155,
+              "d": 1735171376
+            },
+            "life": {
+              "bornAt": -17869920,
+              "sex": "male"
+            },
+            "body": {
+              "satiety": 0.9474455892956443,
+              "hydration": 0.9774155374050048,
+              "sleepPressure": 0.053448272069217095,
+              "exertion": 0.0027165298758279263,
+              "circadianPeak": 960,
+              "pain": 0,
+              "health": 1,
+              "fitness": 0.3499983955055097,
+              "sleepDebt": 0,
+              "alive": true,
+              "asleep": false,
+              "since": 480,
+              "injuries": [],
+              "illnesses": [],
+              "nextId": 0
+            },
+            "needs": {
+              "safety": 0.8,
+              "belonging": 0.6991581402751268,
+              "esteem": 0.5999278232286634,
+              "autonomy": 0.7,
+              "competence": 0.5999278232286634,
+              "leisure": 0.6,
+              "meaning": 0.5998267382260457
+            },
+            "traits": {
+              "honesty": 0.55,
+              "emotionality": 0.2,
+              "extraversion": 0.75,
+              "agreeableness": 0.4,
+              "conscientiousness": 0.45,
+              "openness": 0.6
+            },
+            "values": {
+              "benevolence": 0.5,
+              "universalism": 0.5,
+              "tradition": 0.5,
+              "conformity": 0.5,
+              "security": 0.5,
+              "achievement": 0.5,
+              "power": 0.5,
+              "hedonism": 0.5,
+              "stimulation": 0.5,
+              "selfDirection": 0.5
+            },
+            "conscience": {
+              "norms": [
+                {
+                  "normId": "salah",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "sawm-ramadan",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "zakat",
+                  "standing": "obligatory",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "charity",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "lying",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "theft",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "keep-promise",
+                  "standing": "obligatory",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "kindness-to-parents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "backbiting",
+                  "standing": "forbidden",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "help-neighbor",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "gratitude",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "harm-others",
+                  "standing": "forbidden",
+                  "conviction": 0.75
+                },
+                {
+                  "normId": "intoxicants",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "forbidden-food",
+                  "standing": "forbidden",
+                  "conviction": 0.475
+                },
+                {
+                  "normId": "fairness",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "care-dependents",
+                  "standing": "obligatory",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "punctuality",
+                  "standing": "recommended",
+                  "conviction": 0.6000000000000001
+                },
+                {
+                  "normId": "eid-prayer",
+                  "standing": "recommended",
+                  "conviction": 0.475
+                }
+              ],
+              "breaches": [],
+              "intentions": [],
+              "nextBreach": 0
+            },
+            "affect": {
+              "mood": {
+                "valence": 0.0013715501419670484,
+                "arousal": 0.3
+              },
+              "emotions": [],
+              "regulation": 0.3,
+              "lastUpdated": 483
+            },
+            "skills": {},
+            "habits": [],
+            "memory": {
+              "episodes": [],
+              "beliefs": [],
+              "expectations": [],
+              "sourceTrust": {},
+              "nextEpisode": 0
+            },
+            "social": {
+              "relationships": []
+            },
+            "agenda": {
+              "commitments": [],
+              "goals": [],
+              "nextId": 1,
+              "lastProposalDay": -1
+            },
+            "will": {
+              "voices": [
+                {
+                  "voiceId": "commander",
+                  "trust": 0.7,
+                  "pressure": 0,
+                  "accepted": 0,
+                  "refused": 0,
+                  "history": [],
+                  "seeded": true
+                }
+              ],
+              "precommitments": [],
+              "switchMargin": 0.15,
+              "temperature": 0,
+              "suggestionReasons": true
+            },
+            "activity": null,
+            "trace": [],
+            "nextDecision": 0,
+            "lexicon": {
+              "plainEnglish": true
+            }
+          },
+          "task": "idle",
+          "says": "We use prepared boards, small ballast bags and hand tools. We do not use powered tools or change the building structure.",
+          "order": null,
+          "recoveryUntil": 0,
+          "actionUntil": 0,
+          "status": "waiting"
+        }
+      ],
+      "buildings": [
+        {
+          "id": "town",
+          "kind": "town",
+          "x": 500,
+          "y": 350,
+          "progress": 1,
+          "complete": true
+        }
+      ],
+      "inputs": [
+        {
+          "tick": 0,
+          "command": {
+            "kind": "order",
+            "ids": [
+              "v1"
+            ],
+            "target": "wood"
+          }
+        },
+        {
+          "tick": 1,
+          "command": {
+            "kind": "pause-chapter"
+          }
+        }
+      ],
+      "message": "Everyone has finished. The game is paused so people can leave.",
+      "ended": false,
+      "won": false
+    },
+    "hash": "2a98a5d8"
+  },
+  "proof": {
+    "tick": 6,
+    "stateHash": "2a98a5d8",
+    "replayExact": true,
+    "rng": {
+      "a": -729603367,
+      "b": 574056851,
+      "c": 2720519917,
+      "d": 2484161474
+    },
+    "activities": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  }
+}

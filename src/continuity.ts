@@ -43,7 +43,7 @@ export class Continuity {
     return {
       game: 'glance',
       build: `${String(this.lab.build().c ?? 'local')}.run-${this.runId}`,
-      engine: '2.21.0',
+      engine: '2.23.0',
       rules: RULES,
     };
   }
@@ -77,7 +77,11 @@ export class Continuity {
           this.source(),
           async (inputs: LifePreparation[]) => {
             const initial = Object.fromEntries(
-              base.people.map((p) => [CAST.find((c) => c.id === p.id)!.castId, structuredClone(p)]),
+              base.people.map((p) => {
+                const cast = CAST.find((c) => c.id === p.id);
+                if (!cast) throw new Error('The starting person is not part of this cast.');
+                return [cast.castId, structuredClone(p)];
+              }),
             );
             for (const input of inputs) {
               const opening = initial[input.parent.castId];

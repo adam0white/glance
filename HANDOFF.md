@@ -1,6 +1,5 @@
 # Handoff
 
-
 ## 2026-10-24 simplify stopped at disk threshold
 
 Goal: finish the owner's15-game simplify direction in /Users/abdul/code/.lab-scratch/simplify/owner-request.md. Technical done is reviewed source, signed/rebased commits, exact green CI, fresh clean deployment and both-engine four-size live checks; Adam accepts game readiness.

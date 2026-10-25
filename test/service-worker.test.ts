@@ -1,14 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { expect, it } from 'vitest';
+import { required } from './required.ts';
+
+type FetchEvent = { request: Request; respondWith: (response: Promise<Response>) => void };
 
 function worker() {
-  const handlers: Record<string, (event: any) => void> = {};
+  const handlers: Record<string, (event: FetchEvent) => void> = {};
   runInNewContext(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'), {
     URL,
     self: {
       location: new URL('https://glance.adamwhite.work/sw.js'),
-      addEventListener: (type: string, handler: (event: any) => void) => {
+      addEventListener: (type: string, handler: (event: FetchEvent) => void) => {
         handlers[type] = handler;
       },
     },
@@ -18,7 +21,7 @@ function worker() {
     },
     fetch: async () => new Response('asset'),
   });
-  return handlers.fetch!;
+  return required(handlers.fetch);
 }
 
 it('leaves cross-origin GETs to the browser instead of intercepting their CORS and integrity handling', () => {
@@ -48,5 +51,5 @@ it('continues to cache same-origin game assets for offline play', async () => {
     },
   });
   expect(response).toBeDefined();
-  expect(await (await response!).text()).toBe('asset');
+  expect(await (await required(response)).text()).toBe('asset');
 });

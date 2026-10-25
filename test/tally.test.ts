@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { newGame } from '../src/sim/dam.ts';
 import { SAMPLE_DAWN } from '../src/ui/opener.ts';
 import { tallyBody } from '../src/ui/tally.ts';
+import { required } from './required.ts';
 
 it('counts disclosed closing components only at the end, including a failed night', () => {
   const s = newGame(10);
@@ -10,7 +11,7 @@ it('counts disclosed closing components only at the end, including a failed nigh
   s.phase = 'dawn';
   expect(tallyBody(s)).toBe('');
   s.phase = 'end';
-  s.dawns[0]!.misses.push({
+  required(s.dawns[0]).misses.push({
     at: 1440,
     who: 'dai',
     gauge: 'level',

@@ -23,17 +23,18 @@ Between crises the player plans his next walk ahead of the rain, trades his rest
 
 ## The week (one new pressure a night, brought by a person or the weather)
 
-| Night | New pressure |
-|---|---|
-| Monday | Dai alone. The level, the gate, rain. Learn that he reads low. |
-| Tuesday | The weir upstream and the Bridge Inn: Nerys at the window, and the town warning. False alarms cost her goodwill. |
-| Wednesday | Callum arrives. Two keepers: who walks, who sleeps. He never says no. |
-| Thursday | The radio drops in the wind; a tree comes down on the screen. Silence is the warning. |
-| Friday | The crest. Everything at once; the 1979 mark on the wall. |
+| Night     | New pressure                                                                                                     |
+| --------- | ---------------------------------------------------------------------------------------------------------------- |
+| Monday    | Dai alone. The level, the gate, rain. Learn that he reads low.                                                   |
+| Tuesday   | The weir upstream and the Bridge Inn: Nerys at the window, and the town warning. False alarms cost her goodwill. |
+| Wednesday | Callum arrives. Two keepers: who walks, who sleeps. He never says no.                                            |
+| Thursday  | The radio drops in the wind; a tree comes down on the screen. Silence is the warning.                            |
+| Friday    | The crest. Everything at once; the 1979 mark on the wall.                                                        |
 
 The dam overtopping ends the week (the dawn page still comes). Achievement is the dawn overlay: your gate marks bracketing the true curve though his dots were off. "You read the man, not the gauge."
 
 ## Rules taken from the consults
+
 1. A night is 22:00 to 06:00. Playback runs automatically: brisk quiet work, reading time for new radio words, and time held during an inspection or information popover. Each simulation minute still runs; the first new event ends a fast batch. There is no speed chooser.
 2. No meter for a person. State shows in words, handwriting, gait on the map and the dawn notes.
 3. Every error has a cause in the keeper's true state and a tell the player could have read; the dawn page names the cause.
@@ -42,11 +43,13 @@ The dam overtopping ends the week (the dawn page still comes). Achievement is th
 6. The town is not simulated: one voice, one bridge, a row of houses on the dawn page.
 
 ## The world (host side, `src/sim`)
+
 - **Water.** Rain falls through a catchment (a linear store, about an hour's lag, wetter ground runs off more) into the reservoir; the gate releases by its opening and the head; above the crest the dam overtops. The bridge rises with the release (about forty minutes' lag) and with the town's own runoff.
 - **Readings.** The keeper's read is the truth plus an error whose size grows as his true clarity falls and whose bias is his character (Dai low, Callum high, more so when afraid). His spoken confidence is computed the same way from his perceived state. Skipped walks and copied figures are host rolls from true sleepiness, keyed by the minute.
 - **Noticing.** At the dam the keeper perceives what is there (the rain, the gate, a tree on the screen) through HF `perceive`, whose limited attention narrows with fatigue and fear. He mentions only what got through.
 
 ## Deferred (target: after the owner's first playtest)
+
 - Standing orders for the radio drop-outs ("if it passes four-five, give her a turn").
 - A second week, other dams, a recruited third keeper.
 - Keep both readings on the board when two keepers disagree (Tomás, Priya). The gauge now shows the previous figure and who read it; a fuller side-by-side is the target for the owner's first playtest.
@@ -59,10 +62,12 @@ The dam overtopping ends the week (the dawn page still comes). Achievement is th
 - Resolved 2026-10-20 (F-228): written reading times retain the keeper's slips, labeled “read HH:MM (as written)” across the live board, drawing and sheets. Reading ages use that same written time. Radio arrivals say “reported HH:MM”; dawn explicitly reconstructs actual reading times. Simulation and export replay are unchanged. Owner accepts feel separately.
 
 ## Owner pacing update (2026-10-21)
+
 The desk uses automatic playback. New words, reports and flashes interrupt brisk time; an inspection waits for the player to close it or make a request. The information button opens native dismissible help with the existing sample report. The closing arithmetic is always computed and offered through “See tally” only at the end, without a start/menu preference. Simulation inputs, saves and replay rules are unchanged. Adam accepts feel.
 
 
 ## Owner speed restoration (2026-10-22)
+
 The original speed choices are restored. Inspection, new-event reading time and menu protections remain. Simulation inputs, saves and replay rules are unchanged.
 
 ## Approved UI sweep (2026-10-22)

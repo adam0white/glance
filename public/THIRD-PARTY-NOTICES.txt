@@ -1,0 +1,13 @@
+The Glance water model includes an exponential kernel adapted through Human Framework from Sun/FreeBSD fdlibm e_exp.c.
+Source: https://netlib.org/fdlibm/e_exp.c
+
+
+/*
+ * ====================================================
+ * Copyright (C) 2004 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice 
+ * is preserved.
+ * ====================================================
+ */

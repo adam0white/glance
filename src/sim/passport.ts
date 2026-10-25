@@ -18,7 +18,7 @@ import {
 } from '@adam0white/lab-client';
 import { ALLOCATION as CAST } from './cast.ts';
 
-export const RULES = 'glance-3';
+export const RULES = 'glance-4';
 export const DIALECT = 'glance-cast/1';
 export const MAPPING = 'glance-calendar/1';
 export type Chapter = {
@@ -70,7 +70,8 @@ export function admitResident(input: LifePreparation, opening: Person): Person {
   if (
     portable.person.mappingVersion !== mapping ||
     portable.person.source.id !== sourceId ||
-    portable.person.source.engine !== '2.21.0' ||
+    portable.person.source.engine !== '2.23.0' ||
+    p.source.engine !== portable.person.source.engine ||
     portable.person.name !== cast.name
   )
     throw new Error('The source role, mapping, engine or name differs from the required value.');
@@ -158,7 +159,7 @@ export function checkChapter(chapter: Chapter) {
       claim.branchId !== input.parent.branchId ||
       claim.parentRevision !== input.parent.revision ||
       claim.source.game !== 'glance' ||
-      claim.source.engine !== '2.21.0' ||
+      claim.source.engine !== '2.23.0' ||
       claim.source.rules !== RULES ||
       !same(claim.transfer, { ...input.parent.transfer, life: input.life })
     )

@@ -13,6 +13,7 @@ import {
 } from '../src/sim/dam.ts';
 import { SAMPLE_DAWN } from '../src/ui/opener.ts';
 import { reportBody } from '../src/ui/report.ts';
+import { required } from './required.ts';
 
 vi.mock('../src/ui/lab.ts', () => ({
   lab: {
@@ -43,7 +44,7 @@ vi.mock('@adam0white/lab-client', async (importOriginal) => ({
   watchPersonaCheckpoint: () => () => {},
 }));
 function localFixture(s: GameState) {
-  return { run: exportRun(s, '2.21.0'), runId: 'test-run', heads: [], fileOrigin: false, sources: [] };
+  return { run: exportRun(s, '3.0.0'), runId: 'test-run', heads: [], fileOrigin: false, sources: [] };
 }
 async function click(id: string) {
   const button = document.getElementById(id);
@@ -136,7 +137,7 @@ describe('title and first call', () => {
     const debug = await boot();
     await click('new');
     expect(document.getElementById('restart-confirm')?.hidden).toBe(false);
-    expect(JSON.parse(localStorage.getItem('glance-cast-local-v3')!).run.state.minute).toBe(1340);
+    expect(JSON.parse(required(localStorage.getItem('glance-cast-local-v3'))).run.state.minute).toBe(1340);
     await click('cancel-new');
     await click('cont');
     expect(fingerprint(state(debug))).toBe(fingerprint(expected));
@@ -147,7 +148,7 @@ describe('title and first call', () => {
     const run = newGame(7);
     for (let i = 0; i < 20; i++) step(run);
     const debug = await boot();
-    await importRun(exportRun(run, '2.21.0'));
+    await importRun(exportRun(run, '3.0.0'));
     expect(fingerprint(state(debug))).toBe(fingerprint(run));
     expect(alert).not.toHaveBeenCalled();
   });
@@ -197,7 +198,7 @@ describe('desk sheets and reading labels', () => {
     tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
     debug.step(1);
     const run = state(debug);
-    const activity = personOf(run, 'dai').activity!;
+    const activity = required(personOf(run, 'dai').activity);
     activity.affordanceId = 'doze';
     chooseGauge('level');
     const words = document.querySelector('.sheet [data-job="level"] .h')?.textContent;
@@ -225,7 +226,7 @@ describe('desk sheets and reading labels', () => {
     const debug = await boot();
     await click('new');
     const run = state(debug);
-    const original = run.board.level!;
+    const original = required(run.board.level);
     run.minute = 1410;
     run.inputs.push({ at: 1350, kind: 'ask', keeper: 'dai', job: 'level' });
     const reading = { ...original, at: 1380, wrote: 1350, late: true };
@@ -256,10 +257,10 @@ describe('desk sheets and reading labels', () => {
     await click('new');
     const run = state(debug);
     run.night = 3;
-    const opening = run.board.level!;
+    const opening = required(run.board.level);
     run.board.weir = { ...opening, gauge: 'weir' };
     run.board.bridge = { ...opening, who: 'nerys', gauge: 'bridge' };
-    run.board.gate!.wrote = 1290;
+    required(run.board.gate).wrote = 1290;
     debug.step(0);
     expect(document.querySelectorAll('.gauge .by')).toHaveLength(4);
     chooseGauge('gate');
@@ -281,7 +282,7 @@ describe('desk sheets and reading labels', () => {
     state(debug).night = 2;
     debug.step(0);
     chooseGauge('bridge');
-    const warning = document.getElementById('warn')!;
+    const warning = required(document.getElementById('warn'));
     const before = state(debug).inputs.length;
     tap(warning);
     expect(state(debug).inputs).toHaveLength(before);
@@ -353,7 +354,7 @@ it('shows save failure without adding a manual Save action', async () => {
   set.mockRestore();
   await click('menu');
   expect(document.querySelector('#save-warning')).toBeNull();
-  expect(JSON.parse(localStorage.getItem('glance-cast-local-v3')!).run.state.minute).toBe(
+  expect(JSON.parse(required(localStorage.getItem('glance-cast-local-v3'))).run.state.minute).toBe(
     state(debug).minute,
   );
 });
@@ -614,7 +615,7 @@ it('keeps the town goal beside gate orders and offers the saved lightning compar
   expect(document.querySelector('#desk-goal')?.textContent).toContain('town dry');
   expect(document.querySelector('#desk-goal')?.textContent).toContain("Friday's first light");
   expect(document.querySelector('#sheet #desk-goal')).toBeNull();
-  const panel = document.getElementById('sheet')!;
+  const panel = required(document.getElementById('sheet'));
   panel.scrollTop = 200;
   await click('compare-observations');
   expect(panel.scrollTop).toBe(0);
@@ -624,7 +625,7 @@ it('keeps the town goal beside gate orders and offers the saved lightning compar
   // Use an actual seeded first flash, then let its scene ghost expire.
   const run = state(debug);
   while (!run.flashes.length) debug.step(1);
-  const flash = { ...run.flashes.at(-1)! };
+  const flash = { ...required(run.flashes.at(-1)) };
   debug.step(31);
   const before = fingerprint(run);
   await click('compare-observations');
@@ -635,10 +636,29 @@ it('keeps the town goal beside gate orders and offers the saved lightning compar
   expect(document.querySelector('#observation')?.textContent).not.toContain(flash.level.toFixed(2));
   debug.step(0);
   expect(fingerprint(run)).toBe(before);
-  const exported = exportRun(run, '2.21.0');
+  const exported = exportRun(run, '3.0.0');
   expect(
     fingerprint(
       replay(exported.seed, exported.inputs, exported.state.minute, exported.state.chapter ?? undefined),
     ),
   ).toBe(before);
+});
+
+it('lets the player mark a received reading and remove the note through ordinary controls', async () => {
+  const debug = await boot();
+  await click('new');
+  expect(document.getElementById('reading-note')).toBeNull();
+  tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
+  const run = state(debug);
+  while (!run.board.level) debug.step(1);
+  chooseGauge('level');
+  expect(document.getElementById('reading-note')?.textContent).toContain('Mark this reading');
+  await click('reading-note');
+  debug.step(1);
+  expect(document.querySelector('[data-g="level"]')?.textContent).toContain('Marked for another check');
+  chooseGauge('level');
+  expect(document.getElementById('reading-note')?.getAttribute('aria-pressed')).toBe('true');
+  await click('reading-note');
+  debug.step(1);
+  expect(run.board.level?.doubted).toBe(false);
 });
