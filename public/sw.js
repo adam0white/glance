@@ -27,7 +27,8 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   // The browser owns cross-origin CORS, integrity checks and third-party caching.
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/')) return;
+  // Release metadata must describe the deployed build, never an earlier offline cache.
+  if (url.pathname.startsWith('/api/') || url.pathname === '/release.json') return;
   const isPage = req.mode === 'navigate';
   if (isPage) {
     e.respondWith(

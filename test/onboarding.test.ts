@@ -24,7 +24,7 @@ vi.mock('../src/ui/lab.ts', () => ({
     openSendDialog: vi.fn(),
     trackRun() {},
     captureSave: vi.fn(),
-    sendFeedback: vi.fn(async () => 'queued'),
+    sendFeedback: vi.fn(async () => 'stored-reference'),
     sendRun: vi.fn(async () => 'queued'),
     setEventsOff: vi.fn((off: boolean) => localStorage.setItem('hf-lab-recording-off', off ? '1' : '0')),
     privacySignalOn: false,
@@ -418,7 +418,11 @@ it('sends linked feedback with verdict and trimmed remembered name', async () =>
   (document.getElementById('feedback-note') as HTMLTextAreaElement).value = 'I wanted another reading.';
   (document.getElementById('feedback-name') as HTMLInputElement).value = '  owner  ';
   await click('feedback-send');
-  await vi.waitFor(() => expect(document.getElementById('feedback-result')?.textContent).toContain('queued'));
+  await vi.waitFor(() =>
+    expect(document.getElementById('feedback-result')?.textContent).toBe(
+      'Sent. Your note is stored. Reference stored-reference.',
+    ),
+  );
   const { lab } = await import('../src/ui/lab.ts');
   expect(lab.sendFeedback).toHaveBeenCalledWith(
     '[keep] I wanted another reading.',
@@ -508,7 +512,11 @@ it('keeps feedback sent when remembering the name fails', async () => {
     throw new DOMException('Full', 'QuotaExceededError');
   });
   await click('feedback-send');
-  await vi.waitFor(() => expect(document.getElementById('feedback-result')?.textContent).toContain('queued'));
+  await vi.waitFor(() =>
+    expect(document.getElementById('feedback-result')?.textContent).toBe(
+      'Sent. Your note is stored. Reference stored-reference.',
+    ),
+  );
   expect(document.getElementById('feedback-send')?.textContent).toBe('Back to the desk');
   failedName.mockRestore();
 });

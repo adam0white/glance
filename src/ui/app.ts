@@ -630,17 +630,16 @@ function sendWord() {
     try {
       const message = `${verdict ? `[${verdict}] ` : ''}${note}`;
       const sharePlay = feedbackSharePlay(personaChoice);
-      const noteOnly = !lab.telemetryOn && !sharePlay;
       const receipt = await lab.sendFeedback(message, {
         name: who,
         run: feedbackRun(),
         sharePlay,
       });
-      const sentMessage = `${noteOnly ? 'Your feedback was queued without a run or linked history.' : 'Your feedback was queued with available run and linked play.'} · ${receipt}`;
+      const sentMessage = `Sent. Your note is stored. Reference ${receipt}.`;
       try {
         localStorage.setItem('hf-lab-feedback-name', who);
       } catch {
-        /* The note was queued even when this device cannot remember its name. */
+        /* The note was stored even when this device cannot remember its name. */
       }
       sent = true;
       d.querySelector('#feedback-result')!.textContent = sentMessage;
