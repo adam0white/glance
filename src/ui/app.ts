@@ -935,6 +935,10 @@ function openSheet(sh: Sheet) {
   sheetKey = '';
   carry = 0;
   drawSheet();
+  if (!same && sh) {
+    const panel = document.getElementById('sheet');
+    if (panel) panel.scrollTop = 0;
+  }
   drawBoard();
   drawTop();
 }

@@ -614,7 +614,10 @@ it('keeps the town goal beside gate orders and offers the saved lightning compar
   expect(document.querySelector('#desk-goal')?.textContent).toContain('town dry');
   expect(document.querySelector('#desk-goal')?.textContent).toContain("Friday's first light");
   expect(document.querySelector('#sheet #desk-goal')).toBeNull();
+  const panel = document.getElementById('sheet')!;
+  panel.scrollTop = 200;
   await click('compare-observations');
+  expect(panel.scrollTop).toBe(0);
   expect(document.querySelector('#observation')?.textContent).toContain('next lightning flash');
   await click('x');
   tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
