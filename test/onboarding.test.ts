@@ -711,3 +711,36 @@ it('explains the pinned catch rule when resuming a saved first-edition longer wa
   );
   expect(document.getElementById('about')?.textContent).toContain('twelve nights');
 });
+
+it('accounts real frame minutes under the admitted inspector and holds menus and legacy inspections', async () => {
+  let frame: FrameRequestCallback = () => {};
+  let now = 10000;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  vi.stubGlobal('requestAnimationFrame', (next: FrameRequestCallback) => {
+    frame = next;
+    return 1;
+  });
+  const run = newGame(7, undefined, { edition: 'extended-2', dam: 'valley', outcomes: 'handover-1' });
+  localStorage.setItem('glance-cast-local-v3', JSON.stringify(localFixture(run)));
+  const debug = await boot();
+  await click('cont');
+  chooseGauge('level');
+  const initial = state(debug).minute;
+  const advance = (frames: number) => {
+    for (let i = 0; i < frames; i++) {
+      now += 250;
+      frame(now);
+    }
+  };
+  advance(12);
+  expect(state(debug).minute).toBe(initial + 1);
+  expect(document.getElementById('clock-rate')?.textContent).toContain('continues slowly');
+  expect(document.querySelector('.watch')?.getAttribute('data-sheet-id')).toBe('gauge-level-dai');
+  await click('menu');
+  const beforeMenu = state(debug).minute;
+  advance(40);
+  expect(state(debug).minute).toBe(beforeMenu);
+  await click('dialog-back');
+  advance(12);
+  expect(state(debug).minute).toBe(beforeMenu + 1);
+});

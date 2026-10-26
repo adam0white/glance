@@ -68,6 +68,7 @@ import { eventStamp, playback } from './playback.ts';
 import { receivedReadings } from './readings.ts';
 import { reportBody } from './report.ts';
 import { drawScene, type SceneFx, sceneHit } from './scene.ts';
+import { watchStage } from './stage.ts';
 import { tallyBody } from './tally.ts';
 import { readingTime } from './time.ts';
 
@@ -104,6 +105,13 @@ let s: GameState | null = null;
 let readUntil = 0;
 let sheet: Sheet = null;
 let sheetKey = '';
+let stage: ReturnType<typeof watchStage> | undefined;
+let sceneBounds: { width: number; height: number } | undefined;
+function destroyStage() {
+  stage?.destroy();
+  stage = undefined;
+  sceneBounds = undefined;
+}
 let raf = 0;
 let last = 0;
 let carry = 0;
@@ -286,6 +294,7 @@ export function start() {
 }
 
 function title() {
+  destroyStage();
   continuity.invalidate();
   cancelAnimationFrame(raf);
   screen = 'title';
@@ -494,8 +503,7 @@ function showAbout() {
   let words = `You work at the river authority's night desk. One old dam stands above a town. A keeper reads the gauges with a flashlight and reports the readings by radio. Every reading on your board is what he saw. Tap a gauge to choose a job. Tap the job to ask him. Hold the job button to insist. ${durationWords(extended)}`;
   if (screen === 'watch') {
     heading = 'Reading the desk';
-    words =
-      'The level is the height of water behind the dam. The spillway lip is where water starts to overflow into the spillway. The crest is the top of the dam. The dial marks both heights. More gate turns lower the water behind the dam. The river through town rises about forty minutes later. “Read” is the time he wrote down. “Reported” is when the report reached you. Each job shows his answer and roughly how long it takes. Time stops while an inspection is open. Let him rest between jobs.';
+    words = `The level is the height of water behind the dam. The spillway lip is where water starts to overflow into the spillway. The crest is the top of the dam. The dial marks both heights. More gate turns lower the water behind the dam. The river through town rises about forty minutes later. “Read” is the time he wrote down. “Reported” is when the report reached you. Each job shows his answer and roughly how long it takes. ${s?.outcomes ? 'Time continues slowly while an inspection is open.' : 'Time stops while an inspection is open.'} Let him rest between jobs.`;
     if (s && s.night >= 2)
       words +=
         ' The weir is a low barrier upstream. Its gauge shows how much water is coming in. It is a long walk away. Call Nerys at the Bridge Inn to ask about the river. Hold Warn Mill Lane to send the warden to knock on doors. A false warning makes Nerys less willing to help you.';
@@ -738,6 +746,7 @@ function updateTally() {
 // ---------- the watch ----------
 
 function watch() {
+  destroyStage();
   if (!s) return;
   lab.screen(`night ${s.night}: watch`);
   sheet = null;
@@ -747,11 +756,11 @@ function watch() {
   readUntil = performance.now() + 6000;
   screen = 'watch';
   skipUntil = 0;
-  app.innerHTML = `<div class="watch">${topbar('<span id="night"></span> · <span class="clock" id="clock"></span>')}
-    <div class="state-strip"><div id="concern" class="attention keeper-chips" aria-live="polite"></div><div id="clock-rate" role="status"></div></div>
+  app.innerHTML = `<div class="watch lk-stage">${topbar('<span id="night"></span> · <span class="clock" id="clock"></span>')}
+    <div class="state-strip"><div id="concern" class="attention keeper-chips lk-strip" aria-live="polite"></div><div id="clock-rate" role="status"></div></div>
     <div class="desk-reminder"><p id="desk-goal">Until ${s.rules ? 'the second Friday' : 'Friday'}'s first light: keep the dam below its crest and the town dry, or warned in time.</p><button id="compare-observations">Compare observations</button></div>
-    <div class="desk-main"><div class="desk-picture"><div class="scene-zone"><canvas id="scene" class="scene" aria-label="The dam, as reported"></canvas><div id="latest-radio" class="latest-radio hand"></div></div><div class="board" id="board"></div></div>
-    <div class="desk-context"><div class="sheet" id="sheet"></div>${s.dawns.length ? '<button id="mornings" class="reading-row">This week’s mornings</button>' : ''}<div class="actionbar" id="skip-bar"><button id="skip" aria-label="Skip to the next event">Skip ⏩</button><span id="skip-caption" class="soft"></span></div></div></div></div>`;
+    <div class="desk-main"><div class="desk-picture"><div class="scene-zone"><canvas id="scene" class="scene lk-scene" aria-label="The dam, as reported"></canvas><div id="latest-radio" class="latest-radio hand"></div></div><div class="board" id="board"></div></div>
+    <div class="desk-context"><div class="sheet lk-sheet" id="sheet"></div>${s.dawns.length ? '<button id="mornings" class="reading-row">This week’s mornings</button>' : ''}<div class="actionbar" id="skip-bar"><button id="skip" aria-label="Skip to the next event">Skip ⏩</button><span id="skip-caption" class="soft"></span></div></div></div></div>`;
   bindTopbar();
   document.getElementById('compare-observations')?.addEventListener('click', () => {
     if (s) openSheet({ kind: 'gauge', gauge: 'level', who: freeKeeper(s) });
@@ -780,6 +789,11 @@ function watch() {
     else if (hit === 'dam') openSheet({ kind: 'gauge', gauge: 'level', who: freeKeeper(s) });
     else if (hit) openSheet({ kind: 'keeper', who: hit });
   });
+  stage = watchStage(required(app.querySelector<HTMLElement>('.watch')), (rect) => {
+    sceneBounds = rect;
+    if (s) drawScene(canvas, s, fx, performance.now(), rect);
+  });
+  stage.sheet(null);
   drawAll();
   last = performance.now();
   carry = 0;
@@ -806,7 +820,7 @@ function frame(t: number) {
   if (paused && readUntil > last) readUntil += elapsed;
   last = t;
   if (s.phase === 'watch' && !paused) {
-    const { rate } = playback(sheet !== null, t < readUntil, selectedRate, skipUntil > 0);
+    const { rate } = playback(sheet !== null, t < readUntil, selectedRate, skipUntil > 0, !!s.outcomes);
     if (rate === 0) carry = 0;
     carry += dt * rate;
     let stepped = false;
@@ -839,7 +853,7 @@ function frame(t: number) {
     }
     drawTop();
     const canvas = document.getElementById('scene') as HTMLCanvasElement | null;
-    if (canvas) drawScene(canvas, s, fx, t);
+    if (canvas) drawScene(canvas, s, fx, t, sceneBounds);
   }
   if (s.phase !== 'watch') {
     writeSave();
@@ -856,7 +870,7 @@ function drawAll() {
   drawLog();
   drawSheet();
   const canvas = document.getElementById('scene') as HTMLCanvasElement | null;
-  if (canvas && s) drawScene(canvas, s, fx, performance.now());
+  if (canvas && s) drawScene(canvas, s, fx, performance.now(), sceneBounds);
 }
 
 function drawTop() {
@@ -872,6 +886,7 @@ function drawTop() {
       performance.now() < readUntil,
       selectedRate,
       skipUntil > 0,
+      !!s.outcomes,
     ).reason;
   const skip = document.getElementById('skip') as HTMLButtonElement | null;
   const caption = document.getElementById('skip-caption');
@@ -1000,6 +1015,15 @@ function openSheet(sh: Sheet) {
   const same = JSON.stringify(sheet) === JSON.stringify(sh);
   if (!same) document.querySelector<HTMLDetailsElement>('.sheet details')?.removeAttribute('open');
   sheet = sh;
+  stage?.sheet(
+    sh
+      ? sh.kind === 'gauge'
+        ? `gauge-${sh.gauge}-${sh.who}`
+        : sh.kind === 'keeper'
+          ? `keeper-${sh.who}`
+          : 'inn'
+      : null,
+  );
   skipUntil = 0;
   document.querySelector('.watch')?.classList.toggle('sheet-open', sheet !== null);
   document
@@ -1237,7 +1261,7 @@ function observation(st: GameState): string {
 function castConversations(ids: CastId[]): string {
   if (!s) return '';
   const available = discoveriesFor(s);
-  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. Close this inspection to let the shift continue. Dam requests still go to the keepers.</p>${outcomeRecord(ids)}</details>`;
+  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. ${s?.outcomes ? 'The shift continues slowly while this inspection is open.' : 'Close this inspection to let the shift continue.'} Dam requests still go to the keepers.</p>${outcomeRecord(ids)}</details>`;
 }
 function outcomeRecord(ids: CastId[]): string {
   if (!s?.outcomes || !ids.some((id) => id === 'dai' || id === 'callum')) return '';
@@ -1406,6 +1430,7 @@ function ask(who: KeeperId, job: Job, target: number | undefined, insist: boolea
 // ---------- dawn ----------
 
 function dawn() {
+  destroyStage();
   if (!s) return;
   cancelAnimationFrame(raf);
   const d = s.dawns.at(-1);
@@ -1516,6 +1541,7 @@ function watchArrangements() {
 // ---------- the week ----------
 
 function ending() {
+  destroyStage();
   if (!s) return;
   cancelAnimationFrame(raf);
   lab.screen('ending');

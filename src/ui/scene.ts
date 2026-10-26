@@ -63,10 +63,16 @@ export interface SceneFx {
   flashAt: number;
 }
 
-export function drawScene(canvas: HTMLCanvasElement, s: GameState, fx: SceneFx, now: number) {
+export function drawScene(
+  canvas: HTMLCanvasElement,
+  s: GameState,
+  fx: SceneFx,
+  now: number,
+  bounds?: { width: number; height: number },
+) {
   const dpr = Math.min(3, window.devicePixelRatio || 1);
-  const cw = canvas.clientWidth || W;
-  const ch = canvas.clientHeight || SCENE_H;
+  const cw = bounds?.width || canvas.clientWidth || W;
+  const ch = bounds?.height || canvas.clientHeight || SCENE_H;
   if (canvas.width !== Math.round(cw * dpr) || canvas.height !== Math.round(ch * dpr)) {
     canvas.width = Math.round(cw * dpr);
     canvas.height = Math.round(ch * dpr);

@@ -34,3 +34,13 @@ it('recognizes a new delivered line after the bounded radio log fills', () => {
   s.said.push({ ...line, at: line.at + 1, text: 'A new objection.' });
   expect(eventStamp(s)).not.toBe(before);
 });
+
+it('keeps opted-in outcome work moving during inspection without changing legacy or radio rates', () => {
+  expect(playback(true, false, 1.4, false, true)).toEqual({
+    rate: 0.35,
+    reason: 'Time continues slowly while this inspection is open.',
+  });
+  expect(playback(true, true, 2.4, true, true).rate).toBe(0.35);
+  expect(playback(true, false, 1.4, false, false).rate).toBe(0);
+  expect(playback(false, true, 1.4, false, true).rate).toBe(0.35);
+});
