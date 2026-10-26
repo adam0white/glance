@@ -6,9 +6,11 @@ Remaining: Adam’s readiness decision and recorded F492/F465/F491 owner retests
 
 ### Source and deployed receipt
 
-Current gameplay source is signed `c8804a5d89b9a8cac6f6b8c49a79014630f4149a`, signature G with Codex trailer. Exact CI [40239951618](https://github.com/adam0white/glance/actions/runs/40239951618) succeeded. The v3 report records a normal 94-test lane and fresh clean deployment `829e924a-dab4-43e2-a381-528ab2e78969`. The live `/release.json`, rechecked for this documentation task, reports that commit, framework `3.0.0`, app `0.1.0` and `dirty:false`. Documentation-only commits do not require an app deployment; this is the gameplay deployment receipt, not a receipt for later documentation commits.
+Current delivered source is signed `1d09f42fb21347671fbfd7270acb01fc218628da`, signature G with Codex trailer. Exact CI [40249181785](https://github.com/adam0white/glance/actions/runs/40249181785) succeeded. The games-deferred report records the normal 112-test lane and clean deployment `19cceda9-d1b8-4299-b537-2e2c2a43c8cb`. Live `/release.json`, rechecked for this documentation task, reports that commit, framework `3.0.0`, app `0.1.0` and `dirty:false`. This is the application receipt; this documentation-only delta needs no app deployment.
 
-Source pins: HF package `3.0.0`, engine `2.23.0`, lab-client `0.4.10`, lab-kit `0.5.11`, TypeScript `7.0.2`. TypeScript support is 7+. Lab SDKs remain immutable artifacts. Released client `0.4.11` / kit `0.5.12` and their new Feedback choices are not adopted by this host.
+Source pins: HF package `3.0.0`, engine `2.23.0`, lab-client `0.4.11`, lab-kit `0.5.12`, TypeScript `7.0.2`. TypeScript support is 7+. Lab SDKs remain immutable artifacts. The custom Feedback form uses shared `FEEDBACK_LABELS` and `sendFeedbackLabel`. Selecting “I’m stopping” or “I’m confused” sends nothing. Ordinary Submit sends the choice with any verdict and note; a note receipt does not prove optional run-chunk delivery.
+
+The original five-night default remains unchanged. The unchecked “A longer watch” option starts `extended-1`: twelve nights through the second Friday at authored Valley or Upper dam. Upper has longer walks and slower routing. Standing requests depend on new local level readings and HF decisions. Bilal may accept paid relief gauge cover after travel and briefing, without gate or engineering authority. Reports retain subjective figures and written-time slips. Extended doubts are compared with known outcomes at dawn. Practice is a separate branch; sleeping forecasts remain silent.
 
 ### Replay and continuation evidence
 
@@ -20,17 +22,15 @@ These are source fixture and admission proofs using a synthetic shelf sink. They
 
 ### Browser evidence and limits
 
-The v3 worker verified the production manifest in existing signed-in Chrome. Its proposed safety isolation was rejected before game navigation. The accepted fallback checked an exact served-byte local mirror in existing Chrome, plus actual live WebKit 27.2, at 360×690, 1280×800 and 768×1024. Checks covered the received-report note, removal, persistent goal, loaded fonts, overflow and app errors. The report records 28 captured served assets and the production HTML font rewrite.
+The current games-deferred delivery records existing Chrome public title/sample checks and controlled live WebKit extended-play checks at 360×690 and 1280×800. Chrome did not resume or start a game. WebKit checked the extended start, gate inspector, arrangement and quiet-choice selection with submission traffic blocked. The report distinguishes these receipts from the later mirror-policy instruction.
 
-This does not prove production Chrome persistence, owner-save behavior, offline behavior, shared-shelf ownership or a human journey. Owner storage was preserved. Do not turn the three-size bounded v3 evidence into an unqualified four-size Chromium/WebKit completion claim.
+This is bounded two-size evidence. It does not establish all-four-size or enlarged-text coverage, production Chrome gameplay/persistence, ordinary shelf ownership, cross-host CAS, a human journey or Adam’s acceptance. Earlier v3 three-size mirror/WebKit evidence belongs to the earlier source, not this delivery.
 
 ### Documentation scope and next work
 
-README now explains the literal objective, controls, local save, recording, diagnostic replay and HF’s contribution. The existing information popover explains screens and gameplay; no explanatory app change is needed here. No standalone Credits surface exists. Per-person information is gameplay and remains outside this task.
+README describes the default and optional longer watch, controls, local save, recording, diagnostic replay and HF’s contribution. Existing information text still describes five nights and the original catch rule without an extended-mode condition. Conditional gameplay help belongs to games-deferred/plain4; docsweb routed the source finding and made no app edit. No standalone Credits surface exists.
 
-Historical design claims about speed controls, uniform bias and a missing reading flag need reconciliation with current source by games-deferred. The personal “another check” note is not a new dawn-scoring rule. Preserve the old requests and owner quotes until that owner resolves them.
-
-Full v3 evidence: `/Users/abdul/code/.lab-scratch/v3/glance/report.md` and `STATUS` (`LIVE_VERIFIED_CLEANED`). That worker removed its own source/deploy trees and branches, stopped its servers and closed its tabs; no production Chrome persistence claim was made. Current docs delivery receipts belong in `/Users/abdul/code/.lab-scratch/docsweb/glance-report.md`.
+Current delivery evidence: `/Users/abdul/code/.lab-scratch/games-deferred/glance-report.md` and `glance-handoff-for-docsweb.md`. Earlier native-transfer evidence above remains bounded to its stated fixtures and source. Documentation delta receipts belong in `/Users/abdul/code/.lab-scratch/docsweb/glance-delta-report.md`. Per-keeper bias, trough-only bias, readiness and the recorded owner/player retests remain due 2026-11-03. No owner acceptance is claimed.
 
 ## Historical handoff — 2026-10-24
 
