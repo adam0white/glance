@@ -65,7 +65,7 @@ function missLine(m: Dawn['misses'][number]): string {
   const who = NAMES[m.who];
   const f = m.gauge === 'level' ? spoken(m.said) : m.said.toFixed(2);
   const t = m.gauge === 'level' ? spoken(m.truth) : m.truth.toFixed(2);
-  return `<li><span class="t">actual read ${clock(m.at)}</span> ${who} said <b>${f}</b> at the ${m.gauge === 'level' ? 'level gauge' : 'weir'}. It was ${t}. <span class="soft">${esc(causeWords(m))}.</span>${m.caught ? ' <span class="caught">You caught it.</span>' : ''}</li>`;
+  return `<li><span class="t">Reading at ${clock(m.at)}</span> ${who} said <b>${f}</b> at the ${m.gauge === 'level' ? 'level gauge' : 'weir'}. It was ${t}. <span class="soft">${esc(causeWords(m))}.</span>${m.caught ? ' <span class="caught">You caught it.</span>' : ''}</li>`;
 }
 
 export function reportBody(d: Dawn, _crew: boolean, sample = false): string {
@@ -75,7 +75,7 @@ export function reportBody(d: Dawn, _crew: boolean, sample = false): string {
     <canvas id="chart" class="chart" aria-label="${sample ? 'In this sample night, opening the gate lowered the water behind the dam. The river rose later. The water stayed below the top of the dam and the town stayed dry.' : 'The true water level and the reported readings'}"></canvas>
     <p class="soft legend"><span class="key red"></span> The red line shows the true water level. <span class="key dot"></span> The dots show reported readings, at the actual reading time.</p>
     <div class="houses"><span class="soft">Mill Lane</span>${houseRow(4, d.overtopped ? 'flooded' : d.mill)}<span class="soft">square</span>${houseRow(6, d.overtopped ? 'flooded' : d.square)}</div>
-    ${d.doubts ? `<h3>Readings you doubted</h3>${d.doubts.length ? `<ul>${d.doubts.map((r) => `<li>${esc(NAMES[r.who as keyof typeof NAMES] ?? 'Nerys')}, actual read ${clock(r.at)}, ${r.gauge} gauge: reported ${r.value.toFixed(2)}${r.gauge === 'gate' ? ' turns' : ''}; ${r.gauge === 'gate' ? 'the gate setting was' : 'the known value was'} ${r.truth.toFixed(2)}${r.gauge === 'gate' ? ' turns' : ''}. ${r.wrong ? 'The reading was off.' : 'The reading was close to the known value.'}</li>`).join('')}</ul>` : '<p>You left no doubt marks tonight.</p>'}` : ''}
+    ${d.doubts ? `<h3>Readings you doubted</h3>${d.doubts.length ? `<ul>${d.doubts.map((r) => `<li>${esc(NAMES[r.who as keyof typeof NAMES] ?? 'Nerys')}, Reading at ${clock(r.at)}, ${r.gauge} gauge: reported ${r.value.toFixed(2)}${r.gauge === 'gate' ? ' turns' : ''}; ${r.gauge === 'gate' ? 'the gate setting was' : 'the known value was'} ${r.truth.toFixed(2)}${r.gauge === 'gate' ? ' turns' : ''}. ${r.wrong ? 'The reading was off.' : 'The reading was close to the known value.'}</li>`).join('')}</ul>` : '<p>You left no doubt marks tonight.</p>'}` : ''}
     ${d.misses.length ? `<h3>Where the board was wrong</h3><ul class="misses">${d.misses.slice(0, 6).map(missLine).join('')}</ul><p class="soft">${catchWords(d.edition ?? (d.extended ? 'extended-1' : undefined))} ${caught ? `You caught ${count(caught)} of ${count(d.misses.length)}.` : 'You caught none of them.'}</p>` : '<p>Every reading tonight was close enough to the true value.</p>'}
     ${d.dozes.map((z) => `<p class="soft">${NAMES[z.who]} fell asleep on watch, ${clock(z.from)} to ${clock(z.to)}.</p>`).join('')}
     ${d.strain.map((id) => `<p class="soft">${NAMES[id]} hurt his shoulder while turning the wheel. He did not tell you.</p>`).join('')}

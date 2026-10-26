@@ -250,7 +250,7 @@ describe('desk sheets and reading labels', () => {
         },
         false,
       ),
-    ).toContain('actual read 23:00');
+    ).toContain('Reading at 23:00');
   });
   it('uses segments for who goes and keeps four gauge reading labels', async () => {
     const debug = await boot();
