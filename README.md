@@ -4,7 +4,7 @@
 
 You work at the river authority’s night desk. Keep water below the top of the dam. Keep the town dry, or warn people before it floods. By default, you work five nights, Monday to Friday. The week ends at Friday’s first light, or when water comes over the dam.
 
-For a new game, “A longer watch” is unchecked. Selecting it starts the `extended-1` watch: twelve nights through the second Friday, at Valley or Upper dam. Upper has longer walks and slower water routing to town. Water keeps flowing between nights.
+For a new game, “A longer watch” is unchecked. Selecting it starts the `extended-2` watch: twelve nights through the second Friday, at Valley or Upper dam. Upper is harder, with longer walks and slower water routing to town. Water keeps flowing between nights. Saved `extended-1` watches continue with their original rules.
 
 Every reading on the board is a keeper’s report. It can be wrong. “Read” is the time he wrote down, including any mistake. “Reported” is when his report reached you.
 
@@ -18,6 +18,8 @@ Every reading on the board is a keeper’s report. It can be wrong. “Read” i
 - At dawn, compare the actual water curve with the reported readings. Earlier morning pages remain available at the desk. The tally is optional at the end.
 
 In the longer watch, a standing request waits for a new local level reading; the keeper can refuse or defer the gate work. Bilal may accept paid relief gauge rounds after travel and briefing. He has no gate or engineering authority. Compare the keepers’ received figures and mark doubts for the dawn review of known outcomes. Readings and written times remain uncertain. Dawn practice runs a separate branch without changing the actual save, history or recording. Sleeping keepers give no forecast.
+
+For catch credit at dawn, ask for the same gauge again within twenty minutes of the wrong reading. A lightning flash within twenty minutes also counts for a wrong level reading. In a new longer watch, marking that report as doubted also counts. Saved `extended-1` watches count only doubt marks. These rules do not make a report certain.
 
 The information button explains the current screen. The menu offers Resume, Feedback, Full screen, All games, one recording switch and New game with confirmation.
 

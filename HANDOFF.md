@@ -1,5 +1,33 @@
 # Handoff
 
+## Current state — 2026-10-25, edition facts
+
+Remaining: Adam’s real-input, feel and readiness decision and recorded F492/F465/F491 owner retests, target 2026-11-03. The playtest director may run the authorized HF3 lab panel, with the short watch as default and the longer watch optional. Friends’ playtests and Show HN remain paused. This documentation task runs no rounds and does not change a director-held R1 deployment. Games-deferred owns design/Deferred reconciliation; plain4 owns gameplay wording. No owner acceptance or closure of those tasks is claimed.
+
+### Delivered source and behavior
+
+Games-deferred delivered signed `710c6965f5015f523b3b7f70a6f7883e553a777b` (signature G, Codex trailer). Exact [CI 40256473768](https://github.com/adam0white/glance/actions/runs/40256473768) succeeded. Its normal lane passed 117 tests across 16 files, lint and types, with 43 existing warnings. Clean Cloudflare deployment `090ea24b-ffbc-41a3-a95d-c17eec4be4bf` reported that source, HF `3.0.0`, app `0.1.0` and `dirty:false`. These are the delivered application receipts, not a new live check by this documentation worker. This two-file documentation change requires no app deployment.
+
+Source pins remain HF package `3.0.0`, engine `2.23.0`, lab-client `0.4.11`, lab-kit `0.5.12` and TypeScript `7.0.2` (support 7+). Lab SDK artifacts remain immutable.
+
+The default is five nights. Selecting “A longer watch” starts `extended-2`: twelve nights through the second Friday at Valley or harder Upper dam. Saved `extended-1` continues its original simulation and catch rules. Title, About, contextual help, dawn and tally now follow the selected or saved edition. The seven later-night desk observations use received reports or information already revealed on morning pages; they do not expose hidden water or private states.
+
+For default and new `extended-2` catch credit, the simulation checks a later same-gauge reread request within twenty minutes, or a lightning flash within twenty minutes for a level report. New `extended-2` also credits a doubt mark on that report. Saved `extended-1` remains doubt-only. The dawn doubt list names the gauge: marked gate reports and known gate settings use turns, not water depth. Reports and written times remain uncertain. Standing requests, Bilal’s limited relief role, separate dawn practice and sleeping-keeper forecast silence remain as described in README.
+
+### Evidence and limits
+
+The delivery checked existing signed-in Chrome and controlled repository WebKit at 360×690 and 1280×800 using a literal live-byte static mirror with production services blocked. Checks included default/selected title and help, new `extended-2` dawn, and saved `extended-1` dawn in WebKit, with gate/level fixtures and reachable controls. The initial phone-labelled Chrome run actually used 1680×977; it was discarded and repeated at actual 360×690.
+
+This is bounded two-size builder evidence, not all-four-size or enlarged-text coverage. It proves no production storage journey, Feedback Submit, cross-host CAS, ordinary ownership transfer, player/human journey, week-two panel result or owner readiness. The named seeded raw default and saved `extended-1` exports stayed byte-identical; all three edition fixtures replayed exactly. Earlier native-transfer receipts remain historical fixture proofs with their original limits below.
+
+Authoritative delivery files: `/Users/abdul/code/.lab-scratch/games-deferred/glance-week2-delivery-receipt.json` and `glance-week2-report.md`; routing status is in that directory’s `STATUS`. Documentation review, hashes and delivery receipts are kept under `/Users/abdul/code/.lab-scratch/docsweb/glance-edition-facts-*`.
+
+## Prior handoff preserved verbatim — 2026-10-25
+
+The entire prior handoff follows unchanged. Its current/pending statements describe that earlier stage; the edition-aware help and week-two receipt above supersede those statements. Prior owner instructions, retarget dates, faith/Deferred wording and historical receipts retain their original text.
+
+# Handoff
+
 ## Current state — 2026-10-25
 
 Remaining: Adam’s readiness decision and recorded F492/F465/F491 owner retests, target 2026-11-03. The playtest director may run the authorized HF3 lab panel. Friends’ playtests and Show HN remain paused. This documentation task runs no rounds. Games-deferred owns design/Deferred reconciliation; plain4 owns gameplay wording. This handoff does not close those tasks or the other games.
