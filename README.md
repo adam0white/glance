@@ -39,7 +39,7 @@ The [Human Framework](https://github.com/adam0white/human-framework) supplies th
 
 The exact package pin is `@adam0white/human-framework@3.0.0`; its simulation engine is `2.23.0`. Glance’s package version is `0.1.0`, distinct from its export edition. The immutable lab artifacts are client `0.4.11` and kit `0.5.12`.
 
-Use Node 24 or later and TypeScript 7 or later.
+Use the shared Node 26.12.0 runtime (`.node-version` and `.nvmrc`), pnpm 12.14.0 and TypeScript 7 or later. Run `pnpm install --frozen-lockfile` before the commands below.
 
 - `npm run dev`: play locally.
 - `npm run check:lane`: run this repository’s full lint, typecheck and locked test lane before a commit.
@@ -49,3 +49,5 @@ Use Node 24 or later and TypeScript 7 or later.
 Design: [docs/design.md](docs/design.md). Playtests: [docs/playtests/](docs/playtests/). Framework requests: [docs/hf-requests.md](docs/hf-requests.md). Delivery evidence and limits: [HANDOFF.md](HANDOFF.md).
 
 MIT licence. The water model also preserves the [Sun fdlibm notice](public/THIRD-PARTY-NOTICES.txt).
+
+Dependency changes use pnpm and the committed `pnpm-lock.yaml`. The npm lock was imported with exact dependency versions preserved. Do not regenerate an npm lock or install a separate runtime per worktree. The pnpm policy uses strict engines/peers, no hoisting, hardlinks, a 24-hour third-party release delay and a scoped exemption for owned `@adam0white/*` packages.

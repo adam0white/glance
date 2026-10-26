@@ -1,5 +1,9 @@
 # Handoff
 
+## Dependency installation — 2026-10-26
+
+The dependency configuration uses pnpm 12.14.0 and shared Node 26.12.0. Install with `pnpm install --frozen-lockfile`; `npm run` still runs existing scripts. `pnpm-lock.yaml` imports the npm lock without intended dependency changes. Overrides and exact native build permissions live in `pnpm-workspace.yaml`. Do not regenerate an npm lock or install a runtime per worktree. Configuration delivery requires the full lane, unchanged raw build outputs against the npm baseline, signed source and exact green CI. This conversion does not deploy the app or establish game-readiness acceptance.
+
 ## Current state — 2026-10-25, edition facts
 
 Remaining: Adam’s real-input, feel and readiness decision and recorded F492/F465/F491 owner retests, target 2026-11-03. The playtest director may run the authorized HF3 lab panel, with the short watch as default and the longer watch optional. Friends’ playtests and Show HN remain paused. This documentation task runs no rounds and does not change a director-held R1 deployment. Games-deferred owns design/Deferred reconciliation; plain4 owns gameplay wording. No owner acceptance or closure of those tasks is claimed.

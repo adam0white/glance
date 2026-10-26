@@ -6,7 +6,7 @@
   "description": "The Glance: a storm week on the radio to a small dam. Every reading is what a tired keeper saw.",
   "license": "MIT",
   "engines": {
-    "node": ">=24"
+    "node": "26.12.0"
   },
   "scripts": {
     "dev": "vite",
@@ -35,15 +35,5 @@
     "vitest": "5.0.5",
     "wrangler": "4.152.0"
   },
-  "allowScripts": {
-    "esbuild@0.28.2": true,
-    "workerd@1.20261019.1": true,
-    "fsevents": false
-  },
-  "overrides": {
-    "sharp": "0.35.5",
-    "miniflare": {
-      "undici": "7.30.1"
-    }
-  }
+  "packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6"
 }
