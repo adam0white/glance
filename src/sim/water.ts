@@ -32,7 +32,17 @@ const COMP = 0.4;
 const BRIDGE_T = 35;
 const TOWN_T = 25;
 
+/** Host-authored dam maps. Both staffs use the same lip/crest marks; basin area,
+ * downstream routing and actual footpath length differ. This is no general water planner.
+ */
+export const DAM_MAPS = {
+  valley: { name: 'Valley dam', storageFactor: 1, bridgeMinutes: BRIDGE_T, pathExtra: 0, weirExtra: 0 },
+  upper: { name: 'Upper dam', storageFactor: 0.8, bridgeMinutes: 48, pathExtra: 3, weirExtra: 8 },
+} as const;
+
 export interface Water {
+  /** Authored basin geometry; absent preserves the original water edition. */
+  basin?: 'valley' | 'upper';
   /** Reservoir level on the staff gauge (m). */
   level: number;
   /** Catchment store (cumec-minutes, scaled). */
@@ -100,10 +110,10 @@ export function stepWater(w: Water, rain: number): void {
   w.wet = Math.min(1, w.wet + rain * 0.00012);
   const qin = inflowOf(w);
   const qout = releaseOf(w);
-  w.level += (qin - qout) * K;
+  w.level += (qin - qout) * K * DAM_MAPS[w.basin ?? 'valley'].storageFactor;
   if (w.level < SILL) w.level = SILL;
   if (w.level >= CREST) w.overtopped = true;
-  w.routed += (qout - w.routed) / BRIDGE_T;
+  w.routed += (qout - w.routed) / DAM_MAPS[w.basin ?? 'valley'].bridgeMinutes;
   w.town += (rain * 0.035 - w.town) / TOWN_T;
 }
 

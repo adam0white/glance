@@ -12,3 +12,9 @@ Filed 2026-10-19 against HF 2.7.0, and appended to `~/code/human-framework/docs/
 - Item 1 is answered by `Affordance.forecastAt { comfortAt, spentAt }` and `forecastThresholds(aff)` in HF 2.8.0. The game sets `{ comfortAt: 0.78, spentAt: 0.97 }` on its work offers. Finding: the threshold is a cliff, not a dial. At `comfortAt` 0.74 and below, keepers refuse the wheel through the small hours and every policy except the oracle loses the dam by night 2 or 3 (measured at 0.66, 0.68, 0.70, 0.72 and 0.74). At 0.78, over 6 seeds: idle overtops 6/6, trusting 3/6, careful 4/6, oracle 0/6.
 - Items 2 (involuntary sleep onset) and 3 (estimate a quantity) are deferred by HF to engine 2.10. The host workarounds stay.
 - Item 4 stays host-side.
+
+## Host adoption candidate (2026-10-25)
+
+Installed HF 3.0.0 exports `enableDoze`, `setDozeContext`, `readDoze` and `estimateQuantity`. Items 2 and 3 are answered by released APIs. The longer-watch edition adopts them; unmarked runs retain the earlier host workarounds and exact continuation. The generic request is not reopened as a missing HF faculty. A real radio or handover alarm wakes a dozing keeper. Quantity observations consume the person’s seeded RNG only on an actual read. Dawn uses the released varied/cause-aware `reviewLine` while keeping the actual review record.
+
+Lab client 0.4.11 and kit 0.5.12 are immutable release artifacts, not an SDK npm-publication dependency. The custom Feedback form consumes their exported `FEEDBACK_LABELS` and `sendFeedbackLabel`. Selection alone sends nothing. Submit uses the ordinary note receipt and recording/privacy contract.

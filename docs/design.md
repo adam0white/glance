@@ -35,7 +35,7 @@ The dam overtopping ends the week (the dawn page still comes). Achievement is th
 
 ## Rules taken from the consults
 
-1. A night is 22:00 to 06:00. Playback runs automatically: brisk quiet work, reading time for new radio words, and time held during an inspection or information popover. Each simulation minute still runs; the first new event ends a fast batch. There is no speed chooser.
+1. A night is 22:00 to 06:00. Playback runs automatically: brisk quiet work, reading time for new radio words, and time held during an inspection or information popover. Each simulation minute still runs; the first new event ends a fast batch. The owner restored optional speed choices on 2026-10-22; see the updates below.
 2. No meter for a person. State shows in words, handwriting, gait on the map and the dawn notes.
 3. Every error has a cause in the keeper's true state and a tell the player could have read; the dawn page names the cause.
 4. World randomness is keyed by seed, night and minute (pattern from The Pass), so one input never moves the storm.
@@ -48,18 +48,33 @@ The dam overtopping ends the week (the dawn page still comes). Achievement is th
 - **Readings.** The keeper's read is the truth plus an error whose size grows as his true clarity falls and whose bias is his character (Dai low, Callum high, more so when afraid). His spoken confidence is computed the same way from his perceived state. Skipped walks and copied figures are host rolls from true sleepiness, keyed by the minute.
 - **Noticing.** At the dam the keeper perceives what is there (the rain, the gate, a tree on the screen) through HF `perceive`, whose limited attention narrows with fatigue and fear. He mentions only what got through.
 
-## Deferred (target: after the owner's first playtest)
+## Extended watch candidate (2026-10-25)
 
-- Standing orders for the radio drop-outs ("if it passes four-five, give her a turn").
-- A second week, other dams, a recruited third keeper.
-- Keep both readings on the board when two keepers disagree (Tomás, Priya). The gauge now shows the previous figure and who read it; a fuller side-by-side is the target for the owner's first playtest.
-- Flag a reading as doubted and have the dawn score it (Tomás). Target: owner's first playtest.
-- Carry the water level and the keepers' tiredness from one night to the next (Tomás). Target: second week.
-- A per-keeper bias readout beyond the margin note (Priya). Target: second week; it may undercut the core loop, so decide with the owner.
-- A weather forecast and a what-if replay of the night (Priya). Target: second week.
-- Doze hazard and quantity estimates from HF (docs/hf-requests.md items 2 and 3). Target: HF engine 2.10.
-- Dai's low bias is uniform before three as well as after (Gwen: "half a metre low every time is not tiredness"). Decide with the owner whether it should grow only in the trough. Target: owner's first playtest.
-- Resolved 2026-10-20 (F-228): written reading times retain the keeper's slips, labeled “read HH:MM (as written)” across the live board, drawing and sheets. Reading ages use that same written time. Radio arrivals say “reported HH:MM”; dawn explicitly reconstructs actual reading times. Simulation and export replay are unchanged. Owner accepts feel separately.
+The original five nights remain the default. A new game can opt into “A longer watch”. Its persisted rules are `extended-1`, with a Valley or Upper dam map. Unmarked runs keep their original decisions, RNG and replay. Both full imports and compact replay rebuild the pinned edition. The finite person-transfer projection stays `glance-4`: no new source dialect, skill recognition or body/calendar admission is added.
+
+- The longer watch runs through Saturday and Sunday to the second Friday. The same five HF people retain actual fatigue, sleep, strain and histories. Weather remains keyed by seed and absolute night.
+- Day cover sets the gate to one turn. Water flows through every intervening minute instead of assigning a new level. A daytime overtop ends the watch at its recorded time.
+- Upper dam has a wider basin, slower routing to town and longer walks. Staff marks remain at the same heights. These are authored host maps, not an HF water planner.
+- A standing request waits for a new local level reading, including during radio silence. A copied figure cannot trigger it. The keeper weighs the gate work through HF and can refuse or defer. It is a request, not an assurance of safety.
+- Bilal can be invited for gauge rounds during his existing five-day visit. HF weighs the invitation; travel and briefing occupy about fifty minutes of his actual activity. He can read gauges after arriving. He never operates the wheel or clears the debris screen. There is no sixth maintained person or new engineering qualification. Cover must be arranged again each night. His travel starts at the actual invitation minute. The authored travel/briefing pay becomes a material outcome only on successful completion. The two visitors’ local scenes end after their five-day visits; their saved identities and histories remain.
+- The weather bulletin gives a broad uncertain outlook. It does not expose keyed future peaks.
+- The phone stage retains its useful dam scene above the order sheet. The sheet scrolls within the remaining space instead of forcing the whole desk to scroll.
+- The live board retains each keeper’s latest actually received figure and written time. Radio-held reports stay hidden. A newer figure from one keeper does not erase another keeper’s disagreement.
+- Doubt marks in the longer watch are compared at dawn with actual known outcomes, including accurate figures that the player doubted. The original watch retains its original catch rule. Neither mark reveals correctness during play.
+- A separate dawn practice branch replays the same pinned opening and prior history, then submits an alternative opening gate request through HF. It does not change the actual logbook, local save, recording or browser shelf. Refusal remains possible.
+- The longer watch uses released HF `enableDoze` / `setDozeContext` and salient audible waking. The host resolves stopped work at `dozedAt`. It uses `estimateQuantity` only for real observations; character bias, poor light, fear and written-time slips stay host-authored. Unmarked runs keep the old workarounds.
+- Dawn retains the actual HF review of the watch before the later morning review replaces it. A requested nap that actually began can supply the ordered cause to `reviewLine`. Narration does not erase the recorded lapse. Dawn omits an unqualified kept-watch claim when actual doze spans overlap the watch; the raw HF review remains unchanged.
+
+Technical delivery and independent review receipts belong in the external games-deferred report. This source description is not owner acceptance or a playtest result.
+
+## Deferred — owner and player input
+
+- **Per-keeper bias readout (Priya): Adam, 2026-11-03.** Decide whether a numerical calibration would remove the information puzzle. The delivered comparison can use observed figures without exposing private bias.
+- **Dai’s trough-only bias (Gwen): Adam, 2026-11-03.** Her original report said “half a metre low every time is not tiredness”. Current `biasOf` already grows with impaired clarity; it is not uniform. The narrower choice of a bias that grows only after three remains the owner’s decision.
+- **Readiness and feel: Adam, 2026-11-03.** Keep the written-time retest (F-228), pacing/popovers/end tally (F-433/434), approved persistent desk (F-451/452), cast/receiving journey (F-465), recording linkage (F-491), plain English/setting/tablet reading (F-492/493) and current-build manifest behavior (F-496) as distinct owner/player checks. Their existing source receipts do not establish acceptance of this candidate.
+- **Lab panel and same-tester retest: playtest director, 2026-11-03.** This builder runs no rounds. Friends and Show HN remain paused until Adam accepts readiness. Historical after-first-play dates no longer defer engineering under Widened.
+
+Resolved historical source: F-228 preserves written slips as “read HH:MM (as written)”; radio arrivals use reported time; dawn can reconstruct actual read time. Keep those differences. The 2026-10-20 player reports remain verbatim in `docs/playtests/`.
 
 ## Owner pacing update (2026-10-21)
 

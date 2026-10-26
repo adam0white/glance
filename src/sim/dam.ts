@@ -6,9 +6,10 @@
  * Covers: the storm and the water (`water.ts`), the keepers' jobs (walk, read, turn the gate, rest, sleep) decided
  * through HF (decide/begin/finish; predict and bodyForecast for the telegraph), readings whose error comes from
  * the keeper's true state and whose words come from his felt state (`reading.ts`), noticing through HF `perceive`,
- * dozing and skipped walks as host rolls from true sleepiness, the inn by the bridge, the town warning, lightning,
+ * edition-pinned dozing (HF in the extended watch) and skipped walks from true sleepiness, the inn by the bridge, the town warning, lightning,
  * radio drop-outs, the tree on the screen, and the hours between nights lived through HF (home, review, sleep).
- * Does not cover: the town as people, standing orders, a second week.
+ * The extended watch adds conditional requests, an authored second basin, relief gauge cover and a second week.
+ * Does not cover: the town as people, automatic engineering authority or certain weather forecasts.
  */
 import {
   type Activity,
@@ -17,6 +18,7 @@ import {
   bodyForecast,
   type DecisionRecord,
   decide,
+  enableDoze,
   finish,
   forecastThresholds,
   injure,
@@ -25,18 +27,21 @@ import {
   type Person,
   perceive,
   predict,
+  readDoze,
   readPerson,
   restore,
   reviewed,
   reviewLine,
   type Suggestion,
   type SuggestionResolution,
+  seedVoice,
+  setDozeContext,
   snapshot,
   tick,
 } from '@adam0white/human-framework';
 import { canonicalPersona } from '@adam0white/lab-client';
 import { required } from '../required.ts';
-import { ALLOCATION, type CastId, lifeReady, makeVisitor, talk } from './cast.ts';
+import { ALLOCATION, type CastId, lifeReady, makeVisitor, talk, VISIT_FROM, VISIT_UNTIL } from './cast.ts';
 import { ENGINEER, KEEPERS, type KeeperId, makeKeeper, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
 import { admitResident, type Chapter, checkChapter, lifeAdmission } from './passport.ts';
 import {
@@ -45,6 +50,7 @@ import {
   clarityOf,
   confidenceOf,
   errorSd,
+  estimateRead,
   hedge,
   spoken,
   spokenFine,
@@ -53,6 +59,7 @@ import { DRAW, hashNormal, hashUnit } from './rng.ts';
 import {
   bridgeOf,
   CREST,
+  DAM_MAPS,
   dayWater,
   inflowOf,
   LIP,
@@ -69,6 +76,20 @@ import {
 
 export const GAME_VERSION = 'glance@4-deterministic-water';
 export const NIGHTS = 5;
+export interface WatchRules {
+  edition: 'extended-1';
+  dam: 'valley' | 'upper';
+}
+export function checkRules(rules: WatchRules | undefined): void {
+  if (
+    rules !== undefined &&
+    (rules.edition !== 'extended-1' ||
+      !['valley', 'upper'].includes(rules.dam) ||
+      Object.keys(rules).sort().join(',') !== 'dam,edition')
+  )
+    throw new Error('These watch rules are unknown. Start a new game.');
+}
+export const nightsOf = (s: GameState) => (s.rules ? 12 : NIGHTS);
 
 export type Gauge = 'level' | 'weir' | 'gate' | 'bridge';
 export type Place = 'hut' | 'gate' | 'staff' | 'weir';
@@ -77,6 +98,9 @@ export type Job = 'level' | 'weir' | 'gate' | 'stove' | 'nap' | 'clear';
 export type Input =
   | { at: number; kind: 'ask'; keeper: KeeperId; job: Job; target?: number; insist?: boolean }
   | { at: number; kind: 'talk'; person: CastId }
+  | { at: number; kind: 'standing'; keeper: KeeperId; threshold: number; target: number }
+  | { at: number; kind: 'cancel-standing'; keeper: KeeperId }
+  | { at: number; kind: 'recruit' }
   | { at: number; kind: 'doubt'; report: number; marked: boolean }
   | { at: number; kind: 'pause' | 'resume' }
   | { at: number; kind: 'ring' }
@@ -134,6 +158,9 @@ export interface KeeperState {
   idleUntil: number;
   /** Unanswered calls while dozing. */
   unanswered: number;
+  orderedNap?: boolean;
+  watchReview?: NonNullable<Person['review']>['last'];
+  watchReviewLine?: string;
   night: { asked: number; insisted: number; refused: number; complied: number; naps: number; turns: number };
   dozes: { from: number; to: number }[];
   trustAtOpen: number;
@@ -156,6 +183,9 @@ export interface Miss {
 }
 
 export interface Dawn {
+  daytimeLoss?: { at: number };
+  extended?: true;
+  doubts?: { at: number; who: Report['who']; gauge: Gauge; value: number; truth: number; wrong: boolean }[];
   night: number;
   series: { m: number; level: number; bridge: number; gate: number; rain: number }[];
   reports: Report[];
@@ -175,6 +205,9 @@ export interface Dawn {
 }
 
 export interface GameState {
+  rules?: WatchRules;
+  arrangements?: Partial<Record<KeeperId, { threshold: number; target: number; after: number }>>;
+  relief?: { until: number; night: number };
   version: string;
   seed: number;
   chapter: Chapter | null;
@@ -344,10 +377,97 @@ export const PLANS: NightPlan[] = [
   },
 ];
 
+/** Host-authored later watches. The weekend remains on the same calendar; nobody is reset. */
+export const EXTENDED_PLANS: NightPlan[] = [
+  ...PLANS,
+  {
+    title: 'Saturday',
+    keepers: ['callum'],
+    storm: { peakAt: 150, peak: 4, width: 65, base: 1 },
+    intro: ['Dai has the weekend off. Callum covers tonight. The wet ground still drains into the dam.'],
+    weir: true,
+    inn: true,
+    beats: [],
+  },
+  {
+    title: 'Sunday',
+    keepers: ['dai'],
+    storm: { peakAt: 340, peak: 5, width: 90, base: 1.4 },
+    intro: ['Callum is at home tonight. Dai takes the handover. Water is still arriving from the hills.'],
+    weir: true,
+    inn: true,
+    beats: [],
+  },
+  {
+    title: 'Second Monday',
+    keepers: ['dai', 'callum'],
+    storm: { peakAt: 190, peak: 8, width: 60, base: 2 },
+    intro: ['A second week begins. The same people return with the sleep and strain they actually had.'],
+    weir: true,
+    inn: true,
+    radio: [[210, 245]],
+    beats: [],
+  },
+  {
+    title: 'Second Tuesday',
+    keepers: ['callum'],
+    storm: { peakAt: 360, peak: 10, width: 80, base: 2 },
+    intro: ['Dai has a day away. Callum takes the night watch.'],
+    weir: true,
+    inn: true,
+    tree: 280,
+    beats: [],
+  },
+  {
+    title: 'Second Wednesday',
+    keepers: ['dai', 'callum'],
+    storm: { peakAt: 270, peak: 12, width: 55, base: 1.5 },
+    intro: ['The wind has turned. The keepers bring yesterday’s unfinished worries back to the hut.'],
+    weir: true,
+    inn: true,
+    radio: [
+      [110, 160],
+      [300, 340],
+    ],
+    beats: [],
+  },
+  {
+    title: 'Second Thursday',
+    keepers: ['dai', 'callum'],
+    storm: { peakAt: 320, peak: 9, width: 85, base: 2, second: { at: 90, peak: 5, width: 35 } },
+    intro: ['Rain arrives in two bands. There is no fresh start in the reservoir.'],
+    weir: true,
+    inn: true,
+    tree: 160,
+    beats: [],
+  },
+  {
+    title: 'Second Friday',
+    keepers: ['dai', 'callum'],
+    storm: { peakAt: 280, peak: 13, width: 75, base: 2.5 },
+    intro: ['This is the last watch of the second week. The town is still below you.'],
+    weir: true,
+    inn: true,
+    radio: [[230, 290]],
+    beats: [],
+  },
+];
+
 const nightStart = (night: number) => (night - 1) * 1440;
 export const watchFrom = (night: number) => nightStart(night) + WATCH_FROM;
 export const watchTo = (night: number) => watchFrom(night) + WATCH_MINUTES;
-export const planOf = (s: GameState) => PLANS[s.night - 1] as NightPlan;
+export const planOf = (s: GameState): NightPlan => {
+  const plan = (s.rules ? EXTENDED_PLANS : PLANS)[s.night - 1] as NightPlan;
+  if (!s.rules || !s.keepers.some((k) => k.id === 'bilal' && k.on)) return plan;
+  return { ...plan, keepers: [...plan.keepers, 'bilal'] };
+};
+export const nightTitle = (night: number) => (EXTENDED_PLANS[night - 1] as NightPlan)?.title ?? '';
+/** A qualitative weather-service outlook, not the keyed future rain samples. */
+export function weatherOutlook(s: GameState): string {
+  return s.night === 6 || s.night === 7
+    ? 'The weather service expects scattered showers. A heavier band may still reach the hills. Times and amounts are uncertain.'
+    : 'The weather service expects rain over the hills, with heavier spells overnight. The heaviest band may miss this valley. Times and amounts are uncertain.';
+}
 
 /** A keeper's scripted line is heard only when he is on, awake and the radio carries; the narrator, radio and inn always speak. */
 function beatHeard(s: GameState, beat: NightPlan['beats'][number]): boolean {
@@ -370,6 +490,92 @@ export function walkMinutes(a: Place, b: Place): number {
   if (a === b) return 0;
   return WALK[`${a}-${b}`] ?? WALK[`${b}-${a}`] ?? 10;
 }
+/** Upper-dam footpath is longer; no person or planner is invented by this map. */
+export function walkFor(s: GameState, a: Place, b: Place): number {
+  const map = DAM_MAPS[s.rules?.dam ?? 'valley'];
+  return walkMinutes(a, b) + (a !== b ? (a === 'weir' || b === 'weir' ? map.weirExtra : map.pathExtra) : 0);
+}
+
+/** Invite the existing technician for gauge rounds, never engineering or gate authority.
+ * The briefing and walk occupy his actual HF activity; no extra person or skill certificate is created.
+ */
+function recruitRelief(s: GameState) {
+  if (
+    !s.rules ||
+    s.phase !== 'watch' ||
+    s.radioOut ||
+    s.night < 2 ||
+    s.relief ||
+    s.keepers.some((k) => k.id === 'bilal' && k.on) ||
+    !lifeReady(s, 'bilal')
+  )
+    return;
+  const p = s.people.find((p) => p.id === 'bilal') as Person;
+  if (p.activity) return;
+  tick(p, s.minute);
+  seedVoice(p, ENGINEER, 0.5);
+  const cover = offer('relief-briefing', {
+    action: 'work',
+    label: 'travel to the hut and take the gauge-round briefing',
+    duration: 48,
+    effort: 0.4,
+    focus: 0.5,
+    material: 5,
+    advertises: { competence: 0.3, esteem: 0.1 },
+    forecastAt: NIGHT_FORECAST,
+  });
+  const rec = decide(
+    p,
+    [cover, offer('wait', { label: 'keep the evening free', advertises: { rest: 0.2 } })],
+    { suggestion: { voiceId: ENGINEER, affordanceId: cover.id, strength: 0.6 } },
+  );
+  if (rec.chosenAffordanceId !== cover.id || !begin(p, cover, rec)) {
+    say(s, 'bilal', 'I cannot cover a round tonight. My own work and rest come first.', 'answer');
+    return;
+  }
+  s.relief = { until: (p.activity as unknown as Activity).endsAt, night: s.night };
+  say(
+    s,
+    'bilal',
+    'I can come after my lamp repairs. Give me about fifty minutes for the walk and briefing. I can report gauges. I will not operate the gate.',
+    'answer',
+  );
+}
+function reliefMinute(s: GameState) {
+  if (
+    !s.relief ||
+    s.relief.night !== s.night ||
+    s.minute < s.relief.until ||
+    s.keepers.some((k) => k.id === 'bilal' && k.on)
+  )
+    return;
+  const p = s.people.find((p) => p.id === 'bilal') as Person;
+  if (!p.activity || p.activity.affordanceId !== 'relief-briefing' || p.activity.dozedAt !== undefined)
+    return;
+  endActivity(p, 'completed', p.activity.endsAt);
+  enableDoze(p, { posture: 'upright', stimulation: 1 });
+  s.keepers = s.keepers.filter((k) => k.id !== 'bilal');
+  s.keepers.push({
+    id: 'bilal',
+    on: true,
+    place: 'hut',
+    job: null,
+    pending: null,
+    deferred: null,
+    idleUntil: s.minute,
+    unanswered: 0,
+    night: blankNight(),
+    dozes: [],
+    trustAtOpen: trustOf(p),
+    strained: false,
+  });
+  say(
+    s,
+    'bilal',
+    'I have arrived and finished the briefing. I can cover the staff gauge and weir rounds. Dai and Callum keep responsibility for the gate.',
+    'answer',
+  );
+}
 const DEST: Record<Job, Place> = {
   level: 'staff',
   weir: 'weir',
@@ -381,8 +587,9 @@ const DEST: Record<Job, Place> = {
 
 // ---------- setup ----------
 
-export function newGame(seed: number, chapter?: Chapter): GameState {
-  const now = 15 * 60;
+export function newGame(seed: number, chapter?: Chapter, rules?: WatchRules): GameState {
+  checkRules(rules);
+  const now = VISIT_FROM;
   const s: GameState = {
     version: GAME_VERSION,
     chapter: chapter ? structuredClone(chapter) : null,
@@ -432,8 +639,14 @@ export function newGame(seed: number, chapter?: Chapter): GameState {
     inputs: [],
     applied: 0,
   };
+  if (rules) {
+    s.rules = structuredClone(rules);
+    s.arrangements = {};
+    s.water.basin = rules.dam;
+  }
   dayHours(s, 1);
   startNight(s, 1);
+  if (rules) for (const k of s.keepers) enableDoze(personOf(s, k.id), { posture: 'upright', stimulation: 1 });
   if (chapter) {
     checkChapter(chapter);
     s.people = s.people.map((p) => {
@@ -463,6 +676,12 @@ const blankNight = () => ({ asked: 0, insisted: 0, refused: 0, complied: 0, naps
 export const personOf = (s: GameState, id: KeeperId): Person => s.people.find((p) => p.id === id) as Person;
 export const keeperOf = (s: GameState, id: KeeperId): KeeperState =>
   s.keepers.find((k) => k.id === id) as KeeperState;
+/** Physical sleep, including HF doze after its stopped activity has been resolved. */
+export function keeperAsleep(s: GameState, id: KeeperId): boolean {
+  const p = personOf(s, id);
+  const activity = p.activity?.affordanceId;
+  return activity === 'doze' || activity === 'nap' || readDoze(p)?.asleep === true;
+}
 export const trustOf = (p: Person) => p.will.voices.find((v) => v.voiceId === ENGINEER)?.trust ?? 0.5;
 
 function offer(id: string, over: Partial<Affordance> = {}): Affordance {
@@ -507,11 +726,11 @@ function morningHours(s: GameState, night: number) {
 }
 
 function startNight(s: GameState, night: number) {
-  const plan = PLANS[night - 1] as NightPlan;
+  const plan = (s.rules ? EXTENDED_PLANS : PLANS)[night - 1] as NightPlan;
   s.night = night;
   s.phase = 'watch';
   s.minute = watchFrom(night);
-  if (night > 1) dayWater(s.water, 14);
+  if (night > 1 && !s.rules) dayWater(s.water, 14);
   s.board = { level: null, weir: null, gate: null, bridge: null };
   s.reports = [];
   s.held = [];
@@ -537,10 +756,34 @@ function startNight(s: GameState, night: number) {
     k.idleUntil = s.minute;
     k.unanswered = 0;
     k.night = blankNight();
+    if (s.rules) {
+      delete k.orderedNap;
+      delete k.watchReview;
+      delete k.watchReviewLine;
+    }
     k.dozes = [];
     k.trustAtOpen = trustOf(p);
     if (p.activity) endActivity(p, 'interrupted', Math.max(p.now, p.activity.startedAt));
     tick(p, Math.max(p.now, s.minute));
+  }
+  if (s.rules) {
+    s.arrangements = {};
+    delete s.relief;
+    say(s, 'radio', weatherOutlook(s), 'radio');
+    if (s.minute >= VISIT_UNTIL && watchFrom(night - 1) < VISIT_UNTIL)
+      say(
+        s,
+        'narrator',
+        'Bilal and Wren’s five-day visits have ended. They are no longer available for work or conversations here.',
+        'journal',
+      );
+    if (night > 1)
+      say(
+        s,
+        'narrator',
+        'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers return after their actual rest.',
+        'journal',
+      );
   }
   for (const line of plan.intro) say(s, 'narrator', line, 'journal');
   // The handover: the day man's figures, written at ten, read fresh.
@@ -616,7 +859,7 @@ export function offersFor(s: GameState, id: KeeperId, target?: number): Affordan
   list.push(
     work('level', {
       label: 'read the level',
-      duration: walkMinutes(k.place, 'staff') + 3,
+      duration: walkFor(s, k.place, 'staff') + 3,
       effort: 0.4,
       focus: 0.6,
       skill: { id: 'gauges', difficulty: 0.3 },
@@ -626,7 +869,7 @@ export function offersFor(s: GameState, id: KeeperId, target?: number): Affordan
     list.push(
       work('weir', {
         label: 'walk up to the weir',
-        duration: walkMinutes(k.place, 'weir') + 3,
+        duration: walkFor(s, k.place, 'weir') + 3,
         effort: 0.45,
         focus: 0.6,
         skill: { id: 'gauges', difficulty: 0.3 },
@@ -637,20 +880,20 @@ export function offersFor(s: GameState, id: KeeperId, target?: number): Affordan
   const gate = s.water.gate;
   const t = Math.max(0, Math.min(TURNS, target ?? Math.min(TURNS, gate + 1)));
   const turns = Math.abs(t - Math.round(gate));
-  if (target !== undefined)
+  if (target !== undefined && id !== 'bilal')
     list.push(
       work('gate', {
         label: t > gate ? 'open the gate' : t < gate ? 'close the gate' : 'check the gate',
-        duration: walkMinutes(k.place, 'gate') + Math.max(2, Math.ceil(turns / turnRate(s, k, p, false))),
+        duration: walkFor(s, k.place, 'gate') + Math.max(2, Math.ceil(turns / turnRate(s, k, p, false))),
         effort: turns === 0 ? 0.2 : t > gate ? 0.78 : 0.65,
         skill: { id: 'gate', difficulty: 0.5 },
       }),
     );
-  if (s.treeKnown && s.water.blocked)
+  if (s.treeKnown && s.water.blocked && id !== 'bilal')
     list.push(
       work('clear', {
         label: 'clear the debris screen',
-        duration: walkMinutes(k.place, 'gate') + 22,
+        duration: walkFor(s, k.place, 'gate') + 22,
         effort: 0.9,
         skill: { id: 'gate', difficulty: 0.6 },
       }),
@@ -658,7 +901,7 @@ export function offersFor(s: GameState, id: KeeperId, target?: number): Affordan
   list.push(
     offer('stove', {
       label: 'sit by the stove',
-      duration: walkMinutes(k.place, 'hut') + 20,
+      duration: walkFor(s, k.place, 'hut') + 20,
       effort: 0.03,
       advertises: { rest: 0.25, food: 0.05, water: 0.15 },
     }),
@@ -669,7 +912,7 @@ export function offersFor(s: GameState, id: KeeperId, target?: number): Affordan
         action: 'sleep',
         label: 'take a nap',
         mode: 'sleep',
-        duration: walkMinutes(k.place, 'hut') + 30,
+        duration: walkFor(s, k.place, 'hut') + 30,
         effort: 0,
         advertises: { sleep: 0.6, rest: 0.4 },
       }),
@@ -718,7 +961,7 @@ export function hint(s: GameState, id: KeeperId, job: Job, target?: number, insi
   };
   if (target !== undefined) out.target = target;
   // A sleeping man forecasts nothing.
-  const asleep = p.activity?.affordanceId === 'doze' || p.activity?.affordanceId === 'nap';
+  const asleep = keeperAsleep(s, id);
   if (aff?.followedBy && !asleep) out.forecast = forecastWords(p, aff);
   return out;
 }
@@ -788,6 +1031,40 @@ function applyPending(s: GameState) {
 function apply(s: GameState, inp: Input) {
   if (s.chapterPaused && inp.kind !== 'resume') return;
   switch (inp.kind) {
+    case 'cancel-standing': {
+      if (s.rules && s.arrangements && !s.radioOut) delete s.arrangements[inp.keeper];
+      return;
+    }
+    case 'standing': {
+      const k = s.keepers.find((k) => k.id === inp.keeper);
+      if (
+        !s.rules ||
+        s.phase !== 'watch' ||
+        s.radioOut ||
+        !k?.on ||
+        k.id === 'bilal' ||
+        !Number.isFinite(inp.threshold) ||
+        inp.threshold < 2 ||
+        inp.threshold > CREST ||
+        !Number.isInteger(inp.target) ||
+        inp.target < 0 ||
+        inp.target > TURNS
+      )
+        return;
+      s.arrangements ??= {};
+      s.arrangements[inp.keeper] = { threshold: inp.threshold, target: inp.target, after: s.minute };
+      say(
+        s,
+        'narrator',
+        `You leave a standing request for ${NAMES[k.id]}: after a new local level reading at or above ${inp.threshold.toFixed(1)}, consider setting the gate to ${inp.target} turns. He still decides whether he can do the work.`,
+        'journal',
+      );
+      return;
+    }
+    case 'recruit': {
+      recruitRelief(s);
+      return;
+    }
     case 'doubt': {
       const report = Number.isInteger(inp.report) ? s.reports[inp.report] : undefined;
       if (report && Object.values(s.board).includes(report) && typeof inp.marked === 'boolean')
@@ -813,7 +1090,7 @@ function apply(s: GameState, inp: Input) {
     case 'ask': {
       if (s.phase !== 'watch') return;
       const k = keeperOf(s, inp.keeper);
-      if (!k.on) return;
+      if (!k?.on || (k.id === 'bilal' && (inp.job === 'gate' || inp.job === 'clear'))) return;
       if (s.radioOut) {
         say(s, 'radio', `The radio has only static. ${NAMES[k.id]} can’t hear you.`, 'radio');
         return;
@@ -828,6 +1105,24 @@ function apply(s: GameState, inp: Input) {
         return;
       }
       const p = personOf(s, inp.keeper);
+      if (s.rules && readDoze(p)?.asleep) {
+        tick(p, s.minute);
+        perceive(p, [
+          {
+            kind: 'radio-alarm',
+            at: p.now,
+            channel: 'heard',
+            salience: 1,
+            near: true,
+            targetId: p.id,
+            summary: 'The desk calls urgently on the radio.',
+          },
+        ]);
+        const doze = k.dozes.at(-1);
+        if (doze) doze.to = s.minute;
+        if (p.activity?.dozedAt !== undefined) endActivity(p, 'interrupted', p.activity.dozedAt);
+        k.job = null;
+      }
       if (p.activity?.affordanceId === 'doze' || p.activity?.affordanceId === 'nap') {
         const dozing = p.activity.affordanceId === 'doze';
         k.unanswered += 1;
@@ -877,6 +1172,27 @@ function apply(s: GameState, inp: Input) {
     }
     case 'next': {
       if (s.phase !== 'dawn') return;
+      if (s.rules) {
+        // Background day keeper covers the wheel; same physical water store through all 16 hours.
+        s.water.gate = 1;
+        s.water.blocked = false;
+        for (let at = watchTo(s.night); at < watchFrom(s.night + 1); at++) {
+          stepWater(s.water, 0.35);
+          if (s.water.overtopped) {
+            const dawn = s.dawns.at(-1);
+            if (dawn) dawn.daytimeLoss = { at };
+            s.minute = at;
+            s.phase = 'end';
+            say(
+              s,
+              'narrator',
+              `The day keeper reports water over the top of the dam at ${clock(at)}. There will be no next watch.`,
+              'journal',
+            );
+            return;
+          }
+        }
+      }
       dayHours(s, s.night + 1);
       startNight(s, s.night + 1);
       return;
@@ -1000,7 +1316,8 @@ export function step(s: GameState): void {
       say(s, beat.who, beat.text, beat.who === 'radio' ? 'radio' : 'answer');
   if (s.nerys.ringing !== null && s.minute >= s.nerys.ringing) innAnswers(s);
   // Supporting people have their own HF bodies, not dam operating skills.
-  for (const p of s.people) if (!KEEPERS.includes(p.id as KeeperId)) tick(p, s.minute);
+  for (const p of s.people) if (!s.keepers.some((k) => k.id === p.id)) tick(p, s.minute);
+  if (s.rules) reliefMinute(s);
   // People.
   for (const k of s.keepers) if (k.on) keeperMinute(s, k, rain);
   if (m % 5 === 0) recordSeries(s, rain);
@@ -1043,7 +1360,23 @@ function weatherAt(s: GameState): number {
 
 function keeperMinute(s: GameState, k: KeeperState, rain: number) {
   const p = personOf(s, k.id);
+  if (s.rules) {
+    const sitting = k.place === 'hut' && k.job?.job === 'stove' && s.minute >= k.job.startedAt + k.job.walk;
+    setDozeContext(p, { posture: sitting ? 'seated' : 'upright', stimulation: sitting ? 0.1 : 1 });
+  }
   tick(p, s.minute);
+  if (s.rules) retainWatchReview(s, k, p);
+  if (s.rules && readDoze(p)?.asleep) {
+    if (p.activity?.dozedAt !== undefined) {
+      const from = p.activity.dozedAt;
+      endActivity(p, 'interrupted', from);
+      k.job = null;
+      k.dozes.push({ from, to: s.minute });
+    }
+    const doze = k.dozes.at(-1);
+    if (doze) doze.to = s.minute;
+    return;
+  }
   let a = p.activity;
   if (a && k.job) workMinute(s, k, p, a);
   a = p.activity;
@@ -1054,7 +1387,7 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
   if (a && (a.affordanceId === 'doze' || a.affordanceId === 'nap') && s.minute >= a.endsAt) a = null;
   // Dozing off by the stove: a host roll from true sleepiness (he does not choose it).
   const walking = k.job !== null && s.minute < k.job.startedAt + k.job.walk;
-  if (a && a.affordanceId === 'stove' && !k.pending && !walking) {
+  if (!s.rules && a && a.affordanceId === 'stove' && !k.pending && !walking) {
     const sl = readPerson(p).body.sleepiness;
     const q = Math.floor(s.minute / 15);
     if (sl > 0.84 && hashUnit(s.seed, DRAW.doze, s.night, q, KEEPERS.indexOf(k.id)) < (sl - 0.84) * 2.2) {
@@ -1152,6 +1485,11 @@ const LINES: Record<KeeperId, Record<'assented' | 'complied' | 'cannot', string[
       'I can’t do it yet. I have no energy left. Give me twenty minutes.',
     ],
   },
+  bilal: {
+    assented: ['I can cover a round of gauge readings.'],
+    complied: ['I will check, but I need rest afterwards.'],
+    cannot: ['I cannot cover that safely yet.'],
+  },
   callum: {
     assented: ['I’ll do it, sir.', 'I’m going, sir.', 'I’ll do it now.', 'Yes! I’ll do it.', 'I’ll go now.'],
     complied: ['Yes, I’ll do it, sir.', 'I’ll do it if you think so, sir.', 'OK. OK, I’m going.'],
@@ -1205,7 +1543,7 @@ function startJob(
       skip = true;
   }
   const to = skip ? k.place : DEST[job];
-  const walk = walkMinutes(k.place, to);
+  const walk = walkFor(s, k.place, to);
   const a2 = skip ? { ...aff, duration: 4 } : aff;
   if (!begin(p, a2, rec)) {
     k.idleUntil = s.minute + 4;
@@ -1214,7 +1552,11 @@ function startJob(
   const js: JobState = { job, from: k.place, to, walk, startedAt: s.minute, progress: 0, skip };
   if (job === 'gate') js.target = target ?? Math.round(s.water.gate);
   k.job = js;
-  if (job === 'nap') k.night.naps += 1;
+  if (job === 'nap') {
+    k.night.naps += 1;
+    if (s.rules && rec.suggestion && ['assented', 'complied'].includes(rec.suggestion.verdict))
+      k.orderedNap = true;
+  }
 }
 
 /** Turns per minute at the wheel: skill, true capacity, protest; the first turn of a cold gate is stiff. */
@@ -1358,7 +1700,8 @@ function readGauge(s: GameState, who: KeeperId, gauge: Gauge, skipped: boolean):
     KEEPERS.indexOf(who),
     gauge === 'level' ? 0 : 1,
   );
-  let value = truth + scale * (biasOf(who, c) + errorSd(c) * z);
+  const estimate = s.rules && !skipped ? estimateRead(p, who, truth, weatherAt(s), scale) : null;
+  let value = estimate ? estimate.value : truth + scale * (biasOf(who, c) + errorSd(c) * z);
   const prior = s.board[gauge];
   if (skipped && prior) value = prior.value;
   value = gauge === 'level' ? Math.round(value * 10) / 10 : Math.round(value * 100) / 100;
@@ -1370,7 +1713,7 @@ function readGauge(s: GameState, who: KeeperId, gauge: Gauge, skipped: boolean):
   // A tired man writes the wrong time: a tell on the board, never before the shift began.
   if (c.true < 0.38 && hashUnit(s.seed, DRAW.timeSlip, s.night, s.minute) < 0.4)
     wrote = Math.max(watchFrom(s.night), s.minute - 30);
-  const conf = confidenceOf(p, c);
+  const conf = estimate ? estimate.confidence : confidenceOf(p, c);
   const r: Report = {
     at: s.minute,
     wrote,
@@ -1384,6 +1727,21 @@ function readGauge(s: GameState, who: KeeperId, gauge: Gauge, skipped: boolean):
     skipped,
   };
   s.reports.push(r);
+  const order = s.arrangements?.[who];
+  if (s.rules && !skipped && gauge === 'level' && order && r.at > order.after && r.value >= order.threshold) {
+    const k = keeperOf(s, who);
+    if (!k.pending && !k.deferred && who !== 'bilal') {
+      k.pending = { s: suggestion('gate'), job: 'gate', target: order.target };
+      delete s.arrangements?.[who];
+      if (!s.radioOut)
+        say(
+          s,
+          who,
+          'My new reading meets your standing request. I will consider the gate work now.',
+          'answer',
+        );
+    }
+  }
   return r;
 }
 
@@ -1436,6 +1794,8 @@ export const clock = (m: number) => {
 function endActivity(p: Person, status: Outcome['status'], at: number) {
   const a = p.activity as Activity;
   const out: Outcome = { affordanceId: a.affordanceId, action: a.action, status, at };
+  if (a.affordanceId === 'relief-briefing' && status === 'completed')
+    out.material = a.affordance.material ?? 0;
   if (a.affordanceId === 'stove') out.needs = { water: 0.15, food: 0.05 };
   finish(p, out);
 }
@@ -1530,6 +1890,29 @@ function ownWatchLine(s: GameState, id: KeeperId, line: string): string {
   return xs[(s.night + s.seed) % xs.length] ?? line;
 }
 
+/** Retain the actual HF review of this watch before a later morning review replaces it.
+ * Cause changes narration only. The recorded missed/kept/resolved entries stay as HF wrote them.
+ */
+function retainWatchReview(s: GameState, k: KeeperState, p: Person) {
+  const review = p.review?.last;
+  if (
+    !review ||
+    review.day < Math.floor(watchFrom(s.night) / 1440) ||
+    (!review.missed.includes('my watch') && !review.kept.includes('my watch'))
+  )
+    return;
+  if (k.watchReview?.missed.includes('my watch') && !review.missed.includes('my watch')) return;
+  k.watchReview = structuredClone(review);
+  k.watchReviewLine = (
+    reviewLine(p, {
+      variety: true,
+      ...(k.orderedNap && review.missed.length === 1 && review.missed[0] === 'my watch'
+        ? { cause: 'ordered' as const }
+        : {}),
+    }) ?? ''
+  ).replace(/^Today/, 'Tonight');
+}
+
 function houseFate(firstAt: number | null, warnedAt: number | null): 'dry' | 'saved' | 'flooded' {
   if (firstAt === null) return 'dry';
   return warnedAt !== null && warnedAt <= firstAt - 25 ? 'saved' : 'flooded';
@@ -1571,13 +1954,49 @@ function closeNight(s: GameState, overtopped: boolean) {
       said: r.value,
       truth: r.truth,
       cause: r.cause,
-      caught: again || flash,
+      caught: s.rules ? r.doubted === true : again || flash,
     });
   }
+  if (s.rules)
+    for (const k of s.keepers) {
+      const p = personOf(s, k.id);
+      if (readDoze(p)?.asleep) {
+        tick(p, s.minute);
+        perceive(p, [
+          {
+            kind: 'handover-alarm',
+            at: p.now,
+            channel: 'heard',
+            salience: 1,
+            near: true,
+            targetId: p.id,
+            summary: 'The day keeper calls at the hut for the handover.',
+          },
+        ]);
+        const span = k.dozes.at(-1);
+        if (span) span.to = Math.min(s.minute, p.now);
+      }
+    }
   // Morning: home, review, sleep.
   s.minute = watchTo(night);
   morningHours(s, night);
+  if (s.rules) for (const k of s.keepers) if (k.on) retainWatchReview(s, k, personOf(s, k.id));
   const dawn: Dawn = {
+    ...(s.rules
+      ? {
+          extended: true as const,
+          doubts: s.reports
+            .filter((r) => r.doubted)
+            .map((r) => ({
+              at: r.at,
+              who: r.who,
+              gauge: r.gauge,
+              value: r.value,
+              truth: r.truth,
+              wrong: Math.abs(r.value - r.truth) >= (r.gauge === 'weir' ? 0.06 : 0.2),
+            })),
+        }
+      : {}),
     night,
     series,
     reports: s.reports,
@@ -1597,12 +2016,17 @@ function closeNight(s: GameState, overtopped: boolean) {
       .filter((k) => k.on)
       .map((k) => ({
         id: k.id,
-        line: ownWatchLine(s, k.id, reviewLine(personOf(s, k.id)) ?? ''),
+        line: s.rules
+          ? k.dozes.some((d) => d.to > d.from && d.from < watchTo(night) && d.to > watchFrom(night)) &&
+            k.watchReview?.kept.includes('my watch')
+            ? ''
+            : (k.watchReviewLine ?? '')
+          : ownWatchLine(s, k.id, reviewLine(personOf(s, k.id)) ?? ''),
         aboutYou: aboutYou(s, k, overtopped),
       })),
   };
   s.dawns.push(dawn);
-  s.phase = overtopped || night >= NIGHTS ? 'end' : 'dawn';
+  s.phase = overtopped || night >= nightsOf(s) ? 'end' : 'dawn';
 }
 
 export const levelCrest = CREST;
@@ -1630,8 +2054,14 @@ export function restoreState(json: GameState): GameState {
 }
 
 /** Rebuild a run from its seed and input log, stepping watch minutes until `until` (or the last input). */
-export function replay(seed: number, inputs: readonly Input[], until?: number, chapter?: Chapter): GameState {
-  const s = newGame(seed, chapter);
+export function replay(
+  seed: number,
+  inputs: readonly Input[],
+  until?: number,
+  chapter?: Chapter,
+  rules?: WatchRules,
+): GameState {
+  const s = newGame(seed, chapter, rules);
   for (const inp of inputs) {
     while (s.phase === 'watch' && !s.chapterPaused && s.minute < inp.at) step(s);
     s.inputs.push(inp);

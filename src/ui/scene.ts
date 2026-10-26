@@ -5,7 +5,7 @@
  */
 import { readPerson } from '@adam0white/human-framework';
 import { clock, type GameState, keeperOf, type Place, personOf, planOf } from '../sim/dam.ts';
-import { KEEPERS, type KeeperId, NAMES, WATCH_FROM } from '../sim/keepers.ts';
+import { type KeeperId, NAMES, WATCH_FROM } from '../sim/keepers.ts';
 import { rainAt } from '../sim/water.ts';
 import { readingTime } from './time.ts';
 
@@ -89,6 +89,11 @@ export function drawScene(canvas: HTMLCanvasElement, s: GameState, fx: SceneFx, 
   const plan = planOf(s);
   const m = s.minute - (Math.floor(s.minute / 1440) * 1440 + WATCH_FROM);
 
+  if (s.rules) {
+    ctx.fillStyle = soft;
+    ctx.font = '11px Literata, serif';
+    ctx.fillText(s.rules.dam === 'upper' ? 'Upper dam · wider basin · longer paths' : 'Valley dam', 12, 12);
+  }
   // Hills.
   ctx.strokeStyle = soft;
   ctx.lineWidth = 1.2;
@@ -284,7 +289,7 @@ export function drawScene(canvas: HTMLCanvasElement, s: GameState, fx: SceneFx, 
   }
 
   // The keepers.
-  for (const id of KEEPERS) {
+  for (const { id } of s.keepers) {
     const kp = keeperOf(s, id);
     if (!kp.on) continue;
     figure(ctx, s, id, ink, soft, rope);
@@ -308,7 +313,7 @@ export function drawScene(canvas: HTMLCanvasElement, s: GameState, fx: SceneFx, 
 export function keeperPoint(s: GameState, id: KeeperId): Pt {
   const kp = keeperOf(s, id);
   const j = kp.job;
-  const off = id === 'callum' ? 20 : 0;
+  const off = id === 'bilal' ? 40 : id === 'callum' ? 20 : 0;
   if (!j) return { x: PLACES[kp.place].x + off, y: PLACES[kp.place].y };
   const t = j.walk === 0 ? 1 : Math.min(1, (s.minute - j.startedAt) / j.walk);
   const a = PLACES[j.from];
@@ -327,7 +332,7 @@ function figure(
   const p = personOf(s, id);
   const pt = keeperPoint(s, id);
   const act = p.activity?.affordanceId;
-  const asleep = act === 'doze' || act === 'nap';
+  const asleep = act === 'doze' || act === 'nap' || !!p.body.doze?.since;
   // Posture from how he is: a tired man stoops (the only hint of his state that is not words).
   const stoop = Math.min(1, Math.max(0, (readPerson(p).body.sleepiness - 0.5) * 2)) * 4;
   ctx.strokeStyle = ink;
@@ -374,7 +379,7 @@ export function sceneHit(
   const sx = (x - (cw - W * k) / 2) / k;
   const sy = y / k;
   if (sx < 0 || sx > W || sy < 0 || sy > SCENE_H) return null;
-  for (const id of KEEPERS) {
+  for (const { id } of s.keepers) {
     if (!keeperOf(s, id).on) continue;
     const pt = keeperPoint(s, id);
     if (Math.hypot(sx - pt.x, sy - (pt.y - 8)) < 22) return id;

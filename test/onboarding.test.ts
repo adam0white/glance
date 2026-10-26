@@ -662,3 +662,20 @@ it('lets the player mark a received reading and remove the note through ordinary
   debug.step(1);
   expect(run.board.level?.doubted).toBe(false);
 });
+
+it('keeps quiet feedback choices local until Submit and uses the SDK literal label', async () => {
+  const debug = await boot();
+  await click('new');
+  await click('menu');
+  await click('send-word');
+  const { lab } = await import('../src/ui/lab.ts');
+  vi.mocked(lab.sendFeedback).mockClear();
+  const button = document.querySelector<HTMLButtonElement>('[data-feedback-label="confused"]');
+  expect(button?.textContent).toBe("I'm confused");
+  button?.click();
+  expect(lab.sendFeedback).not.toHaveBeenCalled();
+  await click('feedback-send');
+  await vi.waitFor(() => expect(lab.sendFeedback).toHaveBeenCalledOnce());
+  expect(vi.mocked(lab.sendFeedback).mock.calls[0]?.[0]).toBe("I'm confused");
+  expect(vi.mocked(lab.sendFeedback).mock.calls[0]?.[1]?.run).toEqual(exportRun(state(debug), '3.0.0'));
+});

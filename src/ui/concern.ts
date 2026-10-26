@@ -1,4 +1,4 @@
-import { clock, type GameState, type Job, keeperOf, personOf, planOf, walkMinutes } from '../sim/dam.ts';
+import { clock, type GameState, type Job, keeperOf, personOf, planOf, walkFor } from '../sim/dam.ts';
 import { NAMES } from '../sim/keepers.ts';
 import { CREST, LIP } from '../sim/water.ts';
 
@@ -21,20 +21,21 @@ export function concernLines(s: GameState): string[] {
     const a = personOf(s, id).activity;
     const j = k.job;
     let words = 'He is available';
-    if (a?.affordanceId === 'doze') words = 'He is not answering';
+    if (a?.affordanceId === 'doze' || personOf(s, id).body.doze?.since !== undefined)
+      words = 'He is not answering';
     else if (a?.affordanceId === 'nap') words = 'He is asleep, as you asked';
     else if (j) {
       words = `He is ${jobs[j.job].doing}`;
       if (j.job === 'level' || j.job === 'weir') {
         const destination = j.job === 'level' ? 'staff' : 'weir';
-        const due = j.startedAt + walkMinutes(j.from, destination) + 3;
+        const due = j.startedAt + walkFor(s, j.from, destination) + 3;
         words += `. His report is expected ${expected(due)}`;
       } else if (j.job === 'gate') {
         const reported = s.board.gate?.value;
         if (reported === undefined) words += '. His report is expected after the walk and work';
         else {
           const turns = Math.abs((j.target ?? reported) - reported);
-          const due = j.startedAt + walkMinutes(j.from, 'gate') + Math.max(2, turns * 7);
+          const due = j.startedAt + walkFor(s, j.from, 'gate') + Math.max(2, turns * 7);
           words += `. His report is expected ${expected(due)}`;
         }
       } else if (a) {

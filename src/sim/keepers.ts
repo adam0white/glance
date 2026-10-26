@@ -7,10 +7,10 @@ import { createPerson, MINUTES_PER_YEAR, type Person, promise } from '@adam0whit
 
 import { canonicalSpec } from './cast.ts';
 
-export type KeeperId = 'dai' | 'callum';
+export type KeeperId = 'dai' | 'callum' | 'bilal';
 export const KEEPERS: readonly KeeperId[] = ['dai', 'callum'];
 export const ENGINEER = 'engineer';
-export const NAMES: Record<KeeperId, string> = { dai: 'Dai', callum: 'Callum' };
+export const NAMES: Record<KeeperId, string> = { dai: 'Dai', callum: 'Callum', bilal: 'Bilal' };
 
 /** The watch: 22:00 to 06:00. */
 export const WATCH_FROM = 22 * 60;

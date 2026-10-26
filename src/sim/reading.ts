@@ -8,7 +8,7 @@
  * named on the dawn page. Does not cover: lying. A keeper never reports what he believes is false; a skipped walk
  * is reported as the last figure he holds, which he believes is near enough.
  */
-import { emotionLevel, type Person, readPerson } from '@adam0white/human-framework';
+import { emotionLevel, estimateQuantity, type Person, readPerson } from '@adam0white/human-framework';
 import type { KeeperId } from './keepers.ts';
 
 export interface Clarity {
@@ -56,6 +56,7 @@ export function clarityOf(p: Person, weather: number): Clarity {
 /** Bias of a reading in metres (negative reads low), by character and state. */
 export function biasOf(id: KeeperId, c: Clarity): number {
   // Dai rounds the way he hopes it is: down. Callum reads high because he is frightened of missing it.
+  if (id === 'bilal') return 0;
   if (id === 'dai') return -0.32 * (1 - c.true);
   return 0.18 * (1 - c.true) + 0.22 * c.fear;
 }
@@ -88,6 +89,7 @@ export function spokenFine(x: number): string {
 /** The words around a figure, by confidence. Deterministic pick by `k`. */
 export function hedge(id: KeeperId, conf: number, fig: string, k: number): string {
   const pick = (xs: string[]) => xs[Math.abs(k) % xs.length] as string;
+  if (id === 'bilal') return conf > 0.55 ? `I read ${fig}.` : `I make it about ${fig}. I am not sure.`;
   if (id === 'dai') {
     if (conf > 0.62)
       return pick([
@@ -114,4 +116,18 @@ export function hedge(id: KeeperId, conf: number, fig: string, k: number): strin
     `It's… ${fig}? It could be higher, sir.`,
     `I read ${fig}, or maybe higher. It is hard to see.`,
   ]);
+}
+
+/** Extended-watch observation only. Uses the released HF estimate and its felt confidence;
+ * host-authored light difficulty, character bias and fear remain local. Consumes HF RNG once
+ * for an actual nonzero reading. Never call from render/forecast or for a skipped walk.
+ * No truth, body-state number or calibration is returned to player-facing controls.
+ */
+export function estimateRead(p: Person, who: KeeperId, truth: number, weather: number, scale: number) {
+  const c = clarityOf(p, weather);
+  const estimate = estimateQuantity(p, { truth, difficulty: 0.35 + 0.35 * weather });
+  return {
+    value: estimate.value + scale * biasOf(who, c),
+    confidence: estimate.confidence * confidenceOf(p, c),
+  };
 }

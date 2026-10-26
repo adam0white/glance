@@ -13,19 +13,34 @@ import { required } from '../required.ts';
  */
 
 import { FRAMEWORK_VERSION } from '@adam0white/human-framework';
-import { personaChannel, watchPersonaCheckpoint } from '@adam0white/lab-client';
+import {
+  FEEDBACK_LABELS,
+  type FeedbackLabel,
+  personaChannel,
+  sendFeedbackLabel,
+  watchPersonaCheckpoint,
+} from '@adam0white/lab-client';
 import { Continuity, LOCAL_KEY, watchShelfPreference } from '../continuity.ts';
-import { ALLOCATION, CAST, type CastId, discoveriesFor, rememberedConversation } from '../sim/cast.ts';
+import {
+  ALLOCATION,
+  CAST,
+  type CastId,
+  discoveriesFor,
+  rememberedConversation,
+  VISIT_UNTIL,
+} from '../sim/cast.ts';
 import {
   clock,
+  EXTENDED_PLANS,
   exportRun,
   type GameState,
   type Gauge,
   type Hint,
   hint,
   type Job,
+  keeperAsleep,
   keeperOf,
-  NIGHTS,
+  nightsOf,
   PLANS,
   personOf,
   planOf,
@@ -34,10 +49,13 @@ import {
   reportWords,
   type Said,
   step,
-  walkMinutes,
+  type WatchRules,
+  walkFor,
   watchFrom,
+  weatherOutlook,
 } from '../sim/dam.ts';
 import { KEEPERS, type KeeperId, NAMES } from '../sim/keepers.ts';
+import { practiceNight } from '../sim/practice.ts';
 import { importCurrent } from '../sim/run.ts';
 import { CREST, LIP, TURNS } from '../sim/water.ts';
 import { concernLines, thresholdWords } from './concern.ts';
@@ -45,6 +63,7 @@ import { drawDawn } from './dawn.ts';
 import { lab } from './lab.ts';
 import { SAMPLE_DAWN } from './opener.ts';
 import { eventStamp, playback } from './playback.ts';
+import { receivedReadings } from './readings.ts';
 import { reportBody } from './report.ts';
 import { drawScene, type SceneFx, sceneHit } from './scene.ts';
 import { tallyBody } from './tally.ts';
@@ -282,6 +301,7 @@ function title() {
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">You work at a night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
     <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. You work five nights, Monday to Friday. The week ends at Friday's first light, or when water comes over the top of the dam.</p>
+    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — wider basin, longer paths</option></select></details>
     ${labMode() ? '<button class="reading-row" id="other">Lab tools <span>▸</span></button>' : ''}</div>
     <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
     ${labMode() ? `<p class="credit">People by the Human Framework ${FRAMEWORK_VERSION}</p>` : ''}</div></div>`;
@@ -360,12 +380,24 @@ function otherWays() {
   });
 }
 
-async function beginWeek(localOnly = false) {
+async function beginWeek(localOnly = false, chosen?: WatchRules) {
+  const extended = (document.getElementById('extended-watch') as HTMLInputElement | null)?.checked;
+  const rules: WatchRules | undefined =
+    chosen ??
+    (extended
+      ? {
+          edition: 'extended-1',
+          dam:
+            (document.getElementById('dam-choice') as HTMLSelectElement)?.value === 'upper'
+              ? 'upper'
+              : 'valley',
+        }
+      : undefined);
   continuity.invalidate();
   cancelAnimationFrame(raf);
   const previous = s;
   try {
-    const prepared = await continuity.fresh(Date.now() >>> 0, localOnly === true);
+    const prepared = await continuity.fresh(Date.now() >>> 0, localOnly === true, rules);
     s = prepared;
     const generation = continuity.generation;
     clearSave();
@@ -379,7 +411,7 @@ async function beginWeek(localOnly = false) {
       last = performance.now();
       raf = requestAnimationFrame(frame);
     }
-    startError(error, () => void beginWeek(localOnly));
+    startError(error, () => void beginWeek(localOnly, rules));
   }
 }
 
@@ -546,7 +578,7 @@ function mornings() {
       .reverse()
       .map(
         (dawn) =>
-          `<button class="reading-row" data-morning="${dawn.night}">${PLANS[dawn.night - 1]?.title} · first light ▸</button>`,
+          `<button class="reading-row" data-morning="${dawn.night}">${EXTENDED_PLANS[dawn.night - 1]?.title} · first light ▸</button>`,
       )
       .join(''),
   );
@@ -556,7 +588,7 @@ function mornings() {
       if (!morning) return;
       const page = dialog(
         'past-morning',
-        `${PLANS[morning.night - 1]?.title} · first light`,
+        `${EXTENDED_PLANS[morning.night - 1]?.title} · first light`,
         reportBody(morning, morning.night >= 3),
       );
       drawDawn(page.querySelector('#chart') as HTMLCanvasElement, morning);
@@ -574,6 +606,7 @@ function feedbackName() {
 }
 function sendWord() {
   let sent = false;
+  let feedbackLabel: FeedbackLabel | undefined;
   const d = dialog(
     'feedback',
     'Feedback',
@@ -584,6 +617,12 @@ function sendWord() {
       ['quit', "I'd stop here"],
     ]
       .map(([id, label]) => `<button data-verdict="${id}" aria-pressed="false">${label}</button>`)
+      .join('')}</div>
+    <div class="verdicts" role="group" aria-label="What is happening?">${Object.entries(FEEDBACK_LABELS)
+      .map(
+        ([label, words]) =>
+          `<button data-feedback-label="${label}" aria-pressed="false">${esc(words)}</button>`,
+      )
       .join('')}</div>
     <label class="feedback-note">What happened? What did you want to do? What got in the way?<textarea id="feedback-note" rows="4"></textarea></label>
     <label>Your name (optional)<input id="feedback-name" type="text" maxlength="60" value="${esc(feedbackName())}" autocomplete="name"></label><p class="soft">A name links this device’s past and future play history. Leave it empty to avoid linking a name to your play history.</p>
@@ -618,6 +657,16 @@ function sendWord() {
       });
     });
   });
+  d.querySelectorAll<HTMLButtonElement>('[data-feedback-label]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (sent || send.disabled) return;
+      const label = button.dataset.feedbackLabel as FeedbackLabel;
+      feedbackLabel = feedbackLabel === label ? undefined : label;
+      d.querySelectorAll<HTMLButtonElement>('[data-feedback-label]').forEach((other) => {
+        other.setAttribute('aria-pressed', String(other.dataset.feedbackLabel === feedbackLabel));
+      });
+    });
+  });
   send.addEventListener('click', async () => {
     if (sent) {
       closeDialogs();
@@ -627,13 +676,16 @@ function sendWord() {
     const note = (d.querySelector('#feedback-note') as HTMLTextAreaElement).value;
     const who = (d.querySelector('#feedback-name') as HTMLInputElement).value.trim().slice(0, 60);
     try {
-      const message = `${verdict ? `[${verdict}] ` : ''}${note}`;
+      const text = `${verdict ? `[${verdict}] ` : ''}${note}`;
+      const message = feedbackLabel
+        ? [FEEDBACK_LABELS[feedbackLabel], text].filter(Boolean).join('\n\n')
+        : text;
       const sharePlay = feedbackSharePlay(personaChoice);
-      const receipt = await lab.sendFeedback(message, {
-        name: who,
-        run: feedbackRun(),
-        sharePlay,
-      });
+      const options = { name: who, run: feedbackRun(), sharePlay };
+      const receipt =
+        feedbackLabel && !text
+          ? await sendFeedbackLabel(lab, feedbackLabel, options)
+          : await lab.sendFeedback(message, options);
       const sentMessage = `Sent. Your note is stored. Reference ${receipt}.`;
       try {
         localStorage.setItem('hf-lab-feedback-name', who);
@@ -681,7 +733,7 @@ function watch() {
   skipUntil = 0;
   app.innerHTML = `<div class="watch">${topbar('<span id="night"></span> · <span class="clock" id="clock"></span>')}
     <div class="state-strip"><div id="concern" class="attention keeper-chips" aria-live="polite"></div><div id="clock-rate" role="status"></div></div>
-    <div class="desk-reminder"><p id="desk-goal">Until Friday's first light: keep the dam below its crest and the town dry, or warned in time.</p><button id="compare-observations">Compare observations</button></div>
+    <div class="desk-reminder"><p id="desk-goal">Until ${s.rules ? 'the second Friday' : 'Friday'}'s first light: keep the dam below its crest and the town dry, or warned in time.</p><button id="compare-observations">Compare observations</button></div>
     <div class="desk-main"><div class="desk-picture"><div class="scene-zone"><canvas id="scene" class="scene" aria-label="The dam, as reported"></canvas><div id="latest-radio" class="latest-radio hand"></div></div><div class="board" id="board"></div></div>
     <div class="desk-context"><div class="sheet" id="sheet"></div>${s.dawns.length ? '<button id="mornings" class="reading-row">This week’s mornings</button>' : ''}<div class="actionbar" id="skip-bar"><button id="skip" aria-label="Skip to the next event">Skip ⏩</button><span id="skip-caption" class="soft"></span></div></div></div></div>`;
   bindTopbar();
@@ -861,14 +913,20 @@ function drawBoard() {
 function wasLine(r: Report | null, g: Gauge): string {
   const empty = '<span class="was soft" aria-hidden="true"></span>';
   if (!s || !r || g === 'gate') return empty;
+  const others = receivedReadings(s, g).filter((x) => x.who !== r.who);
+  if (others.length)
+    return others
+      .map(
+        (prev) =>
+          `<span class="was soft other-reader">${prev.who === 'nerys' ? 'Nerys' : NAMES[prev.who]}: ${printed(prev, g)}, ${readingTime(prev)}</span>`,
+      )
+      .join('');
   const prev = s.reports
-    .filter((x) => x.gauge === g && x !== r && x.at >= watchFrom(s?.night ?? 1) && x.at <= r.at)
+    .filter((x) => x.gauge === g && x !== r && !s?.held.includes(x) && x.at <= r.at)
     .at(-1);
   if (!prev) return empty;
-  // Same man: "was". Another man: his name, so a disagreement shows as two names.
-  const lead = prev.who === r.who ? 'was' : prev.who === 'nerys' ? 'Nerys' : NAMES[prev.who as KeeperId];
   const fig = g === 'level' ? prev.value.toFixed(1) : printed(prev, g).replace(' m', '');
-  return `<span class="was soft ${prev.who === r.who ? 'same-reader' : 'other-reader'}">${lead} ${fig}, ${readingTime(prev)}</span>`;
+  return `<span class="was soft same-reader">was ${fig}, ${readingTime(prev)}</span>`;
 }
 
 function sayClass(x: Said): string {
@@ -952,12 +1010,13 @@ function drawConcern() {
   if (!el) return;
   const lines = concernLines(s);
   const ids = planOf(s).keepers;
-  const body = `${s.radioOut ? '<span class="radio-chip">The radio has static.</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: She is available.'))}</button>` : ''}`;
+  const body = `${s.rules ? `<button class="keeper-chip" data-watch-arrangements="1">Watch arrangements</button>` : ''}${s.radioOut ? '<span class="radio-chip">The radio has static.</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: She is available.'))}</button>` : ''}`;
   if (!setHtml(el, body)) return;
   el.querySelectorAll<HTMLElement>('[data-k]').forEach((b) => {
     b.addEventListener('click', () => openSheet({ kind: 'keeper', who: b.dataset.k as KeeperId }));
   });
   el.querySelector('[data-inn]')?.addEventListener('click', () => openSheet({ kind: 'inn' }));
+  el.querySelector('[data-watch-arrangements]')?.addEventListener('click', watchArrangements);
 }
 
 function drawSheet() {
@@ -1016,13 +1075,17 @@ function drawSheet() {
       });
     return;
   }
-  const who = sheet.who;
+  const who =
+    sheet.kind === 'gauge' && sheet.gauge === 'gate' && sheet.who === 'bilal'
+      ? (planOf(s).keepers.find((id) => id !== 'bilal') ?? 'dai')
+      : sheet.who;
   const crew = planOf(s).keepers.length > 1;
   const crewRow = crew
     ? `<div class="crew small segmented" role="group" aria-label="Who goes"><span class="segment-label">Who goes</span>${planOf(
         s,
       )
-        .keepers.map(
+        .keepers.filter((id) => !(sheet?.kind === 'gauge' && sheet.gauge === 'gate' && id === 'bilal'))
+        .map(
           (id) =>
             `<button data-k="${id}" aria-pressed="${id === who}" class="${id === who ? 'on' : ''}"><b>${NAMES[id]}</b><span class="soft">${whereWords(id)}</span></button>`,
         )
@@ -1065,7 +1128,8 @@ function drawSheet() {
       { job: 'nap', label: 'Take a nap' },
     ];
     if (planOf(s).weir) jobs.splice(1, 0, { job: 'weir', label: 'Go to the weir' });
-    if (s.treeKnown && s.water.blocked) jobs.push({ job: 'clear', label: 'Clear the debris screen' });
+    if (who !== 'bilal' && s.treeKnown && s.water.blocked)
+      jobs.push({ job: 'clear', label: 'Clear the debris screen' });
     body = verbButtons(
       jobs.map((j) => ({
         h: deskHint(s as GameState, who, j.job),
@@ -1117,7 +1181,7 @@ function drawSheet() {
 /** A personal desk note. It does not tell the keeper or reveal whether a report is right. */
 function readingNote(st: GameState, report: GameState['board'][Gauge]): string {
   if (!report) return '';
-  return `<div class="reading-note"><button id="reading-note" data-report="${st.reports.indexOf(report)}" aria-pressed="${report.doubted === true}">${report.doubted ? 'Remove the check mark' : 'Mark this reading for another check'}</button><p class="hint">${report.doubted ? 'You marked this reading for another check. Ask for a new reading when you are ready.' : 'This adds your own note. It does not say whether the reading is right.'}</p></div>`;
+  return `<div class="reading-note"><button id="reading-note" data-report="${st.reports.indexOf(report)}" aria-pressed="${report.doubted === true}">${report.doubted ? 'Remove the check mark' : st.rules ? 'Doubt this reading' : 'Mark this reading for another check'}</button><p class="hint">${st.rules ? 'This records your doubt about this report. At dawn, compare it with the known outcome. The mark does not reveal whether it is wrong.' : report.doubted ? 'You marked this reading for another check. Ask for a new reading when you are ready.' : 'This adds your own note. It does not say whether the reading is right.'}</p></div>`;
 }
 function bindReadingNote(el: HTMLElement) {
   const button = el.querySelector<HTMLButtonElement>('#reading-note');
@@ -1210,7 +1274,7 @@ function deskHint(st: GameState, who: KeeperId, job: Job, target?: number, insis
   const h = hint(st, who, job, target, insist);
   const activity = personOf(st, who).activity?.affordanceId;
   if (st.radioOut) return { ...h, short: 'The radio is out.', minutes: 0, forecast: '' };
-  if (activity === 'doze' || activity === 'nap')
+  if (activity === 'doze' || activity === 'nap' || (st.rules && keeperAsleep(st, who)))
     return { ...h, short: 'Call and wait for his answer.', minutes: 0, forecast: '' };
   return h;
 }
@@ -1235,13 +1299,13 @@ function whereWords(id: KeeperId): string {
   if (!s) return '';
   const k = keeperOf(s, id);
   const a = personOf(s, id).activity?.affordanceId;
-  if (a === 'doze' || a === 'nap')
+  if (a === 'doze' || a === 'nap' || (s.rules && keeperAsleep(s, id)))
     return a === 'nap' ? 'He is asleep, as you asked.' : 'He is not answering.';
   const j = k.job;
   if (j) {
     const reading = j.job === 'level' || j.job === 'weir';
     const walking =
-      s.minute < j.startedAt + (reading ? walkMinutes(j.from, j.job === 'level' ? 'staff' : 'weir') : j.walk);
+      s.minute < j.startedAt + (reading ? walkFor(s, j.from, j.job === 'level' ? 'staff' : 'weir') : j.walk);
     const where = {
       level: 'the level gauge',
       weir: 'the weir',
@@ -1311,14 +1375,15 @@ function dawn() {
   cancelAnimationFrame(raf);
   const d = s.dawns.at(-1);
   if (!d) return;
-  const next = PLANS[d.night] ?? null;
+  const next = (s.rules ? EXTENDED_PLANS : PLANS)[d.night] ?? null;
   lab.screen(`night ${d.night}: dawn`);
   lab.milestone(`night ${d.night} done`);
   screen = 'dawn';
   app.innerHTML = `<div class="page screen dawn">${topbar(`${planOf(s).title} · first light`)}<div class="page-body">
-    ${s.phase === 'end' ? `<p class="week-end" role="status">${d.overtopped ? 'The week ends here. Water came over the top of the dam.' : 'It is first light after Friday night. The week is over. Your watch is done.'}</p>` : ''}
+    ${s.phase === 'end' ? `<p class="week-end" role="status">${d.daytimeLoss ? 'The watch ends here. The dam went over during the following day.' : d.overtopped ? 'The week ends here. Water came over the top of the dam.' : 'It is first light after Friday night. Your watch is done.'}</p>` : ''}
     ${reportBody(d, planOf(s).keepers.length > 1)}
     </div><div class="actionbar">
+      <button id="practice">Try a separate practice branch</button>
       ${s.phase === 'dawn' && next ? `<button class="primary" id="next">${esc(next.title)} night</button>` : ''}
       ${s.phase === 'end' ? '<button class="primary" id="end">Read the week’s outcome</button>' : ''}
     </div>
@@ -1330,13 +1395,87 @@ function dawn() {
     if (!s) return;
     queueInput(s, { kind: 'next' });
     writeSave();
-    watch();
+    if (s.phase === 'watch') watch();
+    else dawn();
   });
+  document.getElementById('practice')?.addEventListener('click', practiceDialog);
   document.getElementById('end')?.addEventListener('click', ending);
   document.getElementById('export')?.addEventListener('click', download);
   document.getElementById('send')?.addEventListener('click', sendWord);
 
   window.scrollTo(0, 0);
+}
+
+function practiceDialog() {
+  if (!s || s.phase === 'watch') return;
+  const actual = s;
+  const d = dialog(
+    'practice',
+    'Separate practice branch',
+    '<p>Your actual watch stays in the logbook. This branch uses the same opening people and weather seed. The keeper may refuse your alternative request.</p><label for="practice-turns">Opening gate request</label><select id="practice-turns">' +
+      Array.from({ length: 7 }, (_, n) => `<option value="${n}">${n} turns</option>`).join('') +
+      '</select><button id="run-practice">Try this request</button><div id="practice-result"></div>',
+  );
+  d.querySelector('#run-practice')?.addEventListener('click', () => {
+    const branch = practiceNight(
+      actual,
+      Number((d.querySelector('#practice-turns') as HTMLSelectElement).value),
+    );
+    const dawn = branch.dawns.at(-1);
+    if (!dawn) return;
+    const result = d.querySelector('#practice-result') as HTMLElement;
+    result.innerHTML =
+      '<p><b>Practice branch. This is not the actual watch.</b></p>' +
+      reportBody(dawn, planOf(branch).keepers.length > 1);
+    drawDawn(result.querySelector('canvas') as HTMLCanvasElement, dawn);
+  });
+}
+function watchArrangements() {
+  if (!s?.rules) return;
+  const current = s;
+  const d = dialog(
+    'watch-arrangements',
+    'Watch arrangements',
+    `<p>${esc(weatherOutlook(current))}</p><p>${current.rules?.dam === 'upper' ? 'Upper dam has a wider basin and longer paths. Releases take longer to reach town.' : 'Valley dam has the familiar basin and paths.'}</p><p>A standing request waits for a new local level reading. The keeper considers the gate work through the same decision as a radio request, even if the radio is out. A copied figure cannot trigger it.</p><label for="standing-keeper">Keeper</label><select id="standing-keeper">${planOf(
+      current,
+    )
+      .keepers.filter((id) => id !== 'bilal')
+      .map((id) => `<option value="${id}">${NAMES[id]}</option>`)
+      .join(
+        '',
+      )}</select><label for="standing-threshold">When the keeper reads at least</label><select id="standing-threshold"><option value="4.5">4.5 m</option><option value="5">5.0 m</option><option value="5.5">5.5 m</option></select><label for="standing-target">Consider setting the gate to</label><select id="standing-target">${Array.from({ length: 7 }, (_, n) => `<option value="${n}">${n} turns</option>`).join('')}</select><button id="set-standing">Leave this request</button><button id="clear-standing">Cancel this keeper’s request</button><p>These are requests, not promises. Keep checking the reports.</p>${Object.entries(
+      current.arrangements ?? {},
+    )
+      .map(
+        ([id, a]) =>
+          `<p>${NAMES[id as KeeperId]} has a request for ${a?.target} turns after a reading of ${a?.threshold.toFixed(1)} m.</p>`,
+      )
+      .join(
+        '',
+      )}<p>Bilal may cover gauge rounds during his five-day visit, after his repairs, travel and a briefing. He has no gate authority. His body and other duties can prevent cover.</p>${current.night >= 2 && current.minute < VISIT_UNTIL && !current.keepers.some((k) => k.id === 'bilal' && k.on) ? '<button id="invite-relief">Invite Bilal for tonight’s gauge rounds</button>' : ''}<p id="arrangement-result" role="status"></p>`,
+  );
+  const enqueue = (input: Parameters<typeof queueInput>[1]) => {
+    if (s !== current) return;
+    queueInput(current, input);
+    writeSave();
+    (d.querySelector('#arrangement-result') as HTMLElement).textContent =
+      'The request is queued. Close this page to let the watch continue and hear the answer.';
+  };
+  d.querySelector('#set-standing')?.addEventListener('click', () =>
+    enqueue({
+      kind: 'standing',
+      keeper: (d.querySelector('#standing-keeper') as HTMLSelectElement).value as KeeperId,
+      threshold: Number((d.querySelector('#standing-threshold') as HTMLSelectElement).value),
+      target: Number((d.querySelector('#standing-target') as HTMLSelectElement).value),
+    }),
+  );
+  d.querySelector('#clear-standing')?.addEventListener('click', () =>
+    enqueue({
+      kind: 'cancel-standing',
+      keeper: (d.querySelector('#standing-keeper') as HTMLSelectElement).value as KeeperId,
+    }),
+  );
+  d.querySelector('#invite-relief')?.addEventListener('click', () => enqueue({ kind: 'recruit' }));
 }
 
 // ---------- the week ----------
@@ -1347,15 +1486,17 @@ function ending() {
   lab.screen('ending');
   lab.milestone('ending reached');
   const ds = s.dawns;
-  const held = ds.every((d) => !d.overtopped);
+  const held = ds.every((d) => !d.overtopped && !d.daytimeLoss);
   const flooded = ds.filter((d) => d.overtopped || d.mill === 'flooded').length;
   const misses = ds.reduce((a, d) => a + d.misses.length, 0);
   const caught = ds.reduce((a, d) => a + d.misses.filter((m) => m.caught).length, 0);
-  const verdict = !held
-    ? 'Water came over the top of the dam on your watch. There will be an inquiry, and they will read the log.'
-    : ds.length === NIGHTS && flooded === 0
-      ? 'You worked five nights, and the lane never flooded without warning. You checked the keepers’ readings carefully.'
-      : `The dam held all week. Mill Lane flooded ${flooded === 1 ? 'once' : `${flooded} times`} without warning.`;
+  const verdict = ds.some((d) => d.daytimeLoss)
+    ? 'The day keeper reported water over the top of the dam after your last night. There will be no next watch.'
+    : !held
+      ? 'Water came over the top of the dam on your watch. There will be an inquiry, and they will read the log.'
+      : ds.length === nightsOf(s) && flooded === 0
+        ? 'You completed every watch, and the lane never flooded without warning. You checked the keepers’ readings carefully.'
+        : `The dam held all week. Mill Lane flooded ${flooded === 1 ? 'once' : `${flooded} times`} without warning.`;
   screen = 'end';
   app.innerHTML = `<div class="page screen dawn ending">${topbar('The week is over')}<div class="page-body">
     <h2>The week is over</h2>
@@ -1363,12 +1504,12 @@ function ending() {
     <ul class="week">${ds
       .map(
         (d) =>
-          `<li><b>${PLANS[d.night - 1]?.title}</b> ${d.overtopped ? 'Water came over the dam.' : d.spilled ? 'Water flowed into the spillway.' : 'The dam held.'} Mill Lane ${d.overtopped || d.mill === 'flooded' ? 'flooded without warning' : d.mill === 'saved' ? 'flooded after a warning' : 'stayed dry'}. You caught ${d.misses.filter((m) => m.caught).length} of ${d.misses.length} wrong readings.</li>`,
+          `<li><b>${EXTENDED_PLANS[d.night - 1]?.title}</b> ${d.daytimeLoss ? 'The dam held through this night, then went over during the following day.' : d.overtopped ? 'Water came over the dam.' : d.spilled ? 'Water flowed into the spillway.' : 'The dam held.'} Mill Lane ${d.overtopped || d.mill === 'flooded' ? 'flooded without warning' : d.mill === 'saved' ? 'flooded after a warning' : 'stayed dry'}. You caught ${d.misses.filter((m) => m.caught).length} of ${d.misses.length} wrong readings.</li>`,
       )
       .join('')}</ul>
     <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong readings during the week.` : ''}</p>
     ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(l.aboutYou)}</p></div>`).join('')}
-    <div id="closing-tally"></div><button class="reading-row" id="back">${PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
+    <div id="closing-tally"></div><button class="reading-row" id="back">${EXTENDED_PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
     <div class="actionbar ending-actions"><div><button id="send">Feedback</button>${labMode() ? '<button id="export">Download this run</button>' : ''}</div><button class="primary" id="again">New game</button></div></div>`;
   bindTopbar();
   updateTally();

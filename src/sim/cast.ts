@@ -5,6 +5,12 @@ import { createPerson, MINUTES_PER_YEAR, type Person, type PersonSpec } from '@a
 import { canonicalCast, castForGame } from '@adam0white/lab-client';
 import type { GameState } from './dam.ts';
 
+/** Both visitors' authored five-day arrangements start on the opening Monday afternoon.
+ * Keeping their Person history after this boundary does not renew local work or conversation access.
+ */
+export const VISIT_FROM = 15 * 60;
+export const VISIT_UNTIL = VISIT_FROM + 5 * 1440;
+
 export type CastId = 'dai' | 'callum' | 'nerys' | 'bilal' | 'wren';
 export const CAST = {
   dai: {
@@ -60,6 +66,7 @@ export function makeVisitor(id: 'nerys' | 'bilal' | 'wren', seed: number, now: n
 
 /** Availability is operational, not permission to inspect somebody's private material. */
 export function lifeReady(s: GameState, id: CastId): boolean {
+  if (s.rules && s.minute >= VISIT_UNTIL && (id === 'bilal' || id === 'wren')) return false;
   const firstRole = id === 'dai' ? 1320 : id === 'callum' ? 4200 : 2760;
   return !s.life[id] || !!s.life[id]?.availableForExtraWork || s.minute >= firstRole + 30;
 }

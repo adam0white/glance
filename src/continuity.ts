@@ -11,7 +11,7 @@ import {
   validatePersona,
 } from '@adam0white/lab-client';
 import { ALLOCATION as CAST } from './sim/cast.ts';
-import { newGame as createGame, type GameState as State } from './sim/dam.ts';
+import { newGame as createGame, type GameState as State, type WatchRules } from './sim/dam.ts';
 import { admitResident, type Chapter, DIALECT, RULES, residentTransfer } from './sim/passport.ts';
 import { exportCurrent as exportRun, importCurrent as importRun } from './sim/run.ts';
 
@@ -59,7 +59,7 @@ export class Continuity {
     this.heads = [];
     this.sources = [];
   }
-  async fresh(seed: number, localOnly = false) {
+  async fresh(seed: number, localOnly = false, rules?: WatchRules) {
     if (this.busy) throw new Error('A chapter is already being prepared.');
     this.busy = true;
     this.invalidate();
@@ -68,7 +68,7 @@ export class Continuity {
       await this.shelf.ready;
       if (generation !== this.generation)
         throw new Error('The game changed before the histories could be loaded.');
-      const base = createGame(seed);
+      const base = createGame(seed, undefined, rules);
       let chapter: Chapter | undefined;
       if (this.shelf.enabled && !localOnly) {
         const result = await claimCastChapterBatch(
@@ -101,7 +101,7 @@ export class Continuity {
           };
       }
       if (generation !== this.generation) throw new Error('The game changed. The new chapter did not start.');
-      const state = createGame(seed, chapter);
+      const state = createGame(seed, chapter, rules);
       this.state = state;
       this.runId = crypto.randomUUID();
       this.sources = [];

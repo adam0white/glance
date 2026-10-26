@@ -1399,16 +1399,16 @@ input[type="text"],
 }
 @media (max-width: 767px) {
   .desk-main {
-    overflow: auto;
+    overflow: hidden;
   }
   .desk-picture {
     flex: none;
   }
   .desk-context {
-    min-height: 240px;
+    min-height: 0;
   }
   .sheet {
-    min-height: 180px;
+    min-height: 0;
   }
   .board {
     gap: 3px;

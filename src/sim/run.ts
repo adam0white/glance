@@ -10,7 +10,7 @@ export function importCurrent(value: unknown): GameState {
     !Array.isArray(ex.inputs)
   )
     throw new Error('This file is from a different version of The Glance. Start a new game.');
-  const s = replay(ex.seed, ex.inputs, ex.state.minute, ex.state.chapter ?? undefined);
+  const s = replay(ex.seed, ex.inputs, ex.state.minute, ex.state.chapter ?? undefined, ex.state.rules);
   if (canonicalPersona(exportCurrent(s).state) !== canonicalPersona(ex.state))
     throw new Error(
       'This file does not replay the same way in this version of The Glance. It may come from an older version. The file was not loaded. Start a new game.',
