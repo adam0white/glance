@@ -43,6 +43,15 @@ import { canonicalPersona } from '@adam0white/lab-client';
 import { required } from '../required.ts';
 import { ALLOCATION, type CastId, lifeReady, makeVisitor, talk, VISIT_FROM, VISIT_UNTIL } from './cast.ts';
 import { ENGINEER, KEEPERS, type KeeperId, makeKeeper, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
+import {
+  advanceOutcomes,
+  cancelOutcome,
+  newOutcomes,
+  type OutcomeTask,
+  outcomeOccupies,
+  requestOutcome,
+  type ShiftOutcomes,
+} from './outcomes.ts';
 import { admitResident, type Chapter, checkChapter, lifeAdmission } from './passport.ts';
 import {
   biasOf,
@@ -79,13 +88,16 @@ export const NIGHTS = 5;
 export interface WatchRules {
   edition: 'extended-1' | 'extended-2';
   dam: 'valley' | 'upper';
+  outcomes?: 'handover-1';
 }
 export function checkRules(rules: WatchRules | undefined): void {
   if (
     rules !== undefined &&
     (!['extended-1', 'extended-2'].includes(rules.edition) ||
       !['valley', 'upper'].includes(rules.dam) ||
-      Object.keys(rules).sort().join(',') !== 'dam,edition')
+      (rules.outcomes !== undefined && (rules.outcomes !== 'handover-1' || rules.edition !== 'extended-2')) ||
+      Object.keys(rules).sort().join(',') !==
+        (rules.outcomes === 'handover-1' ? 'dam,edition,outcomes' : 'dam,edition'))
   )
     throw new Error('These watch rules are unknown. Start a new game.');
 }
@@ -98,6 +110,7 @@ export type Job = 'level' | 'weir' | 'gate' | 'stove' | 'nap' | 'clear';
 export type Input =
   | { at: number; kind: 'ask'; keeper: KeeperId; job: Job; target?: number; insist?: boolean }
   | { at: number; kind: 'talk'; person: CastId }
+  | { at: number; kind: 'outcome'; task: OutcomeTask }
   | { at: number; kind: 'standing'; keeper: KeeperId; threshold: number; target: number }
   | { at: number; kind: 'cancel-standing'; keeper: KeeperId }
   | { at: number; kind: 'recruit' }
@@ -206,6 +219,7 @@ export interface Dawn {
 }
 
 export interface GameState {
+  outcomes?: ShiftOutcomes;
   rules?: WatchRules;
   arrangements?: Partial<Record<KeeperId, { threshold: number; target: number; after: number }>>;
   relief?: { until: number; night: number };
@@ -731,6 +745,7 @@ export function newGame(seed: number, chapter?: Chapter, rules?: WatchRules): Ga
     inputs: [],
     applied: 0,
   };
+  if (rules?.outcomes === 'handover-1') s.outcomes = newOutcomes();
   if (rules) {
     s.rules = structuredClone(rules);
     s.arrangements = {};
@@ -1232,6 +1247,7 @@ function apply(s: GameState, inp: Input) {
           'answer',
         );
       }
+      if (outcomeOccupies(s, k)) cancelOutcome(s, 'A dam duty call takes priority.');
       k.night.asked += 1;
       if (inp.insist) k.night.insisted += 1;
       const pend: KeeperState['pending'] = { s: suggestion(inp.job, inp.insist), job: inp.job };
@@ -1239,6 +1255,10 @@ function apply(s: GameState, inp: Input) {
       k.pending = pend;
       k.deferred = null;
       if (p.activity) interrupt(p, s.minute, 'voice:engineer');
+      return;
+    }
+    case 'outcome': {
+      requestOutcome(s, inp.task);
       return;
     }
     case 'talk': {
@@ -1419,6 +1439,7 @@ export function step(s: GameState): void {
   if (s.rules) reliefMinute(s);
   // People.
   for (const k of s.keepers) if (k.on) keeperMinute(s, k, rain);
+  if (s.outcomes) advanceOutcomes(s);
   if (m % 5 === 0) recordSeries(s, rain);
   s.minute += 1;
   if (s.pauseRequested && s.people.every((p) => !p.activity)) s.chapterPaused = true;
@@ -1465,6 +1486,7 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
   }
   tick(p, s.minute);
   if (s.rules) retainWatchReview(s, k, p);
+  if (outcomeOccupies(s, k)) return;
   if (s.rules && readDoze(p)?.asleep) {
     if (p.activity?.dozedAt !== undefined) {
       const from = p.activity.dozedAt;
@@ -2018,6 +2040,7 @@ function houseFate(firstAt: number | null, warnedAt: number | null): 'dry' | 'sa
 }
 
 function closeNight(s: GameState, overtopped: boolean) {
+  if (s.outcomes) cancelOutcome(s, 'The watch has ended.');
   const night = s.night;
   for (const k of s.keepers) {
     const p = personOf(s, k.id);
@@ -2186,5 +2209,6 @@ export function fingerprint(s: GameState): string {
     people: s.people.map((p) => [p.id, p.trace.length, p.now, trustOf(p)]),
     discoveries: s.discoveries,
     conversations: s.conversations,
+    ...(s.outcomes ? { outcomes: s.outcomes } : {}),
   });
 }

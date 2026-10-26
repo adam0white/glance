@@ -56,6 +56,7 @@ import {
   weatherOutlook,
 } from '../sim/dam.ts';
 import { KEEPERS, type KeeperId, NAMES } from '../sim/keepers.ts';
+import { type OutcomeTask, outcomeAvailable } from '../sim/outcomes.ts';
 import { practiceNight } from '../sim/practice.ts';
 import { importCurrent } from '../sim/run.ts';
 import { CREST, LIP, TURNS } from '../sim/water.ts';
@@ -302,7 +303,7 @@ function title() {
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">You work at a night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
     <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(false)}</p>
-    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. You work twelve nights, ending at the second Friday’s first light. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select></details>
+    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. You work twelve nights, ending at the second Friday’s first light. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><label><input id="shift-outcomes" type="checkbox">Offer joint handover and record correction in this new longer watch</label><p>The keepers can decline. Their work takes time while the storm continues. Callum may choose a covered rest in the hut. No message leaves this game.</p></details>
     ${labMode() ? '<button class="reading-row" id="other">Lab tools <span>▸</span></button>' : ''}</div>
     <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
     ${labMode() ? `<p class="credit">People by the Human Framework ${FRAMEWORK_VERSION}</p>` : ''}</div></div>`;
@@ -394,6 +395,9 @@ async function beginWeek(localOnly = false, chosen?: WatchRules) {
     (extended
       ? {
           edition: 'extended-2',
+          ...((document.getElementById('shift-outcomes') as HTMLInputElement | null)?.checked
+            ? { outcomes: 'handover-1' as const }
+            : {}),
           dam:
             (document.getElementById('dam-choice') as HTMLSelectElement)?.value === 'upper'
               ? 'upper'
@@ -1233,9 +1237,28 @@ function observation(st: GameState): string {
 function castConversations(ids: CastId[]): string {
   if (!s) return '';
   const available = discoveriesFor(s);
-  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. Close this inspection to let the shift continue. Dam requests still go to the keepers.</p></details>`;
+  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. Close this inspection to let the shift continue. Dam requests still go to the keepers.</p>${outcomeRecord(ids)}</details>`;
+}
+function outcomeRecord(ids: CastId[]): string {
+  if (!s?.outcomes || !ids.some((id) => id === 'dai' || id === 'callum')) return '';
+  const o = s.outcomes;
+  const button = (task: OutcomeTask, label: string) =>
+    `<button data-outcome="${task}" ${outcomeAvailable(s as GameState, task) ? '' : 'disabled'}>${label}</button>`;
+  return `<section aria-label="Joint shift records"><h3>Joint shift records</h3>
+    <p>The joint tasks need both keepers on duty and free in the hut. Each chooses whether to join. Callum’s later test needs only Callum free, with Dai still on duty. Time continues slowly while this inspection is open. Allow about twenty minutes for each joint task. Dam work and the weather continue.</p>
+    ${s.discoveries.dai ? `<p><b>Dai’s retained original list:</b> ${esc(o.handover.original)}</p><p><b>Current list:</b> ${esc(o.handover.list)}</p>${o.handover.transferredAt !== undefined ? `<p>Both keepers completed the joint transfer at ${clock(o.handover.transferredAt)}. The sensor instruction remains unverified.</p>${o.handover.completedAt !== undefined ? `<p>Callum completed the separate procedural test at ${clock(o.handover.completedAt)}.</p><p>${esc(o.handover.test?.question ?? '')}</p><p>${esc(o.handover.test?.answer ?? '')}</p>` : o.active?.task === 'handover-test' ? `<p>Callum is testing the transferred list alone. No tested result is recorded yet.</p><p>${esc(o.handover.test?.question ?? '')}</p>` : `<p>${o.handover.test?.stoppedAt !== undefined ? 'Callum’s test was interrupted. The joint transfer remains recorded; it is still untested.' : 'The joint transfer awaits Callum’s separate test.'}</p>${button('handover-test', 'Invite Callum to use the transferred list alone · about ten minutes')}`}` : button('handover', 'Invite both keepers to correct and transfer Dai’s handover list')}` : '<p>Dai has not shared his handover list.</p>'}
+    ${s.discoveries.callum ? (o.correction.writtenAt !== undefined ? `<p><b>Retained account:</b> ${esc(o.correction.originalAccount ?? '')}</p><p><b>Callum’s signed correction, written ${clock(o.correction.writtenAt)}:</b> ${esc(o.correction.text ?? '')}</p><p>${o.correction.restedAt !== undefined ? `Callum completed thirty minutes of hut rest at ${clock(o.correction.restedAt)} while Dai remained on duty.` : o.correction.restStoppedAt !== undefined ? 'The rest was interrupted. It is not recorded as completed.' : o.correction.restFrom !== undefined ? 'Callum is resting in the hut. Dai remains on duty; a loss of cover stops the rest.' : 'They did not both choose the proposed rest arrangement. Rest remains unarranged.'} The signed correction is filed in the fictional agency correction register and awaits review. Nothing is sent outside this game. No employer response or approval is recorded.</p>` : button('correction', 'Invite Callum’s written correction and a covered rest arrangement')) : '<p>Callum has not shared the signed-round account.</p>'}
+    ${o.active && o.active.task !== 'handover-test' ? '<p>The keepers are working together. No completed joint result is recorded yet.</p>' : ''}</section>`;
 }
 function bindConversations(el: HTMLElement) {
+  el.querySelectorAll<HTMLButtonElement>('[data-outcome]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!s) return;
+      queueInput(s, { kind: 'outcome', task: button.dataset.outcome as OutcomeTask });
+      writeSave();
+      openSheet(null);
+    });
+  });
   el.querySelectorAll<HTMLButtonElement>('[data-talk]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!s) return;
