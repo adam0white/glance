@@ -1047,13 +1047,17 @@ function openSheet(sh: Sheet) {
 function shortConcern(line: string) {
   return line.replace(/^[^:]+: /, '');
 }
+function telescopeReturning(state: GameState): boolean {
+  const active = state.privateScenes?.active;
+  return active?.action === 'telescope' && active.returningFrom !== undefined;
+}
 function drawConcern() {
   if (!s) return;
   const el = document.getElementById('concern');
   if (!el) return;
   const lines = concernLines(s);
   const ids = planOf(s).keepers;
-  const body = `${s.rules ? `<button class="keeper-chip" data-watch-arrangements="1">Watch arrangements</button>` : ''}${s.radioOut ? '<span class="radio-chip">The radio has static.</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: She is available.'))}</button>` : ''}`;
+  const body = `${s.rules ? `<button class="keeper-chip" data-watch-arrangements="1">Watch arrangements</button>` : ''}${s.radioOut ? '<span class="radio-chip">The radio has static.</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(telescopeReturning(s) ? 'She is returning from the telescope and cannot witness the river steps yet.' : shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: She is available.'))}</button>` : ''}`;
   if (!setHtml(el, body)) return;
   el.querySelectorAll<HTMLElement>('[data-k]').forEach((b) => {
     b.addEventListener('click', () => openSheet({ kind: 'keeper', who: b.dataset.k as KeeperId }));
@@ -1280,11 +1284,17 @@ function outcomeRecord(ids: CastId[]): string {
 function privateRecord(ids: CastId[]): string {
   if (!s?.privateScenes || !ids.some((id) => ['nerys', 'bilal', 'wren'].includes(id))) return '';
   const o = s.privateScenes;
+  const returning = telescopeReturning(s);
+  const attempt = o.active ? o.attempts[o.active.index] : undefined;
+  const availabilityReason = (reason: string | null) =>
+    returning && reason === 'Finish or stop the attended scene first.'
+      ? 'Nerys is returning from the telescope. Wait for her to return.'
+      : reason;
   const button = (
     action: 'telescope' | 'lamp' | 'post-shape' | 'appendix' | 'file-appendix',
     label: string,
   ) => {
-    const reason = privateAvailable(s as GameState, action);
+    const reason = availabilityReason(privateAvailable(s as GameState, action));
     return `<button data-private="${action}" ${reason ? 'disabled' : ''}>${label}</button>${reason ? `<p class="hint">${esc(reason)}</p>` : ''}`;
   };
   const telescope =
@@ -1293,7 +1303,7 @@ function privateRecord(ids: CastId[]): string {
           ['riverbank', 'yard', 'back-wall'] as Corner[]
         )
           .map((corner) => {
-            const reason = privateAvailable(s as GameState, 'telescope', corner);
+            const reason = availabilityReason(privateAvailable(s as GameState, 'telescope', corner));
             return `<button data-private="telescope" data-corner="${corner}" ${reason ? 'disabled' : ''}>Ask for the ${corner} corner · twenty minutes</button>${reason ? `<p class="hint">${esc(reason)}</p>` : ''}`;
           })
           .join(
@@ -1308,7 +1318,7 @@ function privateRecord(ids: CastId[]): string {
     ids.includes('wren') && s.discoveries.wren
       ? `<h3>Wren’s appendix</h3><p>The omitted observation was ambiguous. The retained source page has no supplied identifier or observation detail here. Drafting takes twenty attended minutes. Filing takes a separate chosen five minutes. Filing does not establish approval or a habitat finding.</p>${button('appendix', 'Ask Wren to prepare the appendix · twenty minutes')}<p>${esc(o.appendix.text ?? 'No signed draft yet.')}</p>${o.appendix.filedAt !== undefined ? `<p>Filed in the in-game survey register at ${clock(o.appendix.filedAt)}. Awaiting review.</p><p>The desk may close tonight’s optional dam-owned riverbank corner pending review. This costs Nerys that corner until next night. Her two other corners, emergency access and Wren’s licensed survey duties remain available. This is a precaution, not a habitat finding.</p>${o.access.some((a) => a.night === s?.night) ? `<p>${o.access.find((a) => a.night === s?.night)?.closed ? 'Riverbank corner closed tonight.' : 'Existing optional access left unchanged tonight.'}</p>` : '<button data-private="close-access">Close optional riverbank access tonight pending review</button><button data-private="keep-access">Leave optional access unchanged tonight</button>'}` : button('file-appendix', 'Ask Wren to file the signed draft · five minutes')}`
       : '';
-  return `<section aria-label="Private scenes"><p>${esc(o.premise)}</p>${telescope}${lamp}${appendix}${o.active ? `<p>Attending ${esc(o.active.action)}. ${o.attempts[o.active.index]?.attended ?? 0} minutes attended. No completed result yet.</p><button data-private="stop">Stop attending</button>` : ''}${o.attempts
+  return `<section aria-label="Private scenes"><p>${esc(o.premise)}</p>${telescope}${lamp}${appendix}${o.active ? `${returning ? `<p>Nerys is returning from the telescope. She cannot witness the river steps until she returns. Viewing has stopped. ${attempt?.attended ?? 0} minutes attended. ${attempt?.observations?.length ?? 0} observations retained in the partial record. This attempt is not complete.</p>` : `<p>Attending ${esc(o.active.action)}. ${attempt?.attended ?? 0} minutes attended. No completed result yet.</p>`}${attempt?.stoppedAt === undefined ? '<button data-private="stop">Stop attending</button>' : ''}` : ''}${o.attempts
     .filter((a) => a.stoppedAt !== undefined)
     .map(
       (a) =>
