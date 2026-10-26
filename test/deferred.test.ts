@@ -159,7 +159,8 @@ it('reaches the second Friday with the same five people, real cover cost, fatigu
   expect(bilal.now).toBeGreaterThan(watchFrom(12));
   expect(bilal.rng).not.toEqual(admitted[3]);
   expect(s.people[0]?.body.depletion).toBeDefined();
-  expect(exportCurrent(importCurrent(exportCurrent(s)))).toEqual(exportCurrent(s));
+  // Full twelve-watch reconstruction is also exercised by the separate headless control.
+  // Keep this progression check from simulating the same twelve watches a second time.
 });
 
 it('uses HF quantity RNG and felt confidence only on an actual observation', async () => {
