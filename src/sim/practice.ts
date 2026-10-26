@@ -5,7 +5,7 @@
 import { type GameState, planOf, queueInput, replay, step, watchFrom } from './dam.ts';
 export function practiceNight(actual: GameState, turns: number): GameState {
   if (actual.phase === 'watch' || !Number.isInteger(turns) || turns < 0 || turns > 6)
-    throw new Error('Finish the watch before trying a practice branch.');
+    throw new Error('Finish the watch before trying it again for practice.');
   const start = watchFrom(actual.night);
   const prior = actual.inputs.filter((i) => i.at < start);
   const branch = replay(actual.seed, prior, start, actual.chapter ?? undefined, actual.rules);

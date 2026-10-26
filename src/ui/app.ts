@@ -6,6 +6,7 @@ import {
   telemetryOn,
 } from '@adam0white/lab-kit';
 import { required } from '../required.ts';
+import { catchWords, durationWords } from './watch-copy.ts';
 /**
  * The Glance UI: DOM for the board, the radio log and the sheets; one canvas for the dam. The UI reads state and
  * queues inputs; it never changes the sim directly. Real time drives sim minutes, continuously, slowing while a
@@ -300,12 +301,18 @@ function title() {
   app.innerHTML = `<div class="page screen title-screen">${topbar('', true)}
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">You work at a night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
-    <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. You work five nights, Monday to Friday. The week ends at Friday's first light, or when water comes over the top of the dam.</p>
-    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — wider basin, longer paths</option></select></details>
+    <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(false)}</p>
+    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. You work twelve nights, ending at the second Friday’s first light. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select></details>
     ${labMode() ? '<button class="reading-row" id="other">Lab tools <span>▸</span></button>' : ''}</div>
     <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
     ${labMode() ? `<p class="credit">People by the Human Framework ${FRAMEWORK_VERSION}</p>` : ''}</div></div>`;
   bindTopbar();
+  document.getElementById('extended-watch')?.addEventListener('change', () => {
+    const extended = (document.getElementById('extended-watch') as HTMLInputElement).checked;
+    required(document.getElementById('goal')).textContent =
+      `Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(extended)}`;
+    showAbout();
+  });
   drawDawn(document.getElementById('sample-chart') as HTMLCanvasElement, SAMPLE_DAWN);
   document.getElementById('sample')?.addEventListener('click', () => {
     const d = dialog('sample-page', 'A sample morning', reportBody(SAMPLE_DAWN, false, true));
@@ -386,7 +393,7 @@ async function beginWeek(localOnly = false, chosen?: WatchRules) {
     chosen ??
     (extended
       ? {
-          edition: 'extended-1',
+          edition: 'extended-2',
           dam:
             (document.getElementById('dam-choice') as HTMLSelectElement)?.value === 'upper'
               ? 'upper'
@@ -475,9 +482,12 @@ function showAbout() {
   const about = document.createElement('div');
   about.setAttribute('popover', 'auto');
   about.id = 'about';
+  const extended =
+    screen === 'title'
+      ? (document.getElementById('extended-watch') as HTMLInputElement | null)?.checked === true
+      : !!s?.rules;
   let heading = 'The night desk';
-  let words =
-    "You work at the river authority's night desk. One old dam stands above a town. A keeper reads the gauges with a flashlight and reports the readings by radio. Every reading on your board is what he saw. Tap a gauge to choose a job. Tap the job to ask him. Hold the job button to insist. You work five nights. The week ends at Friday's first light, or when water comes over the top of the dam.";
+  let words = `You work at the river authority's night desk. One old dam stands above a town. A keeper reads the gauges with a flashlight and reports the readings by radio. Every reading on your board is what he saw. Tap a gauge to choose a job. Tap the job to ask him. Hold the job button to insist. ${durationWords(extended)}`;
   if (screen === 'watch') {
     heading = 'Reading the desk';
     words =
@@ -494,12 +504,14 @@ function showAbout() {
   } else if (screen === 'dawn') {
     heading = 'The morning page';
     words =
-      'The red line is what the water did. The dots are what you were told, at the time they were really read. A wrong reading counts as caught if you had it read again within twenty minutes, or lightning showed the wall.';
+      'The red line is what the water did. The dots are what you were told, at the time they were really read. ' +
+      catchWords(s?.rules?.edition);
   } else if (screen === 'end') {
     heading = 'The tally';
     words =
       'The tally adds the nights the dam held, the nights Mill Lane stayed dry or was warned in time, and the wrong readings you caught. It counts the desk’s results. It does not rate the people.';
   }
+  if (screen === 'watch') words += ` ${durationWords(extended)} ${catchWords(s?.rules?.edition)}`;
   about.innerHTML = `<div class="dialog-head"><h2>${heading}</h2><button id="close-about" class="x" aria-label="Close information" popovertarget="about" popovertargetaction="hide">×</button></div><p>${esc(words)}</p>`;
   app.append(about);
   about.addEventListener('toggle', () => {
@@ -1181,7 +1193,7 @@ function drawSheet() {
 /** A personal desk note. It does not tell the keeper or reveal whether a report is right. */
 function readingNote(st: GameState, report: GameState['board'][Gauge]): string {
   if (!report) return '';
-  return `<div class="reading-note"><button id="reading-note" data-report="${st.reports.indexOf(report)}" aria-pressed="${report.doubted === true}">${report.doubted ? 'Remove the check mark' : st.rules ? 'Doubt this reading' : 'Mark this reading for another check'}</button><p class="hint">${st.rules ? 'This records your doubt about this report. At dawn, compare it with the known outcome. The mark does not reveal whether it is wrong.' : report.doubted ? 'You marked this reading for another check. Ask for a new reading when you are ready.' : 'This adds your own note. It does not say whether the reading is right.'}</p></div>`;
+  return `<div class="reading-note"><button id="reading-note" data-report="${st.reports.indexOf(report)}" aria-pressed="${report.doubted === true}">${report.doubted ? (st.rules ? 'Remove this doubt mark' : 'Remove the check mark') : st.rules ? 'Doubt this reading' : 'Mark this reading for another check'}</button><p class="hint">${st.rules ? `This records your doubt about this report. At dawn, compare it with the known outcome. The mark does not reveal whether it is wrong. ${catchWords(st.rules?.edition)}` : report.doubted ? 'You marked this reading for another check. Ask for a new reading when you are ready.' : 'This adds your own note. It does not say whether the reading is right.'}</p></div>`;
 }
 function bindReadingNote(el: HTMLElement) {
   const button = el.querySelector<HTMLButtonElement>('#reading-note');
@@ -1380,12 +1392,12 @@ function dawn() {
   lab.milestone(`night ${d.night} done`);
   screen = 'dawn';
   app.innerHTML = `<div class="page screen dawn">${topbar(`${planOf(s).title} · first light`)}<div class="page-body">
-    ${s.phase === 'end' ? `<p class="week-end" role="status">${d.daytimeLoss ? 'The watch ends here. The dam went over during the following day.' : d.overtopped ? 'The week ends here. Water came over the top of the dam.' : 'It is first light after Friday night. Your watch is done.'}</p>` : ''}
+    ${s.phase === 'end' ? `<p class="week-end" role="status">${d.daytimeLoss ? 'The watch ends here. The dam went over during the following day.' : d.overtopped ? (s.rules ? 'The watch ends here. Water came over the top of the dam.' : 'The week ends here. Water came over the top of the dam.') : s.rules ? 'It is first light after the second Friday night. Your watch is done.' : 'It is first light after Friday night. Your watch is done.'}</p>` : ''}
     ${reportBody(d, planOf(s).keepers.length > 1)}
     </div><div class="actionbar">
-      <button id="practice">Try a separate practice branch</button>
+      <button id="practice">Try this night again for practice</button>
       ${s.phase === 'dawn' && next ? `<button class="primary" id="next">${esc(next.title)} night</button>` : ''}
-      ${s.phase === 'end' ? '<button class="primary" id="end">Read the week’s outcome</button>' : ''}
+      ${s.phase === 'end' ? '<button class="primary" id="end">Read the watch’s outcome</button>' : ''}
     </div>
   </div>`;
   bindTopbar();
@@ -1411,8 +1423,8 @@ function practiceDialog() {
   const actual = s;
   const d = dialog(
     'practice',
-    'Separate practice branch',
-    '<p>Your actual watch stays in the logbook. This branch uses the same opening people and weather seed. The keeper may refuse your alternative request.</p><label for="practice-turns">Opening gate request</label><select id="practice-turns">' +
+    'Try a different opening request',
+    '<p>Your watch stays in the logbook. Practice starts with the same people and weather as that night. You can ask for a different gate setting at the start. The keeper may refuse. Practice does not change your saved watch.</p><label for="practice-turns">Opening gate request</label><select id="practice-turns">' +
       Array.from({ length: 7 }, (_, n) => `<option value="${n}">${n} turns</option>`).join('') +
       '</select><button id="run-practice">Try this request</button><div id="practice-result"></div>',
   );
@@ -1425,7 +1437,7 @@ function practiceDialog() {
     if (!dawn) return;
     const result = d.querySelector('#practice-result') as HTMLElement;
     result.innerHTML =
-      '<p><b>Practice branch. This is not the actual watch.</b></p>' +
+      '<p><b>Practice result. Your saved watch has not changed.</b></p>' +
       reportBody(dawn, planOf(branch).keepers.length > 1);
     drawDawn(result.querySelector('canvas') as HTMLCanvasElement, dawn);
   });
@@ -1436,7 +1448,7 @@ function watchArrangements() {
   const d = dialog(
     'watch-arrangements',
     'Watch arrangements',
-    `<p>${esc(weatherOutlook(current))}</p><p>${current.rules?.dam === 'upper' ? 'Upper dam has a wider basin and longer paths. Releases take longer to reach town.' : 'Valley dam has the familiar basin and paths.'}</p><p>A standing request waits for a new local level reading. The keeper considers the gate work through the same decision as a radio request, even if the radio is out. A copied figure cannot trigger it.</p><label for="standing-keeper">Keeper</label><select id="standing-keeper">${planOf(
+    `<p>${esc(weatherOutlook(current))}</p><p>${current.rules?.dam === 'upper' ? 'Upper dam has a wider basin and longer paths. Releases take longer to reach town.' : 'Valley dam has the familiar basin and paths.'}</p><p>A standing request waits for a new local level reading. After reading the level again, the keeper decides whether to do the gate work you requested. He can do this while the radio is out. Repeating an old reading does not start the gate work.</p><label for="standing-keeper">Keeper</label><select id="standing-keeper">${planOf(
       current,
     )
       .keepers.filter((id) => id !== 'bilal')
@@ -1459,7 +1471,7 @@ function watchArrangements() {
     queueInput(current, input);
     writeSave();
     (d.querySelector('#arrangement-result') as HTMLElement).textContent =
-      'The request is queued. Close this page to let the watch continue and hear the answer.';
+      'The request is ready to send. Close this page to let the watch continue and hear the answer.';
   };
   d.querySelector('#set-standing')?.addEventListener('click', () =>
     enqueue({
@@ -1496,10 +1508,10 @@ function ending() {
       ? 'Water came over the top of the dam on your watch. There will be an inquiry, and they will read the log.'
       : ds.length === nightsOf(s) && flooded === 0
         ? 'You completed every watch, and the lane never flooded without warning. You checked the keepers’ readings carefully.'
-        : `The dam held all week. Mill Lane flooded ${flooded === 1 ? 'once' : `${flooded} times`} without warning.`;
+        : `The dam held ${s.rules ? 'through all twelve nights' : 'all week'}. Mill Lane flooded ${flooded === 1 ? 'once' : `${flooded} times`} without warning.`;
   screen = 'end';
-  app.innerHTML = `<div class="page screen dawn ending">${topbar('The week is over')}<div class="page-body">
-    <h2>The week is over</h2>
+  app.innerHTML = `<div class="page screen dawn ending">${topbar(s.rules ? 'The longer watch is over' : 'The week is over')}<div class="page-body">
+    <h2>${s.rules ? 'The longer watch is over' : 'The week is over'}</h2>
     <p>${esc(verdict)}</p>
     <ul class="week">${ds
       .map(
@@ -1507,7 +1519,7 @@ function ending() {
           `<li><b>${EXTENDED_PLANS[d.night - 1]?.title}</b> ${d.daytimeLoss ? 'The dam held through this night, then went over during the following day.' : d.overtopped ? 'Water came over the dam.' : d.spilled ? 'Water flowed into the spillway.' : 'The dam held.'} Mill Lane ${d.overtopped || d.mill === 'flooded' ? 'flooded without warning' : d.mill === 'saved' ? 'flooded after a warning' : 'stayed dry'}. You caught ${d.misses.filter((m) => m.caught).length} of ${d.misses.length} wrong readings.</li>`,
       )
       .join('')}</ul>
-    <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong readings during the week.` : ''}</p>
+    <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong readings during ${s.rules ? 'the longer watch' : 'the week'}.` : ''}</p>
     ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(l.aboutYou)}</p></div>`).join('')}
     <div id="closing-tally"></div><button class="reading-row" id="back">${EXTENDED_PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
     <div class="actionbar ending-actions"><div><button id="send">Feedback</button>${labMode() ? '<button id="export">Download this run</button>' : ''}</div><button class="primary" id="again">New game</button></div></div>`;

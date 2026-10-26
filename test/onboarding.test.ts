@@ -679,3 +679,35 @@ it('keeps quiet feedback choices local until Submit and uses the SDK literal lab
   expect(vi.mocked(lab.sendFeedback).mock.calls[0]?.[0]).toBe("I'm confused");
   expect(vi.mocked(lab.sendFeedback).mock.calls[0]?.[1]?.run).toEqual(exportRun(state(debug), '3.0.0'));
 });
+
+it('keeps the short watch default and updates the goal and About when the longer watch is selected', async () => {
+  const debug = await boot();
+  const choice = document.getElementById('extended-watch') as HTMLInputElement;
+  expect(choice.checked).toBe(false);
+  expect(document.getElementById('goal')?.textContent).toContain('five nights');
+  choice.checked = true;
+  choice.dispatchEvent(new Event('change'));
+  expect(document.getElementById('goal')?.textContent).toContain('twelve nights');
+  expect(document.getElementById('goal')?.textContent).toContain('second Friday');
+  expect(document.querySelector('#dam-choice option[value="upper"]')?.textContent).toContain('harder');
+  await click('help');
+  expect(document.getElementById('about')?.textContent).toContain('twelve nights');
+  await click('new');
+  expect(state(debug).rules?.edition).toBe('extended-2');
+  expect(document.getElementById('about')?.textContent).toContain('twelve nights');
+  expect(document.getElementById('about')?.textContent).toContain(
+    'Marking that report as doubted also counts',
+  );
+});
+
+it('explains the pinned catch rule when resuming a saved first-edition longer watch', async () => {
+  const old = newGame(7, undefined, { edition: 'extended-1', dam: 'upper' });
+  localStorage.setItem('glance-cast-local-v3', JSON.stringify(localFixture(old)));
+  const debug = await boot();
+  await click('cont');
+  expect(state(debug).rules?.edition).toBe('extended-1');
+  expect(document.getElementById('about')?.textContent).toContain(
+    'Rereads and lightning do not add catch credit',
+  );
+  expect(document.getElementById('about')?.textContent).toContain('twelve nights');
+});

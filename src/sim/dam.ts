@@ -77,13 +77,13 @@ import {
 export const GAME_VERSION = 'glance@4-deterministic-water';
 export const NIGHTS = 5;
 export interface WatchRules {
-  edition: 'extended-1';
+  edition: 'extended-1' | 'extended-2';
   dam: 'valley' | 'upper';
 }
 export function checkRules(rules: WatchRules | undefined): void {
   if (
     rules !== undefined &&
-    (rules.edition !== 'extended-1' ||
+    (!['extended-1', 'extended-2'].includes(rules.edition) ||
       !['valley', 'upper'].includes(rules.dam) ||
       Object.keys(rules).sort().join(',') !== 'dam,edition')
   )
@@ -185,6 +185,7 @@ export interface Miss {
 export interface Dawn {
   daytimeLoss?: { at: number };
   extended?: true;
+  edition?: 'extended-2';
   doubts?: { at: number; who: Report['who']; gauge: Gauge; value: number; truth: number; wrong: boolean }[];
   night: number;
   series: { m: number; level: number; bridge: number; gate: number; rain: number }[];
@@ -257,7 +258,7 @@ export interface NightPlan {
   /** Minutes after 22:00 a tree comes down on the screen. */
   tree?: number;
   /** Scripted lines: minutes after 22:00. */
-  beats: { at: number; who: Said['who']; text: string; if?: KeeperId }[];
+  beats: { at: number; who: Said['who']; text: string | ((s: GameState) => string); if?: KeeperId }[];
 }
 
 export const PLANS: NightPlan[] = [
@@ -453,11 +454,102 @@ export const EXTENDED_PLANS: NightPlan[] = [
   },
 ];
 
+/** Edition 2 adds desk observations of received reports and the already revealed morning pages.
+ * These lines never inspect hidden water, held reports or a person's private state.
+ * They change the recorded radio log, so edition 1 keeps its original plans.
+ */
+const SECOND_WEEK_BEATS: NightPlan['beats'][] = [
+  [
+    {
+      at: 8,
+      who: 'narrator',
+      text: (s) => {
+        const last = s.dawns.at(-1);
+        return `Friday’s morning page ${last?.misses.some((m) => m.who === 'callum') ? 'shows a wrong reading from Callum' : last?.reports.some((r) => r.who === 'callum' && (r.gauge === 'level' || r.gauge === 'weir')) ? 'shows no large error in Callum’s readings' : 'has no level or weir reading from Callum to check'}. Tonight he works alone. Another reading will still be his; Nerys can give you a separate view from the bridge.`;
+      },
+    },
+  ],
+  [
+    {
+      at: 8,
+      who: 'narrator',
+      text: (s) => {
+        const last = s.dawns.at(-1);
+        return `Saturday’s morning page says Mill Lane ${last?.mill === 'dry' ? 'stayed dry' : last?.mill === 'saved' ? 'flooded after a warning' : 'flooded without warning'}. Dai returns tonight, but the water did not stop while he was away.`;
+      },
+    },
+  ],
+  [
+    {
+      at: 100,
+      who: 'narrator',
+      text: (s) => {
+        const readings = ['dai', 'callum'].map((who) =>
+          s.reports.findLast((r) => r.who === who && r.gauge === 'level' && !s.held.includes(r)),
+        );
+        const [dai, callum] = readings;
+        return dai && callum
+          ? `Dai’s latest level report says ${spoken(dai.value)}; Callum’s says ${spoken(callum.value)}. They were written at ${clock(dai.wrote)} and ${clock(callum.wrote)}. A difference can come from the reader or from water moving between readings.`
+          : 'Both keepers are on duty, but the desk has not received a level reading from each of them tonight. One keeper’s figure does not check the other’s.';
+      },
+    },
+  ],
+  [
+    {
+      at: 300,
+      who: 'narrator',
+      text: (s) =>
+        s.treeKnown
+          ? 'Callum has reported a tree on the screen. He is the only keeper tonight. Clearing it takes him away from reading gauges and turning the wheel.'
+          : 'The desk has had no report of a tree on the screen tonight. That does not tell you whether anyone has looked. Callum is alone; checking the screen takes him away from the gauges.',
+    },
+  ],
+  [
+    {
+      at: 112,
+      who: 'narrator',
+      text: (s) => {
+        const r = s.board.level;
+        return `The radio has gone silent. ${r ? `The last level report on the desk was written at ${clock(r.wrote)}.` : 'The desk has no level report tonight.'} A standing request can use a new reading up at the dam, but you will not hear the answer until the signal returns.`;
+      },
+    },
+  ],
+  [
+    {
+      at: 180,
+      who: 'narrator',
+      text: (s) => {
+        const r = s.board.gate;
+        return `${s.treeKnown ? 'A tree has been reported on the screen.' : 'No report of a tree has reached the desk tonight.'} ${r ? `The last gate report says ${turnWords(r.value)}, written at ${clock(r.wrote)}.` : 'No gate report has reached the desk tonight.'} A gate report tells you where the wheel was set; it does not tell you whether the screen is clear.`;
+      },
+    },
+  ],
+  [
+    {
+      at: 90,
+      who: 'narrator',
+      text: (s) => {
+        const r = s.board.bridge;
+        return r
+          ? `Nerys’s latest river report was written at ${clock(r.wrote)}. It is a view from the town, not a reading of the reservoir. A gate change takes time to reach her steps.`
+          : 'Nerys has not given the desk a river reading tonight. The last morning page cannot tell you what is at her steps now. The final watch still needs a view from the town.';
+      },
+    },
+  ],
+];
+export const FOLLOWUP_PLANS: NightPlan[] = EXTENDED_PLANS.map((plan, index) => ({
+  ...plan,
+  intro: index === 7 ? ['A second week begins. The same keepers return after the day at home.'] : plan.intro,
+  beats: index >= 5 ? (SECOND_WEEK_BEATS[index - 5] as NightPlan['beats']) : plan.beats,
+}));
+const plansOf = (s: GameState) =>
+  s.rules?.edition === 'extended-2' ? FOLLOWUP_PLANS : s.rules ? EXTENDED_PLANS : PLANS;
+
 const nightStart = (night: number) => (night - 1) * 1440;
 export const watchFrom = (night: number) => nightStart(night) + WATCH_FROM;
 export const watchTo = (night: number) => watchFrom(night) + WATCH_MINUTES;
 export const planOf = (s: GameState): NightPlan => {
-  const plan = (s.rules ? EXTENDED_PLANS : PLANS)[s.night - 1] as NightPlan;
+  const plan = plansOf(s)[s.night - 1] as NightPlan;
   if (!s.rules || !s.keepers.some((k) => k.id === 'bilal' && k.on)) return plan;
   return { ...plan, keepers: [...plan.keepers, 'bilal'] };
 };
@@ -726,7 +818,7 @@ function morningHours(s: GameState, night: number) {
 }
 
 function startNight(s: GameState, night: number) {
-  const plan = (s.rules ? EXTENDED_PLANS : PLANS)[night - 1] as NightPlan;
+  const plan = plansOf(s)[night - 1] as NightPlan;
   s.night = night;
   s.phase = 'watch';
   s.minute = watchFrom(night);
@@ -781,7 +873,9 @@ function startNight(s: GameState, night: number) {
       say(
         s,
         'narrator',
-        'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers return after their actual rest.',
+        s.rules.edition === 'extended-2'
+          ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers have come back from their time at home.'
+          : 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers return after their actual rest.',
         'journal',
       );
   }
@@ -1313,7 +1407,12 @@ export function step(s: GameState): void {
   }
   for (const beat of plan.beats)
     if (beat.at === m && beatHeard(s, beat))
-      say(s, beat.who, beat.text, beat.who === 'radio' ? 'radio' : 'answer');
+      say(
+        s,
+        beat.who,
+        typeof beat.text === 'function' ? beat.text(s) : beat.text,
+        beat.who === 'radio' ? 'radio' : 'answer',
+      );
   if (s.nerys.ringing !== null && s.minute >= s.nerys.ringing) innAnswers(s);
   // Supporting people have their own HF bodies, not dam operating skills.
   for (const p of s.people) if (!s.keepers.some((k) => k.id === p.id)) tick(p, s.minute);
@@ -1954,7 +2053,10 @@ function closeNight(s: GameState, overtopped: boolean) {
       said: r.value,
       truth: r.truth,
       cause: r.cause,
-      caught: s.rules ? r.doubted === true : again || flash,
+      caught:
+        s.rules?.edition === 'extended-1'
+          ? r.doubted === true
+          : again || flash || (s.rules?.edition === 'extended-2' && r.doubted === true),
     });
   }
   if (s.rules)
@@ -1985,6 +2087,7 @@ function closeNight(s: GameState, overtopped: boolean) {
     ...(s.rules
       ? {
           extended: true as const,
+          ...(s.rules.edition === 'extended-2' ? { edition: 'extended-2' as const } : {}),
           doubts: s.reports
             .filter((r) => r.doubted)
             .map((r) => ({
