@@ -54,6 +54,16 @@ import {
 } from './outcomes.ts';
 import { admitResident, type Chapter, checkChapter, lifeAdmission } from './passport.ts';
 import {
+  advancePrivate,
+  cancelPrivate,
+  newPrivateScenes,
+  PRIVATE_PREMISE,
+  type PrivateInput,
+  type PrivateScenes,
+  requestPrivate,
+  returnForRiver,
+} from './private-scenes.ts';
+import {
   biasOf,
   type Clarity,
   clarityOf,
@@ -88,16 +98,17 @@ export const NIGHTS = 5;
 export interface WatchRules {
   edition: 'extended-1' | 'extended-2';
   dam: 'valley' | 'upper';
-  outcomes?: 'handover-1';
+  outcomes?: 'handover-1' | 'private-scenes-1';
 }
 export function checkRules(rules: WatchRules | undefined): void {
   if (
     rules !== undefined &&
     (!['extended-1', 'extended-2'].includes(rules.edition) ||
       !['valley', 'upper'].includes(rules.dam) ||
-      (rules.outcomes !== undefined && (rules.outcomes !== 'handover-1' || rules.edition !== 'extended-2')) ||
+      (rules.outcomes !== undefined &&
+        (!['handover-1', 'private-scenes-1'].includes(rules.outcomes) || rules.edition !== 'extended-2')) ||
       Object.keys(rules).sort().join(',') !==
-        (rules.outcomes === 'handover-1' ? 'dam,edition,outcomes' : 'dam,edition'))
+        (rules.outcomes !== undefined ? 'dam,edition,outcomes' : 'dam,edition'))
   )
     throw new Error('These watch rules are unknown. Start a new game.');
 }
@@ -111,6 +122,7 @@ export type Input =
   | { at: number; kind: 'ask'; keeper: KeeperId; job: Job; target?: number; insist?: boolean }
   | { at: number; kind: 'talk'; person: CastId }
   | { at: number; kind: 'outcome'; task: OutcomeTask }
+  | ({ at: number; kind: 'private' } & PrivateInput)
   | { at: number; kind: 'standing'; keeper: KeeperId; threshold: number; target: number }
   | { at: number; kind: 'cancel-standing'; keeper: KeeperId }
   | { at: number; kind: 'recruit' }
@@ -220,6 +232,7 @@ export interface Dawn {
 
 export interface GameState {
   outcomes?: ShiftOutcomes;
+  privateScenes?: PrivateScenes;
   rules?: WatchRules;
   arrangements?: Partial<Record<KeeperId, { threshold: number; target: number; after: number }>>;
   relief?: { until: number; night: number };
@@ -745,7 +758,8 @@ export function newGame(seed: number, chapter?: Chapter, rules?: WatchRules): Ga
     inputs: [],
     applied: 0,
   };
-  if (rules?.outcomes === 'handover-1') s.outcomes = newOutcomes();
+  if (rules?.outcomes) s.outcomes = newOutcomes();
+  if (rules?.outcomes === 'private-scenes-1') s.privateScenes = newPrivateScenes();
   if (rules) {
     s.rules = structuredClone(rules);
     s.arrangements = {};
@@ -753,6 +767,7 @@ export function newGame(seed: number, chapter?: Chapter, rules?: WatchRules): Ga
   }
   dayHours(s, 1);
   startNight(s, 1);
+  if (s.privateScenes) say(s, 'narrator', PRIVATE_PREMISE, 'journal');
   if (rules) for (const k of s.keepers) enableDoze(personOf(s, k.id), { posture: 'upright', stimulation: 1 });
   if (chapter) {
     checkChapter(chapter);
@@ -1182,7 +1197,8 @@ function apply(s: GameState, inp: Input) {
     }
     case 'pause': {
       s.pauseRequested = true;
-      s.chapterPaused = s.people.every((p) => !p.activity);
+      if (s.privateScenes) cancelPrivate(s, 'The player asked to pause.');
+      s.chapterPaused = s.people.every((p) => !p.activity) && !s.privateScenes?.active;
       say(
         s,
         'narrator',
@@ -1257,6 +1273,10 @@ function apply(s: GameState, inp: Input) {
       if (p.activity) interrupt(p, s.minute, 'voice:engineer');
       return;
     }
+    case 'private': {
+      requestPrivate(s, inp);
+      return;
+    }
     case 'outcome': {
       requestOutcome(s, inp.task);
       return;
@@ -1267,7 +1287,10 @@ function apply(s: GameState, inp: Input) {
     }
     case 'ring': {
       if (s.phase !== 'watch' || !planOf(s).inn || s.nerys.ringing !== null) return;
+      if (s.privateScenes?.active?.action === 'telescope') returnForRiver(s);
       ringInn(s);
+      if (s.privateScenes?.active?.returningFrom !== undefined && s.nerys.ringing !== null)
+        s.nerys.ringing = Math.max(s.nerys.ringing, s.privateScenes.active.until + 1);
       return;
     }
     case 'warn': {
@@ -1433,16 +1456,23 @@ export function step(s: GameState): void {
         typeof beat.text === 'function' ? beat.text(s) : beat.text,
         beat.who === 'radio' ? 'radio' : 'answer',
       );
-  if (s.nerys.ringing !== null && s.minute >= s.nerys.ringing) innAnswers(s);
+  if (
+    s.nerys.ringing !== null &&
+    s.minute >= s.nerys.ringing &&
+    s.privateScenes?.active?.action !== 'telescope'
+  )
+    innAnswers(s);
   // Supporting people have their own HF bodies, not dam operating skills.
   for (const p of s.people) if (!s.keepers.some((k) => k.id === p.id)) tick(p, s.minute);
   if (s.rules) reliefMinute(s);
   // People.
   for (const k of s.keepers) if (k.on) keeperMinute(s, k, rain);
   if (s.outcomes) advanceOutcomes(s);
+  if (s.privateScenes) advancePrivate(s);
   if (m % 5 === 0) recordSeries(s, rain);
   s.minute += 1;
-  if (s.pauseRequested && s.people.every((p) => !p.activity)) s.chapterPaused = true;
+  if (s.pauseRequested && s.people.every((p) => !p.activity) && !s.privateScenes?.active)
+    s.chapterPaused = true;
   if (s.water.overtopped) {
     say(s, 'narrator', 'Water came over the top of the dam.', 'journal');
     closeNight(s, true);
@@ -2040,6 +2070,7 @@ function houseFate(firstAt: number | null, warnedAt: number | null): 'dry' | 'sa
 }
 
 function closeNight(s: GameState, overtopped: boolean) {
+  if (s.privateScenes) cancelPrivate(s, 'The watch has ended.');
   if (s.outcomes) cancelOutcome(s, 'The watch has ended.');
   const night = s.night;
   for (const k of s.keepers) {

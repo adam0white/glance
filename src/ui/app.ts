@@ -58,6 +58,7 @@ import {
 import { KEEPERS, type KeeperId, NAMES } from '../sim/keepers.ts';
 import { type OutcomeTask, outcomeAvailable } from '../sim/outcomes.ts';
 import { practiceNight } from '../sim/practice.ts';
+import { type Corner, cornerSky, type PrivateAction, privateAvailable } from '../sim/private-scenes.ts';
 import { importCurrent } from '../sim/run.ts';
 import { CREST, LIP, TURNS } from '../sim/water.ts';
 import { concernLines, thresholdWords } from './concern.ts';
@@ -312,7 +313,7 @@ function title() {
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">You work at a night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
     <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(false)}</p>
-    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. You work twelve nights, ending at the second Friday’s first light. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><label><input id="shift-outcomes" type="checkbox">Offer joint handover and record correction in this new longer watch</label><p>The keepers can decline. Their work takes time while the storm continues. Callum may choose a covered rest in the hut. No message leaves this game.</p></details>
+    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. You work twelve nights, ending at the second Friday’s first light. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><label><input id="shift-outcomes" type="checkbox">Offer joint handover and record correction in this new longer watch</label><p>The keepers can decline. Their work takes time while the storm continues. Callum may choose a covered rest in the hut. No message leaves this game.</p><label><input id="private-scenes" type="checkbox">Also offer Nerys’s telescope trip, Bilal’s shadow play and post, and Wren’s appendix in this new longer watch</label><p>Each person chooses. These scenes take attended time. The riverbank corner has optional dam-owned access that the desk may close for tonight pending review. No sighting, reply or habitat finding is promised.</p></details>
     ${labMode() ? '<button class="reading-row" id="other">Lab tools <span>▸</span></button>' : ''}</div>
     <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
     ${labMode() ? `<p class="credit">People by the Human Framework ${FRAMEWORK_VERSION}</p>` : ''}</div></div>`;
@@ -404,9 +405,11 @@ async function beginWeek(localOnly = false, chosen?: WatchRules) {
     (extended
       ? {
           edition: 'extended-2',
-          ...((document.getElementById('shift-outcomes') as HTMLInputElement | null)?.checked
-            ? { outcomes: 'handover-1' as const }
-            : {}),
+          ...((document.getElementById('private-scenes') as HTMLInputElement | null)?.checked
+            ? { outcomes: 'private-scenes-1' as const }
+            : (document.getElementById('shift-outcomes') as HTMLInputElement | null)?.checked
+              ? { outcomes: 'handover-1' as const }
+              : {}),
           dam:
             (document.getElementById('dam-choice') as HTMLSelectElement)?.value === 'upper'
               ? 'upper'
@@ -1261,7 +1264,7 @@ function observation(st: GameState): string {
 function castConversations(ids: CastId[]): string {
   if (!s) return '';
   const available = discoveriesFor(s);
-  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. ${s?.outcomes ? 'The shift continues slowly while this inspection is open.' : 'Close this inspection to let the shift continue.'} Dam requests still go to the keepers.</p>${outcomeRecord(ids)}</details>`;
+  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. ${s?.outcomes ? 'The shift continues slowly while this inspection is open.' : 'Close this inspection to let the shift continue.'} Dam requests still go to the keepers.</p>${outcomeRecord(ids)}${privateRecord(ids)}</details>`;
 }
 function outcomeRecord(ids: CastId[]): string {
   if (!s?.outcomes || !ids.some((id) => id === 'dai' || id === 'callum')) return '';
@@ -1274,7 +1277,67 @@ function outcomeRecord(ids: CastId[]): string {
     ${s.discoveries.callum ? (o.correction.writtenAt !== undefined ? `<p><b>Retained account:</b> ${esc(o.correction.originalAccount ?? '')}</p><p><b>Callum’s signed correction, written ${clock(o.correction.writtenAt)}:</b> ${esc(o.correction.text ?? '')}</p><p>${o.correction.restedAt !== undefined ? `Callum completed thirty minutes of hut rest at ${clock(o.correction.restedAt)} while Dai remained on duty.` : o.correction.restStoppedAt !== undefined ? 'The rest was interrupted. It is not recorded as completed.' : o.correction.restFrom !== undefined ? 'Callum is resting in the hut. Dai remains on duty; a loss of cover stops the rest.' : 'They did not both choose the proposed rest arrangement. Rest remains unarranged.'} The signed correction is filed in the fictional agency correction register and awaits review. Nothing is sent outside this game. No employer response or approval is recorded.</p>` : button('correction', 'Invite Callum’s written correction and a covered rest arrangement')) : '<p>Callum has not shared the signed-round account.</p>'}
     ${o.active && o.active.task !== 'handover-test' ? '<p>The keepers are working together. No completed joint result is recorded yet.</p>' : ''}</section>`;
 }
+function privateRecord(ids: CastId[]): string {
+  if (!s?.privateScenes || !ids.some((id) => ['nerys', 'bilal', 'wren'].includes(id))) return '';
+  const o = s.privateScenes;
+  const button = (
+    action: 'telescope' | 'lamp' | 'post-shape' | 'appendix' | 'file-appendix',
+    label: string,
+  ) => {
+    const reason = privateAvailable(s as GameState, action);
+    return `<button data-private="${action}" ${reason ? 'disabled' : ''}>${label}</button>${reason ? `<p class="hint">${esc(reason)}</p>` : ''}`;
+  };
+  const telescope =
+    ids.includes('nerys') && s.discoveries.nerys
+      ? `<h3>Nerys’s telescope</h3><p>For this chapter, Nerys has inn cover from 22:00 to midnight. The trip takes five minutes to set up, ten to view and five to return. She cannot witness the river steps while away. A river call stops viewing and needs return time. Local sky at the inn now: ${cornerSky(s.seed, s.night, s.minute)}. This fictional local sky does not describe catchment rain.</p>${(
+          ['riverbank', 'yard', 'back-wall'] as Corner[]
+        )
+          .map((corner) => {
+            const reason = privateAvailable(s as GameState, 'telescope', corner);
+            return `<button data-private="telescope" data-corner="${corner}" ${reason ? 'disabled' : ''}>Ask for the ${corner} corner · twenty minutes</button>${reason ? `<p class="hint">${esc(reason)}</p>` : ''}`;
+          })
+          .join(
+            '',
+          )}<p>${esc(o.telescope.notebook ?? 'No completed attempt is recorded. A cloudy attempt cannot establish a sighting.')}</p>`
+      : '';
+  const lamp =
+    ids.includes('bilal') && s.discoveries.bilal
+      ? `<h3>Bilal’s shadow play</h3><p>His existing heron is an old story. Hold and adjust his own lamp and choose a new practice shape during ten attended minutes. Relief work and its travel cannot overlap. Posting the retained drawing takes a separate chosen five minutes. Nothing leaves the game. No receipt or reply is recorded.</p>${button('lamp', 'Ask to hold the lamp · ten minutes')}${o.active?.action === 'lamp' ? '<label>New shape<select id="private-shape"><option value="boat">Boat</option><option value="rabbit">Rabbit</option></select></label><label>Lamp position<select id="private-lamp"><option value="low">Low</option><option value="high">High</option></select></label><button data-private="adjust-lamp">Adjust the lamp and try this new shape</button>' : ''}<p>${esc(o.lamp.drawing ?? 'No completed new drawing retained.')}</p>${o.lamp.postedAt !== undefined ? `<p>Posted in the in-game outgoing post at ${clock(o.lamp.postedAt)}: ${esc(o.lamp.postedDrawing ?? '')}</p>` : button('post-shape', 'Ask to post the retained drawing · five minutes')}`
+      : '';
+  const appendix =
+    ids.includes('wren') && s.discoveries.wren
+      ? `<h3>Wren’s appendix</h3><p>The omitted observation was ambiguous. The retained source page has no supplied identifier or observation detail here. Drafting takes twenty attended minutes. Filing takes a separate chosen five minutes. Filing does not establish approval or a habitat finding.</p>${button('appendix', 'Ask Wren to prepare the appendix · twenty minutes')}<p>${esc(o.appendix.text ?? 'No signed draft yet.')}</p>${o.appendix.filedAt !== undefined ? `<p>Filed in the in-game survey register at ${clock(o.appendix.filedAt)}. Awaiting review.</p><p>The desk may close tonight’s optional dam-owned riverbank corner pending review. This costs Nerys that corner until next night. Her two other corners, emergency access and Wren’s licensed survey duties remain available. This is a precaution, not a habitat finding.</p>${o.access.some((a) => a.night === s?.night) ? `<p>${o.access.find((a) => a.night === s?.night)?.closed ? 'Riverbank corner closed tonight.' : 'Existing optional access left unchanged tonight.'}</p>` : '<button data-private="close-access">Close optional riverbank access tonight pending review</button><button data-private="keep-access">Leave optional access unchanged tonight</button>'}` : button('file-appendix', 'Ask Wren to file the signed draft · five minutes')}`
+      : '';
+  return `<section aria-label="Private scenes"><p>${esc(o.premise)}</p>${telescope}${lamp}${appendix}${o.active ? `<p>Attending ${esc(o.active.action)}. ${o.attempts[o.active.index]?.attended ?? 0} minutes attended. No completed result yet.</p><button data-private="stop">Stop attending</button>` : ''}${o.attempts
+    .filter((a) => a.stoppedAt !== undefined)
+    .map(
+      (a) =>
+        `<p>${esc(a.person)}: ${esc(a.action)} stopped at ${clock(a.stoppedAt as number)} after ${a.attended} minutes. ${esc(a.reason ?? '')}</p>`,
+    )
+    .join('')}</section>`;
+}
 function bindConversations(el: HTMLElement) {
+  // Delegate these changing scene controls: a minute can replace a nested record node.
+  el.onclick = (event) => {
+    const target =
+      event.target instanceof Element ? event.target.closest<HTMLButtonElement>('[data-private]') : null;
+    if (!s || !target || !el.contains(target) || target.disabled) return;
+    const action = target.dataset.private as PrivateAction;
+    queueInput(s, {
+      kind: 'private',
+      action,
+      ...(target.dataset.corner ? { corner: target.dataset.corner as Corner } : {}),
+      ...(action === 'adjust-lamp'
+        ? {
+            shape: (el.querySelector<HTMLSelectElement>('#private-shape')?.value ?? 'boat') as
+              | 'boat'
+              | 'rabbit',
+            lamp: (el.querySelector<HTMLSelectElement>('#private-lamp')?.value ?? 'low') as 'low' | 'high',
+          }
+        : {}),
+    });
+    writeSave();
+  };
   el.querySelectorAll<HTMLButtonElement>('[data-outcome]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!s) return;
