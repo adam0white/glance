@@ -69,6 +69,14 @@ The original five nights remain the default. A new game can opt into “A longer
 
 Technical delivery and independent review receipts belong in the external games-deferred report. This source description is not owner acceptance or a playtest result.
 
+## Public controls — 2026-10-27 candidate
+
+Pace choices are public in native and file menus. New longer watches include joint handover, correction, covered hut rest and all implemented private scenes. Choosing five or twelve nights selects game length; no separate scene switch remains. Existing saved rules remain exact for current-version replay.
+
+New native chapters carry matching people automatically through the public shelf contract. Loaded chapters keep their pinned people. Cast controls live on the central shelf, linked from the ending. File play stays memory-only and does not acquire people. Its dedicated chooser/download path preserves the local saved week; Debug does not offer the former in-place native-save importer. Debug starts collapsed beside Lab privacy.
+
+This is an unreviewed source candidate. Source, live behavior and owner acceptance remain distinct.
+
 ## Deferred — owner and player input
 
 - **Per-keeper bias readout (Priya): Adam, 2026-11-03.** Decide whether a numerical calibration would remove the information puzzle. The delivered comparison can use observed figures without exposing private bias.

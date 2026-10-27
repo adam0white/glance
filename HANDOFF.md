@@ -1,3 +1,15 @@
+# Games-deferred resume candidate — 2026-10-27
+
+Remaining: independent director-launched review of this uncommitted batch, then signed source/CI/live gates. No player rounds or retests. Owner/player review remains 2026-11-03. HF stays pinned to 3.0.0, engine 2.23.0.
+
+Reconciled origin/live: e2939d0901893083e8a65c5b221c5492ab8bc4e5 includes reviewed bdfc0f1930fef0b0ff48aec2651e331dc76b0b83 and 3048587. Exact ci 40470140171 is green. A fresh live release.json reports e2939d0 / HF3.0.0 / dirty:false. The old SDK14 delivery report's source-only/deploy-pending status is superseded by that narrow live receipt. No redeploy was needed. This does not establish occupied-profile, active-service-worker, pending-Blob, recording-ingestion or owner admission.
+
+Candidate behavior: pace controls are public in native and file menus. New longer watches include all implemented joint and private scenes without separate feature switches. Existing saved editions retain their pinned simulation/replay. New native chapters enable the supported public shelf channel and check matching histories automatically. Loaded games keep their pinned people. File mode still constructs no shelf, touches no native save and requires the real SDK existing-local preservation status. Cast controls are removed from Glance; the end screen links to the central shelf. Debug is collapsed beside Lab privacy. File play uses the preservation route; the old diagnostic importer that wrote into the native week has been removed. No vendor bytes or framework logic changed.
+
+The installed kit 0.5.17 notebookMenu still uses a lab query gate; this custom-menu host implements its own small Debug layout without changing vendor bytes. Shared kit adoption needs a published public Debug menu contract; this candidate does not claim that release exists.
+
+Private report and review packet: /Users/abdul/code/.lab-scratch/games-deferred/gd-resume-glance-report.md and gd-resume-glance-READY.json. Earlier handoffs below retain historical claims and limits.
+
 # Native file source candidate — 2026-10-26
 
 Remaining: parent ONE independent review of this coupled nine-path candidate, then integration/exact CI/deployment gates. SDK preservation capability, marker adoption, active-service-worker behavior and occupied-profile runtime admission remain separate and unproved. Adam accepts feel separately. No source publication, commit, push, deployment, owner browser or player run in this author stage.

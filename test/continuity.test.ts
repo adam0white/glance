@@ -1,5 +1,5 @@
 import { castForGame } from '@adam0white/lab-client';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { exportRun, fingerprint, newGame, replay } from '../src/sim/dam.ts';
 import { admitResident } from '../src/sim/passport.ts';
 import { required } from './required.ts';
@@ -408,4 +408,16 @@ it('receives actual paused Commonstead Nerys and replays the complete current no
     wrong.parent.source[field] = 'unsupported';
     expect(() => admitResident(wrong, opening)).toThrow();
   }
+});
+
+it('automatically enables the supported shelf channel before admitting matching people', async () => {
+  const parent = await source('nerys', true);
+  const h = harness([parent]);
+  h.shelf.enabled = false;
+  const setEnabled = vi.spyOn(h.shelf, 'setEnabled');
+  const runtime = new Continuity(h.lab, h.shelf);
+  const s = await runtime.fresh(71);
+  expect(setEnabled).toHaveBeenCalledWith(true);
+  expect(s.chapter?.inputs.some((input) => input.parent.castId === parent.castId)).toBe(true);
+  expect(h.requests.some((request) => request.action === 'prepareBatch')).toBe(true);
 });

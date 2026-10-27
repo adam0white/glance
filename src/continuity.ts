@@ -87,6 +87,12 @@ export class Continuity {
     const generation = this.generation;
     try {
       await this.shelf.ready;
+      // New chapters carry matching people automatically through the public SDK contract.
+      // File sessions never reach this native-only path; loaded chapters keep their pinned people.
+      if (!localOnly && generation === this.generation && !this.shelf.enabled) {
+        this.shelf.setEnabled(true);
+        await this.shelf.ready;
+      }
       if (generation !== this.generation)
         throw new Error('The game changed before the histories could be loaded.');
       const base = createGame(seed, undefined, rules);
