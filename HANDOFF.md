@@ -1,3 +1,11 @@
+# Chosen fictional reply candidate — 2026-10-27
+
+Remaining: director ONE independent review of the exact READY packet, signed source, exact CI, director merge and clean deployment. Adam accepts feel/readiness separately. GDI979 still requires the actual original retained field page; source-owner follow-up is 2026-10-28. Actual retirement/leave, changed rota and agreed home rest remain open.
+
+New recorded public choices offer five attended minutes to read an explicitly fictional stepchild improvement to Bilal’s exact posted shape, or fictional negative responses to Dai/Callum’s completed proposals. HF owns participation and can refuse; duty, visit expiry, radio, stop or pause can interrupt. Posting alone creates no reply. These are supplied authored fiction, never real agency/partner contact, outside receipt or family consent. No incidental relative becomes a Person. Original drawings/proposals remain unchanged. No approval, retirement, rota change, home-rest completion, paid/clinical relief or reconciliation is awarded; actual duty, cover, travel, work and rest costs remain.
+
+No new action means exact old state/Persons/RNG/history/provenance. New records retain named editions and chosen reading times through complete full/compact replay and native file sessions. The delivered5975556 family proposal/visit batch and58b30a8 canonical file route remain intact. HF3 pins, source archives, native formats and capacities are unchanged. Evidence/report/READY use /Users/abdul/code/.lab-scratch/games-deferred/gd-resume-glance-reply-*.
+
 # Keeper family story candidate — 2026-10-27
 
 Remaining: one director-launched independent review, then signed source, exact CI and clean deployment. Adam accepts feel/readiness separately on 2026-11-03. GDI978 fictional reply remains next batch. GDI979 habitat finding still needs retained source input; no measurement is invented. This candidate does not close GDI975/976 in full.

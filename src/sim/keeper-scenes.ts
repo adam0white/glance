@@ -7,6 +7,8 @@ import type { GameState } from './dam.ts';
 export type KeeperSceneAction =
   | 'dai-proposal'
   | 'callum-proposal'
+  | 'dai-fictional-response'
+  | 'callum-fictional-responses'
   | 'daughter-voicemail'
   | 'daughter-invitation'
   | 'daughter-visit'
@@ -49,11 +51,25 @@ export interface KeeperScenes {
   callumProposal?: Proposal;
   voicemail?: { at: number; text: string };
   invitation?: { at: number; night: number; until: number; text: string };
+  fictionalResponses?: Partial<
+    Record<
+      'dai' | 'callum',
+      {
+        edition: 'fictional-response-1';
+        from: number;
+        at: number;
+        proposalAt: number;
+        text: string;
+      }
+    >
+  >;
   decisions: { at: number; action: Task; result: 'refused' | 'begin-failed' | 'began' }[];
 }
 const actions: string[] = [
   'dai-proposal',
   'callum-proposal',
+  'dai-fictional-response',
+  'callum-fictional-responses',
   'daughter-voicemail',
   'daughter-invitation',
   'daughter-visit',
@@ -102,6 +118,8 @@ export function keeperSceneAvailable(s: GameState, action: KeeperSceneAction) {
   if (s.minute < (f?.retryAfter ?? 0)) return false;
   if (!free(s, 'dai') || !free(s, 'callum') || !(s.minute % 1440 >= 1320 || s.minute % 1440 < 280))
     return false;
+  if (action === 'dai-fictional-response') return !!f?.daiProposal && !f.fictionalResponses?.dai;
+  if (action === 'callum-fictional-responses') return !!f?.callumProposal && !f.fictionalResponses?.callum;
   if (action === 'dai-proposal') return !!s.discoveries.dai && !f?.daiProposal;
   if (action === 'callum-proposal') return !!s.discoveries.callum && !f?.callumProposal;
   if (action === 'daughter-voicemail') return !!s.discoveries.dai && !f?.voicemail;
@@ -145,7 +163,7 @@ export function requestKeeperScene(s: GameState, action: KeeperSceneAction) {
       ? 40
       : action === 'daughter-return'
         ? 10
-        : action === 'daughter-voicemail'
+        : ['daughter-voicemail', 'dai-fictional-response', 'callum-fictional-responses'].includes(action)
           ? 5
           : 20;
   const ids: ('dai' | 'callum')[] =
@@ -319,6 +337,23 @@ export function advanceKeeperScenes(s: GameState) {
       text: 'Dai plays the voicemail he kept: “Please stop apologising for an absence you have already chosen.” He has not replied because he cannot tell whether his daughter is angry or has stopped asking. Playing it is not a new reply or an attended visit.',
     };
     say(s, f.voicemail.text);
+  } else if (a.action === 'dai-fictional-response' || a.action === 'callum-fictional-responses') {
+    // Scope: chosen finite fictional answers, not an employer/partner consent process.
+    // A refusal resolves the reading only; actual duty, pay, travel and rest costs remain.
+    const dai = a.action === 'dai-fictional-response';
+    const proposal = dai ? f.daiProposal! : f.callumProposal!;
+    f.fictionalResponses ??= {};
+    const response = {
+      edition: 'fictional-response-1' as const,
+      from: a.from,
+      at: s.minute,
+      proposalAt: proposal.at,
+      text: dai
+        ? 'Chosen authored fiction, fictional-response-1. Agency: “No longer leave or retirement is approved. We have not supplied a qualified replacement, retirement date or pay terms. Keep the proposal open for a staffed rota discussion.” The keepers read this refusal. Dai remains responsible for his actual dam duty and any separately arranged visit, cover, travel and return. No residency or retirement is awarded. Nothing was sent outside this game.'
+        : 'Chosen authored fiction, fictional-response-1. Agency: “We cannot remove those two future shift hours without staffed cover. No rota or pay change is approved.” Partner: “I cannot agree to that two-hour slot. The baby still needs care then. We need a different plan.” The keepers read these refusals. The earlier round record and its correction remain separate from these replies. The proposal remains open; no shared care, completed home rest, paid relief or clinical improvement is awarded. Nothing was sent outside this game.',
+    };
+    f.fictionalResponses[dai ? 'dai' : 'callum'] = response;
+    say(s, response.text);
   } else {
     const dai = a.action === 'dai-proposal';
     const proposal: Proposal = {

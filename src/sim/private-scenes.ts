@@ -20,12 +20,13 @@ export type PrivateAction =
   | 'lamp'
   | 'adjust-lamp'
   | 'post-shape'
+  | 'read-fictional-reply'
   | 'appendix'
   | 'file-appendix'
   | 'close-access'
   | 'keep-access'
   | 'stop';
-type Task = 'telescope' | 'lamp' | 'post-shape' | 'appendix' | 'file-appendix';
+type Task = 'telescope' | 'lamp' | 'post-shape' | 'read-fictional-reply' | 'appendix' | 'file-appendix';
 type Visitor = 'nerys' | 'bilal' | 'wren';
 export interface PrivateInput {
   action: PrivateAction;
@@ -77,6 +78,14 @@ export interface PrivateScenes {
     postedAt?: number;
     postedDrawing?: string;
     channel?: 'in-game-outgoing-post';
+    fictionalReply?: {
+      edition: 'fictional-reply-1';
+      from: number;
+      at: number;
+      postedAt: number;
+      postedDrawing: string;
+      text: string;
+    };
   };
   appendix: {
     startedAt?: number;
@@ -112,11 +121,19 @@ export function cornerSky(seed: number, night: number, minute: number): 'rain' |
   return q < 0.2 ? 'rain' : q < 0.55 ? 'cloud' : 'clear';
 }
 const whoFor = (task: Task): Visitor =>
-  task === 'telescope' ? 'nerys' : task === 'lamp' || task === 'post-shape' ? 'bilal' : 'wren';
+  task === 'telescope'
+    ? 'nerys'
+    : task === 'lamp' || task === 'post-shape' || task === 'read-fictional-reply'
+      ? 'bilal'
+      : 'wren';
 const duration = (task: Task) =>
-  task === 'lamp' ? 10 : task === 'post-shape' || task === 'file-appendix' ? 5 : 20;
+  task === 'lamp'
+    ? 10
+    : task === 'post-shape' || task === 'read-fictional-reply' || task === 'file-appendix'
+      ? 5
+      : 20;
 const isTask = (a: string): a is Task =>
-  ['telescope', 'lamp', 'post-shape', 'appendix', 'file-appendix'].includes(a);
+  ['telescope', 'lamp', 'post-shape', 'read-fictional-reply', 'appendix', 'file-appendix'].includes(a);
 const person = (s: GameState, id: Visitor) => s.people.find((p) => p.id === id) as Person;
 function say(s: GameState, who: Visitor | 'narrator', text: string) {
   s.said.push({ at: s.minute, who, kind: 'answer', text });
@@ -161,6 +178,11 @@ export function privateAvailable(s: GameState, action: Task, corner: Corner = 'r
     (!o.lamp.drawing || o.lamp.completedAt === undefined || o.lamp.postedAt !== undefined)
   )
     return 'A completed new shape is needed; a posted shape is not posted twice.';
+  if (
+    action === 'read-fictional-reply' &&
+    (o.lamp.postedAt === undefined || !o.lamp.postedDrawing || o.lamp.fictionalReply)
+  )
+    return 'A completed fictional post is needed. A chosen fictional reply is read only once.';
   if (action === 'appendix' && o.appendix.draftedAt !== undefined)
     return 'Wren’s signed draft is already retained.';
   if (
@@ -175,6 +197,8 @@ function offer(task: Task): Affordance {
     telescope: 'carry, set up, view and return the telescope',
     lamp: 'play with a new shadow shape and the player-held lamp',
     'post-shape': 'prepare and post the retained drawing in the in-game outgoing post',
+    'read-fictional-reply':
+      'read the explicitly chosen fictional stepchild improvement to the posted drawing',
     appendix: 'prepare the honest appendix from the retained page',
     'file-appendix': 'file the signed appendix in the in-game survey register',
   };
@@ -447,6 +471,22 @@ export function advancePrivate(s: GameState) {
       'bilal',
       'After five minutes preparing it, I post that retained drawing through the in-game outgoing post. Nothing leaves this game. There is no receipt or reply.',
     );
+  } else if (a.action === 'read-fictional-reply') {
+    // Scope: an explicitly recorded story choice supplies this finite fictional reply.
+    // HF owns reading time and refusal; no outside sender, cognition or consent is simulated.
+    const improvement =
+      o.lamp.shape === 'boat'
+        ? 'Put a small triangular flag above the sail. Then I can tell which way our boat is going.'
+        : 'Bend one long ear sideways. Then the rabbit is listening to something beside it.';
+    o.lamp.fictionalReply = {
+      edition: 'fictional-reply-1',
+      from: a.from,
+      at: s.minute,
+      postedAt: o.lamp.postedAt!,
+      postedDrawing: o.lamp.postedDrawing!,
+      text: `Chosen authored fiction, fictional-reply-1: the stepchild’s reply to the retained drawing says, “${improvement}” Bilal reads it and keeps the suggestion beside the original drawing. The drawing is unchanged. This is supplied story content, never a real message, receipt, family consent or reconciliation.`,
+    };
+    say(s, 'bilal', o.lamp.fictionalReply.text);
   } else if (a.action === 'appendix') {
     Object.assign(o.appendix, {
       draftedAt: s.minute,
