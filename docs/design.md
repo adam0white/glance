@@ -77,6 +77,14 @@ New native chapters carry matching people automatically through the public shelf
 
 This is an unreviewed source candidate. Source, live behavior and owner acceptance remain distinct.
 
+## Chosen keeper family scenes — 2026-10-27 candidate
+
+Public keeper inspections offer new recorded actions; no background reply or old history changes. Two keepers may spend twenty minutes drafting Dai’s cover/retirement proposal or Callum’s rota/home-rest proposal. Dai’s plan costs forty minutes of Callum’s own rest for a short visit; retirement date, pay and longer cover remain unknown. Callum requests removal of two future shift hours, with two paid hours potentially lost, and a separate two-hour home-rest discussion. Agency and partner replies remain unsupplied. These are proposals, not approved arrangements or completed home rest.
+
+Dai can choose five minutes to play the retained voicemail. A separate public choice supplies an explicitly fictional invitation for tonight; no outside person is consulted. A willing Dai can then leave work for ten minutes of travel, twenty minutes of actual attendance and ten minutes back. Callum must choose and maintain cover through an actual HF activity. Ordinary dam duty, loss of cover/participation, radio loss, pause or stop interrupts the visit. An interrupted Dai remains away until a separately chosen ten-minute return completes; a duty call cannot queue dam work for him while absent. Only attendance plus return completes the visit. No reconciliation, future family agreement, retirement, competence or safety result follows. The daughter remains incidental, without an HF Person.
+
+The delivered joint transfer, separate test, signed correction and covered hut rest retain their existing behavior. New scene fields are absent until a new action is chosen. Existing full exports and saved editions continue exactly; full and compact replay preserve complete new fields after opted actions. GDI975/976 remain partial until their unanswered proposal outcomes are actually supplied. GDI978 fictional reply is next batch; GDI979 habitat finding still needs retained source input. Owner acceptance remains 2026-11-03 and is separate from this engineering candidate.
+
 ## Deferred — owner and player input
 
 - **Per-keeper bias readout (Priya): Adam, 2026-11-03.** Decide whether a numerical calibration would remove the information puzzle. The delivered comparison can use observed figures without exposing private bias.

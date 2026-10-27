@@ -6,8 +6,21 @@ import { type Affordance, begin, decide, finish, type Person, readDoze } from '@
 import { rememberedConversation } from './cast.ts';
 import type { GameState, KeeperState } from './dam.ts';
 
-export type OutcomeTask = 'handover' | 'handover-test' | 'correction';
+import {
+  advanceKeeperScenes,
+  cancelKeeperScene,
+  isKeeperScene,
+  type KeeperSceneAction,
+  type KeeperScenes,
+  keeperSceneAvailable,
+  keeperSceneOccupies,
+  requestKeeperScene,
+} from './keeper-scenes.ts';
+
+type JointTask = 'handover' | 'handover-test' | 'correction';
+export type OutcomeTask = JointTask | KeeperSceneAction;
 export interface ShiftOutcomes {
+  keeperScenes?: KeeperScenes;
   handover: {
     original: string;
     list: string;
@@ -42,7 +55,7 @@ export interface ShiftOutcomes {
     restedAt?: number;
     restStoppedAt?: number;
   };
-  active?: { task: OutcomeTask; from: number; until: number; night: number };
+  active?: { task: JointTask; from: number; until: number; night: number };
   retryAfter?: number;
 }
 const original =
@@ -70,6 +83,10 @@ function free(s: GameState, id: 'dai' | 'callum') {
   );
 }
 export function outcomeAvailable(s: GameState, task: OutcomeTask) {
+  if (isKeeperScene(task)) return keeperSceneAvailable(s, task);
+  if (!['handover', 'handover-test', 'correction'].includes(task)) return false;
+  if (s.outcomes?.keeperScenes?.active !== undefined || s.outcomes?.keeperScenes?.away !== undefined)
+    return false;
   const o = s.outcomes;
   if (
     !o ||
@@ -124,6 +141,10 @@ function choose(s: GameState, id: 'dai' | 'callum', proposed: Affordance) {
   };
 }
 export function requestOutcome(s: GameState, task: OutcomeTask) {
+  if (isKeeperScene(task)) {
+    requestKeeperScene(s, task);
+    return;
+  }
   if (!outcomeAvailable(s, task)) return;
   const o = s.outcomes as ShiftOutcomes;
   if (task === 'handover-test') {
@@ -203,6 +224,7 @@ export function requestOutcome(s: GameState, task: OutcomeTask) {
   );
 }
 export function cancelOutcome(s: GameState, reason: string) {
+  cancelKeeperScene(s, reason);
   const o = s.outcomes;
   if (!o) return;
   if (o.active) {
@@ -238,6 +260,7 @@ export function cancelOutcome(s: GameState, reason: string) {
 }
 /** Keep an actually attended scene/rest from being treated as a dam job. Body time still advances. */
 export function outcomeOccupies(s: GameState, k: KeeperState): boolean {
+  if (keeperSceneOccupies(s, k.id)) return true;
   const o = s.outcomes;
   if (!o) return false;
   if (o.active && (k.id === 'callum' || (k.id === 'dai' && o.active.task !== 'handover-test'))) return true;
@@ -249,6 +272,7 @@ export function outcomeOccupies(s: GameState, k: KeeperState): boolean {
   );
 }
 export function advanceOutcomes(s: GameState) {
+  advanceKeeperScenes(s);
   const o = s.outcomes;
   if (!o) return;
   if (o.active) {

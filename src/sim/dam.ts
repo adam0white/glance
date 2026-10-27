@@ -42,6 +42,7 @@ import {
 import { canonicalPersona } from '@adam0white/lab-client';
 import { required } from '../required.ts';
 import { ALLOCATION, type CastId, lifeReady, makeVisitor, talk, VISIT_FROM, VISIT_UNTIL } from './cast.ts';
+import { recallDai } from './keeper-scenes.ts';
 import { ENGINEER, KEEPERS, type KeeperId, makeKeeper, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
 import {
   advanceOutcomes,
@@ -1198,6 +1199,7 @@ function apply(s: GameState, inp: Input) {
     case 'pause': {
       s.pauseRequested = true;
       if (s.privateScenes) cancelPrivate(s, 'The player asked to pause.');
+      if (s.outcomes?.keeperScenes) cancelOutcome(s, 'The player asked to pause.');
       s.chapterPaused = s.people.every((p) => !p.activity) && !s.privateScenes?.active;
       say(
         s,
@@ -1229,6 +1231,7 @@ function apply(s: GameState, inp: Input) {
         );
         return;
       }
+      if (inp.keeper === 'dai' && recallDai(s)) return;
       const p = personOf(s, inp.keeper);
       if (s.rules && readDoze(p)?.asleep) {
         tick(p, s.minute);

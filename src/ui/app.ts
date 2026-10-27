@@ -6,6 +6,7 @@ import {
   telemetryOn,
 } from '@adam0white/lab-kit';
 import { required } from '../required.ts';
+import { daiAway, type KeeperSceneAction, keeperSceneAvailable } from '../sim/keeper-scenes.ts';
 import { catchWords, durationWords } from './watch-copy.ts';
 /**
  * The Glance UI: DOM for the board, the radio log and the sheets; one canvas for the dam. The UI reads state and
@@ -390,7 +391,7 @@ function title() {
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">You work at a night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
     <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(false)}</p>
-    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. You work twelve nights, ending at the second Friday’s first light. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><p>The keepers may choose joint handover, record correction and covered rest. Nerys’s telescope trip, Bilal’s shadow play and post, and Wren’s appendix are available when their duties allow. Each person chooses; attended scenes take time. No sighting, reply or habitat finding is promised.</p></details>
+    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. You work twelve nights, ending at the second Friday’s first light. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><p>The keepers may choose joint handover, record correction and covered rest. Dai’s visit and retirement and home-rest proposals take time; proposals await responses. A visit needs chosen cover, attendance and return. Nerys’s telescope trip, Bilal’s shadow play and post, and Wren’s appendix are available when their duties allow. Each person chooses; attended scenes take time. No sighting, reply or habitat finding is promised.</p></details>
     ${debugFooter()}</div>
     <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
     </div></div>`;
@@ -1133,7 +1134,11 @@ function drawConcern() {
   if (!s) return;
   const el = document.getElementById('concern');
   if (!el) return;
-  const lines = concernLines(s);
+  const lines = concernLines(s).map((line) =>
+    daiAway(s as GameState) && line.startsWith('Dai:')
+      ? 'Dai: He is away. Dam work waits for his return.'
+      : line,
+  );
   const ids = planOf(s).keepers;
   const body = `${s.rules ? `<button class="keeper-chip" data-watch-arrangements="1">Watch arrangements</button>` : ''}${s.radioOut ? '<span class="radio-chip">The radio has static.</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(telescopeReturning(s) ? 'She is returning from the telescope and cannot witness the river steps yet.' : shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: She is available.'))}</button>` : ''}`;
   if (!setHtml(el, body)) return;
@@ -1346,7 +1351,7 @@ function observation(st: GameState): string {
 function castConversations(ids: CastId[]): string {
   if (!s) return '';
   const available = discoveriesFor(s);
-  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. ${s?.outcomes ? 'The shift continues slowly while this inspection is open.' : 'Close this inspection to let the shift continue.'} Dam requests still go to the keepers.</p>${outcomeRecord(ids)}${privateRecord(ids)}</details>`;
+  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. ${s?.outcomes ? 'The shift continues slowly while this inspection is open.' : 'Close this inspection to let the shift continue.'} Dam requests still go to the keepers.</p>${outcomeRecord(ids)}${keeperFamilyRecord(ids)}${privateRecord(ids)}</details>`;
 }
 function outcomeRecord(ids: CastId[]): string {
   if (!s?.outcomes || !ids.some((id) => id === 'dai' || id === 'callum')) return '';
@@ -1358,6 +1363,33 @@ function outcomeRecord(ids: CastId[]): string {
     ${s.discoveries.dai ? `<p><b>Dai’s retained original list:</b> ${esc(o.handover.original)}</p><p><b>Current list:</b> ${esc(o.handover.list)}</p>${o.handover.transferredAt !== undefined ? `<p>Both keepers completed the joint transfer at ${clock(o.handover.transferredAt)}. The sensor instruction remains unverified.</p>${o.handover.completedAt !== undefined ? `<p>Callum completed the separate procedural test at ${clock(o.handover.completedAt)}.</p><p>${esc(o.handover.test?.question ?? '')}</p><p>${esc(o.handover.test?.answer ?? '')}</p>` : o.active?.task === 'handover-test' ? `<p>Callum is testing the transferred list alone. No tested result is recorded yet.</p><p>${esc(o.handover.test?.question ?? '')}</p>` : `<p>${o.handover.test?.stoppedAt !== undefined ? 'Callum’s test was interrupted. The joint transfer remains recorded; it is still untested.' : 'The joint transfer awaits Callum’s separate test.'}</p>${button('handover-test', 'Invite Callum to use the transferred list alone · about ten minutes')}`}` : button('handover', 'Invite both keepers to correct and transfer Dai’s handover list')}` : '<p>Dai has not shared his handover list.</p>'}
     ${s.discoveries.callum ? (o.correction.writtenAt !== undefined ? `<p><b>Retained account:</b> ${esc(o.correction.originalAccount ?? '')}</p><p><b>Callum’s signed correction, written ${clock(o.correction.writtenAt)}:</b> ${esc(o.correction.text ?? '')}</p><p>${o.correction.restedAt !== undefined ? `Callum completed thirty minutes of hut rest at ${clock(o.correction.restedAt)} while Dai remained on duty.` : o.correction.restStoppedAt !== undefined ? 'The rest was interrupted. It is not recorded as completed.' : o.correction.restFrom !== undefined ? 'Callum is resting in the hut. Dai remains on duty; a loss of cover stops the rest.' : 'They did not both choose the proposed rest arrangement. Rest remains unarranged.'} The signed correction is filed in the fictional agency correction register and awaits review. Nothing is sent outside this game. No employer response or approval is recorded.</p>` : button('correction', 'Invite Callum’s written correction and a covered rest arrangement')) : '<p>Callum has not shared the signed-round account.</p>'}
     ${o.active && o.active.task !== 'handover-test' ? '<p>The keepers are working together. No completed joint result is recorded yet.</p>' : ''}</section>`;
+}
+function keeperFamilyRecord(ids: CastId[]): string {
+  if (!s?.outcomes || !ids.some((id) => id === 'dai' || id === 'callum')) return '';
+  const f = s.outcomes.keeperScenes;
+  const button = (action: KeeperSceneAction, label: string) =>
+    `<button data-outcome="${action}" ${keeperSceneAvailable(s as GameState, action) ? '' : 'disabled'}>${label}</button>`;
+  const proposal = (p: NonNullable<typeof f>['daiProposal']) =>
+    p
+      ? `<p>${esc(p.text)}</p><p>Written ${clock(p.at)} after twenty minutes together. This proposal awaits responses. No approval or change of duty is recorded.</p>`
+      : '';
+  const trip =
+    f?.attempts.find((a) => a.action === 'daughter-visit' && a.completedAt !== undefined) ??
+    f?.attempts.filter((a) => a.action === 'daughter-visit').at(-1);
+  const current = f?.active === undefined ? undefined : f.attempts[f.active];
+  return `<section aria-label="Keeper family records"><h3>Time away from work</h3>
+  <p>These optional fictional scenes take real shift time. Both keepers must be free to draft a plan. Each chooses whether to join. No employer or family agreement follows from a biography or a good shift.</p>
+  ${proposal(f?.daiProposal)}${!f?.daiProposal ? button('dai-proposal', 'Draft Dai’s cover and retirement proposal · about twenty minutes') : ''}
+  ${proposal(f?.callumProposal)}${!f?.callumProposal ? button('callum-proposal', 'Draft Callum’s rota and home-rest proposal · about twenty minutes') : ''}
+  ${f?.voicemail ? `<p>${esc(f.voicemail.text)}</p>` : button('daughter-voicemail', 'Invite Dai to play his retained voicemail · about five minutes')}
+  ${f?.voicemail ? button('daughter-invitation', 'Choose the fictional visit invitation for tonight') : ''}
+  ${f?.invitation ? `<p>${esc(f.invitation.text)} The offered time ends at ${clock(f.invitation.until)} tonight.</p>` : ''}
+  <p>The visit costs ten minutes out, twenty minutes attending and ten minutes back. Callum reserves forty minutes for duty instead of possible rest. Duty, lost cover or radio loss can interrupt it. Dai cannot read gauges or turn the wheel while away.</p>
+  ${button('daughter-visit', 'Invite the covered visit · about forty minutes')}
+  ${current ? `<p>A chosen scene is in progress. No completed result is recorded yet.</p>${button('stop-family', 'Stop the scene')}` : ''}
+  ${trip ? `<p>Dai left work at ${clock(trip.from)}.${trip.arrivedAt !== undefined ? ` He arrived at ${clock(trip.arrivedAt)}.` : ' Arrival is not recorded.'} Visit attendance: ${trip.attended} minutes. ${trip.completedAt !== undefined ? `Dai completed the visit and returned to work at ${clock(trip.returnedAt!)}.` : trip.stoppedAt !== undefined ? 'The visit was interrupted and remains incomplete.' : 'The visit has not finished.'} ${trip.returnedAt !== undefined && trip.completedAt === undefined ? `Dai returned at ${clock(trip.returnedAt)}.` : ''}</p>` : ''}
+  ${daiAway(s) ? `<p>Dai is still away. He cannot do dam work from there.</p>${button('daughter-return', 'Invite Dai’s return · about ten minutes')}` : ''}
+  </section>`;
 }
 function privateRecord(ids: CastId[]): string {
   if (!s?.privateScenes || !ids.some((id) => ['nerys', 'bilal', 'wren'].includes(id))) return '';
@@ -1483,6 +1515,13 @@ function patchSheet(el: HTMLElement, html: string, stable: boolean) {
 function deskHint(st: GameState, who: KeeperId, job: Job, target?: number, insist = false): Hint {
   const h = hint(st, who, job, target, insist);
   const activity = personOf(st, who).activity?.affordanceId;
+  if (who === 'dai' && daiAway(st))
+    return {
+      ...h,
+      short: 'He is away. Call him back; dam work waits for his return.',
+      minutes: 0,
+      forecast: '',
+    };
   if (st.radioOut) return { ...h, short: 'The radio is out.', minutes: 0, forecast: '' };
   if (activity === 'doze' || activity === 'nap' || (st.rules && keeperAsleep(st, who)))
     return { ...h, short: 'Call and wait for his answer.', minutes: 0, forecast: '' };
@@ -1507,6 +1546,8 @@ function lastWords(st: GameState, g: Gauge): string {
 
 function whereWords(id: KeeperId): string {
   if (!s) return '';
+  if (id === 'dai' && daiAway(s))
+    return 'He is away from the dam for the family scene. Dam work waits for his actual return.';
   const k = keeperOf(s, id);
   const a = personOf(s, id).activity?.affordanceId;
   if (a === 'doze' || a === 'nap' || (s.rules && keeperAsleep(s, id)))
