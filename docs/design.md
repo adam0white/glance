@@ -85,6 +85,14 @@ Dai can choose five minutes to play the retained voicemail. A separate public ch
 
 The delivered joint transfer, separate test, signed correction and covered hut rest retain their existing behavior. New scene fields are absent until a new action is chosen. Existing full exports and saved editions continue exactly; full and compact replay preserve complete new fields after opted actions. GDI975/976 remain partial until their unanswered proposal outcomes are actually supplied. GDI978 fictional reply is next batch; GDI979 habitat finding still needs retained source input. Owner acceptance remains 2026-11-03 and is separate from this engineering candidate.
 
+## Chosen fictional readings — 2026-10-27 candidate
+
+The public “Choose the fictional stepchild reply” action asks Bilal to spend five actual minutes reading an authored improvement to his completed, fictionally posted drawing. A boat gains a suggested flag; a rabbit gains a suggested bent ear. The original drawing stays unchanged. The reply record pins fictional-reply-1, the posted drawing/time and actual attended reading times. No new input means no reply. Visit expiry, relief work, refusal or interrupted attendance prevents a completed reading. No outside message, family consent or reconciliation follows.
+
+Separate public fictional-response choices ask both free keepers to read supplied fictional refusals for five minutes. The agency refuses Dai’s longer leave/retirement without a replacement. Callum’s agency refuses a shift change without cover; his partner declines the proposed two-hour slot because baby care is not arranged. The fictional-response-1 records reference the original completed proposals. Those proposals remain unchanged and actual arrangements remain unresolved. No actual agency/partner was contacted. Duty, cover, travel, work/pay and rest costs remain with the real keepers; no leave, residency, changed rota, shared care, completed home rest, paid relief or clinical result is awarded. No extra Person or simulated institution is added.
+
+GDI978’s supplied fictional improvement and GDI975/976’s supplied negative-response clauses are this finite batch only. Actual retirement/rota/home-rest clauses remain open. GDI979’s actual retained field-page text, identifier, observation detail, species, date, location and measurement are absent from the named original registry/source maps/private-scene report links. Unknown detail is not a software defect. No habitat finding is invented. Games-deferred/canonical cast source author owns obtaining the original input or its exact link; follow-up2026-10-28. Precautionary access, original appendix and all archive/file capacities remain unchanged.
+
 ## Deferred — owner and player input
 
 - **Per-keeper bias readout (Priya): Adam, 2026-11-03.** Decide whether a numerical calibration would remove the information puzzle. The delivered comparison can use observed figures without exposing private bias.

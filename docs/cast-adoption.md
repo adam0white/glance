@@ -57,3 +57,9 @@ Fresh original people and new admitted chapters use persisted plain English narr
 Current exports replay their complete pinned chapter state; incompatible older files are refused.
 The source mappings and admission qualifications remain unchanged.
 See the upgrade lesson in `docs/lab/plain-english.md` and the delivery evidence in `~/code/.lab-scratch/hfadopt/glance-report.md`.
+
+## Chosen fictional reply candidate, 2026-10-27
+
+The original Deferred table above stays literal. GDI978 gains a separately chosen five-minute reading of the stepchild’s explicitly authored fictional improvement to the exact posted boat/rabbit drawing. GDI975/976 gain chosen five-minute readings of explicitly fictional negative agency/partner responses to the completed proposals. HF participation, actual elapsed attendance, refusal and interruption remain authoritative. All original drawings/proposals, actual dam duties, cover/travel/return costs and supported autonomy remain. Incidental relatives stay background. No outside contact/receipt/consent, approval, retirement, rota change, home-rest completion, paid/clinical relief or reconciliation is claimed.
+
+Actual retirement/rota/home-rest remain unresolved. GDI979 needs actual original retained field-page content; the original registry and named source-map/report links supply only an omitted ambiguous observation. No identifier/detail/species/date/location/measurement is invented. Source owner: games-deferred/canonical cast source author, follow-up2026-10-28. Exact review/source/CI/live evidence is external under gd-resume-glance-reply; candidate status is not delivery or owner acceptance.

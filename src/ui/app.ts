@@ -1381,6 +1381,9 @@ function keeperFamilyRecord(ids: CastId[]): string {
   <p>These optional fictional scenes take real shift time. Both keepers must be free to draft a plan. Each chooses whether to join. No employer or family agreement follows from a biography or a good shift.</p>
   ${proposal(f?.daiProposal)}${!f?.daiProposal ? button('dai-proposal', 'Draft Dai’s cover and retirement proposal · about twenty minutes') : ''}
   ${proposal(f?.callumProposal)}${!f?.callumProposal ? button('callum-proposal', 'Draft Callum’s rota and home-rest proposal · about twenty minutes') : ''}
+  <p>Separate choices below supply authored fictional refusals to the proposals. No real agency or partner is contacted. Both keepers must choose five minutes to read each response. Actual duty, travel, cover, lost work and rest costs remain theirs.</p>
+  ${f?.daiProposal ? (f.fictionalResponses?.dai ? `<p>${esc(f.fictionalResponses.dai.text)}</p><p>Read at ${clock(f.fictionalResponses.dai.at)} after five attended minutes. Original proposal retained.</p>` : button('dai-fictional-response', 'Choose the fictional agency refusal and read with Dai · five minutes')) : ''}
+  ${f?.callumProposal ? (f.fictionalResponses?.callum ? `<p>${esc(f.fictionalResponses.callum.text)}</p><p>Read at ${clock(f.fictionalResponses.callum.at)} after five attended minutes. Original proposal retained.</p>` : button('callum-fictional-responses', 'Choose the fictional agency and partner refusals and read with Callum · five minutes')) : ''}
   ${f?.voicemail ? `<p>${esc(f.voicemail.text)}</p>` : button('daughter-voicemail', 'Invite Dai to play his retained voicemail · about five minutes')}
   ${f?.voicemail ? button('daughter-invitation', 'Choose the fictional visit invitation for tonight') : ''}
   ${f?.invitation ? `<p>${esc(f.invitation.text)} The offered time ends at ${clock(f.invitation.until)} tonight.</p>` : ''}
@@ -1401,7 +1404,7 @@ function privateRecord(ids: CastId[]): string {
       ? 'Nerys is returning from the telescope. Wait for her to return.'
       : reason;
   const button = (
-    action: 'telescope' | 'lamp' | 'post-shape' | 'appendix' | 'file-appendix',
+    action: 'telescope' | 'lamp' | 'post-shape' | 'read-fictional-reply' | 'appendix' | 'file-appendix',
     label: string,
   ) => {
     const reason = availabilityReason(privateAvailable(s as GameState, action));
@@ -1422,7 +1425,7 @@ function privateRecord(ids: CastId[]): string {
       : '';
   const lamp =
     ids.includes('bilal') && s.discoveries.bilal
-      ? `<h3>Bilal’s shadow play</h3><p>His existing heron is an old story. Hold and adjust his own lamp and choose a new practice shape during ten attended minutes. Relief work and its travel cannot overlap. Posting the retained drawing takes a separate chosen five minutes. Nothing leaves the game. No receipt or reply is recorded.</p>${button('lamp', 'Ask to hold the lamp · ten minutes')}${o.active?.action === 'lamp' ? '<label>New shape<select id="private-shape"><option value="boat">Boat</option><option value="rabbit">Rabbit</option></select></label><label>Lamp position<select id="private-lamp"><option value="low">Low</option><option value="high">High</option></select></label><button data-private="adjust-lamp">Adjust the lamp and try this new shape</button>' : ''}<p>${esc(o.lamp.drawing ?? 'No completed new drawing retained.')}</p>${o.lamp.postedAt !== undefined ? `<p>Posted in the in-game outgoing post at ${clock(o.lamp.postedAt)}: ${esc(o.lamp.postedDrawing ?? '')}</p>` : button('post-shape', 'Ask to post the retained drawing · five minutes')}`
+      ? `<h3>Bilal’s shadow play</h3><p>His existing heron is an old story. Hold and adjust his own lamp and choose a new practice shape during ten attended minutes. Relief work and its travel cannot overlap. Posting the retained drawing takes a separate chosen five minutes. Nothing leaves the game. Posting supplies no reply. A separate public choice supplies an authored fictional stepchild improvement, read only if Bilal chooses five minutes for it. No outside sender or family consent is implied.</p>${button('lamp', 'Ask to hold the lamp · ten minutes')}${o.active?.action === 'lamp' ? '<label>New shape<select id="private-shape"><option value="boat">Boat</option><option value="rabbit">Rabbit</option></select></label><label>Lamp position<select id="private-lamp"><option value="low">Low</option><option value="high">High</option></select></label><button data-private="adjust-lamp">Adjust the lamp and try this new shape</button>' : ''}<p>${esc(o.lamp.drawing ?? 'No completed new drawing retained.')}</p>${o.lamp.postedAt !== undefined ? `<p>Posted in the in-game outgoing post at ${clock(o.lamp.postedAt)}: ${esc(o.lamp.postedDrawing ?? '')}</p>` : button('post-shape', 'Ask to post the retained drawing · five minutes')}${o.lamp.fictionalReply ? `<p>${esc(o.lamp.fictionalReply.text)}</p><p>Read after five attended minutes, at ${clock(o.lamp.fictionalReply.at)}. Original posted drawing: ${esc(o.lamp.fictionalReply.postedDrawing)}</p>` : button('read-fictional-reply', 'Choose the fictional stepchild reply and ask Bilal to read · five minutes')}`
       : '';
   const appendix =
     ids.includes('wren') && s.discoveries.wren

@@ -805,3 +805,59 @@ it('offers costed keeper proposals publicly and records a chosen attended draft 
     'awaits responses',
   );
 });
+
+// Actual App control, synthetic public-input fixture; no browser profile or outside submission.
+it('labels a chosen fictional reply and retains posting when reading is unavailable or interrupted', async () => {
+  window.history.replaceState({}, '', '/');
+  const run = newGame(7, undefined, { edition: 'extended-2', dam: 'valley', outcomes: 'private-scenes-1' });
+  for (let n = 0; n < 6000 && run.privateScenes?.active?.action !== 'post-shape'; n++) {
+    if (run.phase === 'dawn') {
+      queueInput(run, { kind: 'next' });
+      continue;
+    }
+    if (run.minute % 1440 === 1321) queueInput(run, { kind: 'ask', keeper: 'dai', job: 'gate', target: 4 });
+    for (const person of discoveriesFor(run)) {
+      const first = run.conversations[person];
+      if (first === undefined || run.minute - first >= 20) queueInput(run, { kind: 'talk', person });
+    }
+    if (run.privateScenes?.active?.action === 'lamp')
+      queueInput(run, { kind: 'private', action: 'adjust-lamp', shape: 'boat', lamp: 'low' });
+    if (!run.privateScenes?.active)
+      queueInput(run, {
+        kind: 'private',
+        action: run.privateScenes?.lamp.completedAt === undefined ? 'lamp' : 'post-shape',
+      });
+    step(run);
+  }
+  expect(run.privateScenes?.active?.action).toBe('post-shape');
+  localStorage.setItem('glance-cast-local-v3', JSON.stringify(localFixture(run)));
+  const debug = await boot();
+  await click('cont');
+  const open = () => (document.querySelector('#concern [data-inn]') as HTMLButtonElement).click();
+  const control = () => document.querySelector<HTMLButtonElement>('[data-private="read-fictional-reply"]');
+  open();
+  expect(control()?.disabled).toBe(true);
+  expect(control()?.textContent).toContain('Choose the fictional stepchild reply');
+  expect(document.body.textContent).toContain('Finish or stop the attended scene first.');
+  debug.step(25);
+  open();
+  expect(control()?.disabled).toBe(false);
+  control()!.click();
+  debug.step(1);
+  expect(state(debug).inputs.at(-1)).toMatchObject({ kind: 'private', action: 'read-fictional-reply' });
+  expect(state(debug).privateScenes?.active?.action).toBe('read-fictional-reply');
+  open();
+  document.querySelector<HTMLButtonElement>('[data-private="stop"]')!.click();
+  debug.step(1);
+  expect(state(debug).privateScenes?.lamp.fictionalReply).toBeUndefined();
+  const drawing = state(debug).privateScenes?.lamp.postedDrawing;
+  debug.step(20);
+  open();
+  control()!.click();
+  debug.step(6);
+  open();
+  expect(state(debug).privateScenes?.lamp.fictionalReply?.postedDrawing).toBe(drawing);
+  expect(document.body.textContent).toContain('small triangular flag');
+  expect(document.body.textContent).toContain('authored fiction');
+  expect(control()).toBeNull();
+});
