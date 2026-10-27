@@ -1692,6 +1692,34 @@ function watchArrangements() {
 
 // ---------- the week ----------
 
+// Run the supported publication once per finished state; no fixture or synthetic ownership.
+const endingPublications = new WeakMap<GameState, Promise<{ published: number; refused: number }>>();
+function publishEnding(state: GameState) {
+  if (fileMode) return;
+  const generation = continuity.generation,
+    runId = continuity.runId;
+  const current = () =>
+    s === state && screen === 'end' && generation === continuity.generation && runId === continuity.runId;
+  let pending = endingPublications.get(state);
+  if (!pending) {
+    pending = continuity.checkpointAll();
+    endingPublications.set(state, pending);
+  }
+  void pending
+    .then(({ published, refused }) => {
+      if (!current()) return;
+      const result = document.getElementById('continuity-result');
+      if (result)
+        result.textContent = `${published} histories saved to the browser shelf. ${refused ? `${refused} could not be saved. Their duties, condition or the shelf may prevent travel. Download this run to keep every source.` : 'The shelf can show which receiving games accept each history.'}`;
+    })
+    .catch(() => {
+      if (!current()) return;
+      const result = document.getElementById('continuity-result');
+      if (result)
+        result.textContent =
+          'The browser shelf could not be reached. Download this run; no successful transfer is claimed.';
+    });
+}
 function ending() {
   destroyStage();
   if (!s) return;
@@ -1722,9 +1750,10 @@ function ending() {
       .join('')}</ul>
     <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong readings during ${s.rules ? 'the longer watch' : 'the week'}.` : ''}</p>
     ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(l.aboutYou)}</p></div>`).join('')}
-    <div id="closing-tally"></div><button class="reading-row" id="back">${EXTENDED_PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
+    ${fileMode ? '' : '<p id="continuity-result" role="status">Checking the browser shelf. No transfer is confirmed yet.</p>'}<div id="closing-tally"></div><button class="reading-row" id="back">${EXTENDED_PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
     <div class="actionbar ending-actions"><div><button id="send">Feedback</button><button id="export">Download this run</button><a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">Continue people in another game</a></div><button class="primary" id="again">${fileMode ? 'Choose another file' : 'New game'}</button></div></div>`;
   bindTopbar();
+  publishEnding(s);
   updateTally();
   document.getElementById('again')?.addEventListener('click', () => {
     if (fileMode) {

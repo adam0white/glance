@@ -19,6 +19,7 @@ import { exportCurrent as exportRun, importCurrent as importRun } from './sim/ru
 type Shelf = ReturnType<typeof personaChannel>;
 type SourceArchive = { revision: string; source: PersonaEnvelope['source']; snapshot: unknown };
 export const LOCAL_KEY = 'glance-cast-local-v3';
+// Native archive capacity is serialized JSON UTF-16 code units, as on local load/import.
 const maxArchive = 1_000_000;
 
 /** Pure entry selection, shared by the pre-SDK module and app evaluation. */
@@ -410,11 +411,14 @@ export class Continuity {
         !state.inputs.some((input) => input.kind !== 'pause' && input.kind !== 'resume') ||
         state.minute <= 1320 ||
         (!state.chapterPaused &&
+          state.phase !== 'end' &&
           state.people.find((p) => p.id === CAST.find((c) => c.castId === castId)?.id)?.body.alive !== false)
       )
         throw new Error(
           'Play the game, then pause the chapter after the current work finishes before saving a person.',
         );
+      // A finished chapter is not a pause: admit only its actual complete replay.
+      if (state.phase === 'end') importRun(exportRun(state));
       await this.shelf.ready;
       if (!current() || !this.shelf.enabled)
         throw new Error('Carrying people between games is off, or the game has changed.');
@@ -428,7 +432,7 @@ export class Continuity {
       if (!villager.person.body.alive) {
         if (!parent)
           throw new Error('This game does not own a living history for this person that it can close.');
-        if (parent.terminal) return;
+        if (parent.terminal) return false;
         raw = snapshot(villager.person);
         const closed = await closePersonaBranch(parent, this.source(), villager.person.now);
         const { revision: _revision, ...body } = closed;
@@ -462,8 +466,15 @@ export class Continuity {
       if (!current()) throw new Error('The game changed before this history could be saved.');
       // Preserve full actual source before publication, including failed CAS attempts, local only.
       if (raw) {
-        this.sources.push({ revision: envelope.revision, source: envelope.source, snapshot: raw });
-        while (JSON.stringify(this.sources).length > maxArchive) this.sources.shift();
+        const retained = [
+          ...this.sources,
+          { revision: envelope.revision, source: envelope.source, snapshot: raw },
+        ];
+        if (JSON.stringify(retained).length > maxArchive)
+          throw new Error(
+            'Complete source archive exceeds capacity. Download this run. This history was not published.',
+          );
+        this.sources = retained;
         this.changed();
       }
       if (!current()) throw new Error('The game changed before this history could be saved.');
@@ -473,7 +484,7 @@ export class Continuity {
         fork,
         authored: !fork && !parent && !this.fileOrigin && !state.chapter?.inputs.length,
       });
-      if (!current()) return;
+      if (!current()) return false;
       this.heads = [...this.heads.filter((p) => p.castId !== castId), envelope].sort((a, b) =>
         a.castId.localeCompare(b.castId),
       );
@@ -482,20 +493,37 @@ export class Continuity {
       this.status = `${villager.name}: ${envelope.terminal ? 'The end of this history was saved' : 'This point in the history was saved'}. Data that other games cannot use stays in the local export.`;
       this.changed();
       await this.recording();
+      return true;
     });
-    this.operation = task.catch(() => {});
+    this.operation = task.then(
+      () => {},
+      () => {},
+    );
     return task;
   }
   async checkpointAll() {
     this.nativeOnly();
+    const generation = this.generation,
+      state = this.state,
+      runId = this.runId;
+    const current = () => generation === this.generation && state === this.state && runId === this.runId;
+    let published = 0;
+    let refused = 0;
     for (const c of CAST) {
+      if (!current()) break;
       try {
-        await this.checkpoint(c.castId);
+        const saved = await this.checkpoint(c.castId);
+        if (!current()) break;
+        if (saved) published++;
+        else refused++;
       } catch (error) {
+        if (!current()) break;
+        refused++;
         this.status = String(error);
       }
     }
-    this.changed();
+    if (current()) this.changed();
+    return { published, refused };
   }
 }
 
