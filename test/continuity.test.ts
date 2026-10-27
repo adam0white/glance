@@ -18,7 +18,7 @@ it('uses released complete profiles and refuses a public profile in place of a p
 });
 
 // Synthetic protocol/semantic controls. These are not browser journey evidence.
-import { createPerson } from '@adam0white/human-framework';
+import { createPerson, snapshot } from '@adam0white/human-framework';
 import {
   acceptPersona,
   acceptPersonaBatch,
@@ -420,4 +420,108 @@ it('automatically enables the supported shelf channel before admitting matching 
   expect(setEnabled).toHaveBeenCalledWith(true);
   expect(s.chapter?.inputs.some((input) => input.parent.castId === parent.castId)).toBe(true);
   expect(h.requests.some((request) => request.action === 'prepareBatch')).toBe(true);
+});
+
+it('publishes a naturally finished native chapter without requiring an unreachable pause input', async () => {
+  const h = harness();
+  const runtime = new Continuity(h.lab, h.shelf);
+  const state = await runtime.fresh(7);
+  while (state.phase !== 'end') {
+    if (state.phase === 'dawn') queueInput(state, { kind: 'next' });
+    else step(state);
+  }
+  expect(state.chapterPaused).toBe(false);
+  const result = await runtime.checkpointAll();
+  const puts = h.requests.filter((r) => r.action === 'put');
+  expect(result.published).toBe(puts.length);
+  expect(result.refused).toBe(5 - puts.length);
+  expect(h.requests.some((r) => r.action === 'put' && r.envelope?.castId === 'hf.cast.nerys.glance')).toBe(
+    true,
+  );
+  expect(runtime.sources).toHaveLength(result.published);
+  for (const put of puts) {
+    const retained = required(runtime.sources.find((entry) => entry.revision === put.envelope?.revision));
+    const id = String(put.envelope?.transfer.sourceRole);
+    expect(retained.snapshot).toEqual(snapshot(required(state.people.find((p) => p.id === id))));
+  }
+  expect(exportCurrent(importCurrent(exportCurrent(state)))).toEqual(exportCurrent(state));
+});
+
+it('refuses a native checkpoint at archive capacity without dropping any retained source or publishing', async () => {
+  const h = harness();
+  const runtime = new Continuity(h.lab, h.shelf);
+  const state = await runtime.fresh(7);
+  while (state.phase !== 'end') {
+    if (state.phase === 'dawn') queueInput(state, { kind: 'next' });
+    else step(state);
+  }
+  const retained = {
+    revision: 'a'.repeat(64),
+    source: runtime.source(),
+    snapshot: snapshot(required(state.people.find((p) => p.id === 'nerys'))),
+    raw: '',
+  };
+  runtime.sources = [retained];
+  retained.raw = 'é'.repeat(999900 - JSON.stringify(runtime.sources).length);
+  expect(JSON.stringify(runtime.sources).length).toBe(999900);
+  expect(new TextEncoder().encode(JSON.stringify(runtime.sources)).byteLength).toBeGreaterThan(1_000_000);
+  const world = exportCurrent(state);
+  const claims = structuredClone(runtime.heads);
+  const before = JSON.stringify(runtime.sources);
+  await expect(runtime.checkpoint('hf.cast.nerys.glance')).rejects.toThrow(/archive.*capacity/i);
+  expect(JSON.stringify(runtime.sources)).toBe(before);
+  expect(h.requests.some((r) => r.action === 'put')).toBe(false);
+  expect(runtime.heads).toEqual(claims);
+  expect(exportCurrent(state)).toEqual(world);
+});
+
+it('refuses a fabricated ending through the complete current source verifier', async () => {
+  const h = harness();
+  const runtime = new Continuity(h.lab, h.shelf);
+  const state = await runtime.fresh(7);
+  queueInput(state, { kind: 'ring' });
+  step(state);
+  state.phase = 'end';
+  await expect(runtime.checkpoint('hf.cast.nerys.glance')).rejects.toThrow(/replay/i);
+  expect(runtime.sources).toEqual([]);
+  expect(h.requests.some((r) => r.action === 'put')).toBe(false);
+});
+
+// Independent reviewer control: queued ending publication must not write a successor run.
+it('review: cancellation during ending publication leaves successor status untouched', async () => {
+  const h = harness();
+  const changed = vi.fn();
+  const runtime = new Continuity(h.lab, h.shelf, changed);
+  const state = await runtime.fresh(7);
+  while (state.phase !== 'end') {
+    if (state.phase === 'dawn') queueInput(state, { kind: 'next' });
+    else step(state);
+  }
+  let release!: () => void;
+  let entered!: () => void;
+  const enteredPut = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const original = h.shelf.request.bind(h.shelf);
+  h.shelf.request = async <T>(r: PersonaRequest): Promise<T> => {
+    if (r.action === 'put') {
+      entered();
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      throw new Error('old ending refused');
+    }
+    return original<T>(r);
+  };
+  const pending = runtime.checkpointAll();
+  await enteredPut;
+  runtime.clear();
+  runtime.status = 'successor status';
+  changed.mockClear();
+  release();
+  await pending;
+  expect(runtime.status).toBe('successor status');
+  expect(changed).not.toHaveBeenCalled();
+  expect(runtime.heads).toEqual([]);
+  expect(runtime.sources).toEqual([]);
 });

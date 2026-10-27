@@ -745,3 +745,22 @@ it('offers all implemented scenes in a new longer watch without feature switches
   expect(state(debug).outcomes).toBeDefined();
   expect(state(debug).privateScenes).toBeDefined();
 });
+
+it('automatically checkpoints a finished native run and exposes a truthful receipt summary', async () => {
+  const run = newGame(7);
+  while (run.phase !== 'end') {
+    if (run.phase === 'dawn') queueInput(run, { kind: 'next' });
+    else step(run);
+  }
+  localStorage.setItem('glance-cast-local-v3', JSON.stringify(localFixture(run)));
+  const { Continuity } = await import('../src/continuity.ts');
+  const checkpoint = vi
+    .spyOn(Continuity.prototype, 'checkpointAll')
+    .mockResolvedValue({ published: 2, refused: 3 } as never);
+  await boot();
+  await click('cont');
+  expect(checkpoint).toHaveBeenCalledOnce();
+  expect(document.getElementById('continuity-result')?.textContent).toContain('2 histories saved');
+  expect(document.getElementById('continuity-result')?.textContent).toContain('3 could not');
+  expect(document.querySelector('#export')).not.toBeNull();
+});

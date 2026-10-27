@@ -1,3 +1,13 @@
+# Checkpoint/archive/end-screen safety candidate — 2026-10-27
+
+Remaining: director-launched independent review of this exact candidate, then signed source, exact green CI, clean deployment and two-size engineering verification. This batch ends at delivery and cleanup. No player round or retest; Adam accepts feel/readiness separately on 2026-11-03. HF remains 3.0.0.
+
+Base is delivered b492faadfc501b71f83a090ff4eab90a4b52e5e2. Only retained continuity and ending draft hunks were restored; no story or pause-menu change. A naturally finished native source passes the complete current replay verifier and the unchanged finite Person/calendar projection and shelf CAS/file-origin guards. Ending is not treated as paused and no duties are waived.
+
+A proposed archive includes all prior entries and their optional fields plus the full new snapshot. Capacity remains the existing 1,000,000 serialized JSON UTF-16 code-unit limit used by native load/import, not the separate 16MiB UTF8 file-session bound. An oversized proposal refuses before installation or shelf put. No old source is dropped. Batch publication captures generation, state and runId; cancellation stops remaining people without touching successor status or save callbacks. Native endings invoke the supported checkpointAll adapter once per finished state and show actual publication/refusal counts. The central shelf link offers receiving games; it does not establish transfer or acceptance. File ending does not publish or construct a shelf. Full/compact replay and legacy saved editions remain unchanged.
+
+Source proof and review packet: /Users/abdul/code/.lab-scratch/games-deferred/gd-resume-glance-capacity-{report.md,READY.json}. Focused RED history retained. Normal lane passes 147 tests/20 files, lint and types with existing 106 warnings/12 infos. End/occupied-archive API controls use actual SDK acceptPersona with a synthetic in-memory shelf; they are engineering evidence, not a real cross-host owner journey. Source, live and owner acceptance remain separate. Story clauses GDI-975/976/978 remain for the director's next batch; this worker must not start them.
+
 # Games-deferred resume candidate — 2026-10-27
 
 Remaining: independent director-launched review of this uncommitted batch, then signed source/CI/live gates. No player rounds or retests. Owner/player review remains 2026-11-03. HF stays pinned to 3.0.0, engine 2.23.0.
