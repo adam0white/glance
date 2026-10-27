@@ -1447,3 +1447,24 @@ input[type="text"],
   font-size: 13px;
   fill: var(--ink);
 }
+
+.debug-footer {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  font-size: 0.8rem;
+}
+.debug-footer details {
+  min-width: 0;
+}
+.debug-footer summary {
+  cursor: pointer;
+}
+.debug-footer details[open] {
+  flex: 1;
+}
+.debug-footer details button,
+.debug-footer details a,
+.debug-footer small {
+  display: block;
+}

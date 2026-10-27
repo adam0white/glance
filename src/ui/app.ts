@@ -76,8 +76,6 @@ import { watchStage } from './stage.ts';
 import { tallyBody } from './tally.ts';
 import { readingTime } from './time.ts';
 
-const labMode = () => new URLSearchParams(location.search).get('lab') === '1';
-
 const SAVE = LOCAL_KEY;
 const entryMode = fileEntry(location.search);
 const fileMode = entryMode !== 'native';
@@ -392,10 +390,10 @@ function title() {
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">You work at a night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
     <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(false)}</p>
-    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. You work twelve nights, ending at the second Friday’s first light. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><label><input id="shift-outcomes" type="checkbox">Offer joint handover and record correction in this new longer watch</label><p>The keepers can decline. Their work takes time while the storm continues. Callum may choose a covered rest in the hut. No message leaves this game.</p><label><input id="private-scenes" type="checkbox">Also offer Nerys’s telescope trip, Bilal’s shadow play and post, and Wren’s appendix in this new longer watch</label><p>Each person chooses. These scenes take attended time. The riverbank corner has optional dam-owned access that the desk may close for tonight pending review. No sighting, reply or habitat finding is promised.</p></details>
-    ${labMode() ? '<button class="reading-row" id="other">Lab tools <span>▸</span></button>' : ''}</div>
+    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. You work twelve nights, ending at the second Friday’s first light. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><p>The keepers may choose joint handover, record correction and covered rest. Nerys’s telescope trip, Bilal’s shadow play and post, and Wren’s appendix are available when their duties allow. Each person chooses; attended scenes take time. No sighting, reply or habitat finding is promised.</p></details>
+    ${debugFooter()}</div>
     <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
-    ${labMode() ? `<p class="credit">People by the Human Framework ${FRAMEWORK_VERSION}</p>` : ''}</div></div>`;
+    </div></div>`;
   bindTopbar();
   document.getElementById('extended-watch')?.addEventListener('change', () => {
     const extended = (document.getElementById('extended-watch') as HTMLInputElement).checked;
@@ -443,7 +441,7 @@ function title() {
     required(document.getElementById('restart-confirm')).hidden = true;
     required(document.getElementById('new')).hidden = false;
   });
-  document.getElementById('other')?.addEventListener('click', otherWays);
+  document.getElementById('debug-download')?.addEventListener('click', download);
 }
 
 function fileChooser() {
@@ -489,35 +487,8 @@ function fileChooser() {
   });
 }
 
-function otherWays() {
-  if (!labMode()) return;
-  const d = dialog(
-    'other-ways',
-    'Other ways in',
-    '<button id="browser-people">Browser people and continuity</button><button id="load">Load a playtest run</button><input type="file" id="file" accept="application/json" hidden><p id="load-result" role="status"></p>',
-  );
-  const file = d.querySelector('#file') as HTMLInputElement;
-  d.querySelector('#browser-people')?.addEventListener('click', continuityMenu);
-  d.querySelector('#load')?.addEventListener('click', () => file.click());
-  file.addEventListener('change', async () => {
-    const f = file.files?.[0];
-    if (!f) return;
-    const result = d.querySelector('#load-result') as HTMLElement;
-    try {
-      const loaded = await continuity.importFile(await f.text());
-      s = loaded;
-      const generation = continuity.generation;
-      await continuity.recording();
-      if (generation !== continuity.generation || s !== loaded) return;
-      writeSave();
-      result.textContent = 'The replay matches the exported run. Recording follows your menu choice.';
-      const resume = d.querySelector('#dialog-back') as HTMLButtonElement;
-      resume.textContent = 'Back to the desk';
-      resume.addEventListener('click', enter);
-    } catch {
-      result.textContent = 'That file is not a saved game from this edition of The Glance. Start a new game.';
-    }
-  });
+function debugFooter() {
+  return `<div class="debug-footer"><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a><details id="debug"><summary>Debug</summary>${s ? '<button id="debug-download">Download this run</button>' : ''}<a href="?file=1">Play a saved file without replacing the local week</a><small>HF ${FRAMEWORK_VERSION}</small></details></div>`;
 }
 
 async function beginWeek(localOnly = false, chosen?: WatchRules) {
@@ -528,11 +499,7 @@ async function beginWeek(localOnly = false, chosen?: WatchRules) {
     (extended
       ? {
           edition: 'extended-2',
-          ...((document.getElementById('private-scenes') as HTMLInputElement | null)?.checked
-            ? { outcomes: 'private-scenes-1' as const }
-            : (document.getElementById('shift-outcomes') as HTMLInputElement | null)?.checked
-              ? { outcomes: 'handover-1' as const }
-              : {}),
+          outcomes: 'private-scenes-1',
           dam:
             (document.getElementById('dam-choice') as HTMLSelectElement)?.value === 'upper'
               ? 'upper'
@@ -566,55 +533,11 @@ function startError(error: unknown, retry: () => void, action = 'start') {
   const d = dialog(
     'start-error',
     action === 'load' ? 'Could not resume' : 'Could not start',
-    `<p>We could not ${action === 'load' ? 'resume' : 'start'} the week. Your saved week is unchanged. You can try again or send Feedback.</p>${labMode() ? `<pre>${esc(String(error))}</pre>` : ''}`,
+    `<p>We could not ${action === 'load' ? 'resume' : 'start'} the week. Your saved week is unchanged. You can try again or send Feedback.</p><details><summary>Debug</summary><pre>${esc(String(error))}</pre></details>`,
     '<button id="retry-start">Try again</button><button id="error-feedback">Feedback</button><button id="dialog-back">Back</button>',
   );
   d.querySelector('#retry-start')?.addEventListener('click', retry);
   d.querySelector('#error-feedback')?.addEventListener('click', sendWord);
-}
-
-function continuityMenu() {
-  if (fileMode) return;
-  if (!labMode()) return;
-  const d = dialog(
-    'continuity',
-    'People between chapters',
-    `<p id="continuity-status" role="status">${esc(continuity.status)}</p><p>The game checks the saved histories of all five people together before a new chapter starts. A loaded game keeps the people it started with. You choose separately whether to carry people between games, record play or allow character analysis.</p><label><input type="checkbox" id="continuity-enabled" ${continuity.shelf.enabled ? 'checked' : ''}>Continue people between games</label><button id="fresh-local">Start fresh locally without browser histories</button>${s ? `<button id="departure">${s.chapterPaused ? 'Resume chapter' : 'Pause chapter for departure'}</button><p>Finish the storm week before people leave their duties. They must finish their current work before you can pause the chapter. Their health or other duties may still prevent travel.</p><details><summary>Save a person to browser continuity</summary>${ALLOCATION.map((c) => `<p>${c.name}<button data-checkpoint="${c.castId}">Save ${c.name}</button><button data-fork="${c.castId}">Save a separate history for ${c.name}</button></p>`).join('')}</details><p>Recorded play links across games on this device. Switch recording off in the game menu.</p><button id="continuity-export">Download run and source archive</button>` : ''}<a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">Inspect or export browser people</a>`,
-    '<button id="dialog-back">Back</button>',
-  );
-  const attempt = async (action: () => Promise<unknown>) => {
-    try {
-      await action();
-    } catch (error) {
-      continuity.status = String(error);
-    }
-    const status = document.getElementById('continuity-status');
-    if (status) status.textContent = continuity.status;
-    writeSave();
-  };
-  d.querySelector('#continuity-enabled')?.addEventListener('change', (e) => {
-    void attempt(() => continuity.setEnabled((e.target as HTMLInputElement).checked));
-  });
-  d.querySelector('#fresh-local')?.addEventListener('click', () => {
-    void beginWeek(true);
-  });
-  d.querySelector('#departure')?.addEventListener('click', () => {
-    if (!s) return;
-    inputNow(s, { kind: s.chapterPaused ? 'resume' : 'pause' });
-    writeSave();
-    closeDialogs();
-  });
-  d.querySelectorAll<HTMLButtonElement>('[data-checkpoint]').forEach((b) => {
-    b.addEventListener('click', () => {
-      void attempt(() => continuity.checkpoint(b.dataset.checkpoint ?? ''));
-    });
-  });
-  d.querySelectorAll<HTMLButtonElement>('[data-fork]').forEach((b) => {
-    b.addEventListener('click', () => {
-      void attempt(() => continuity.checkpoint(b.dataset.fork ?? '', true));
-    });
-  });
-  d.querySelector('#continuity-export')?.addEventListener('click', download);
 }
 
 function showAbout() {
@@ -679,16 +602,31 @@ function bindRecord(d: HTMLElement, id: string, changed?: () => void) {
     changed?.();
   });
 }
+function paceSetting() {
+  return `<fieldset class="pace-setting"><legend>The night’s pace</legend>${['Automatic', 'Slow', 'Steady', 'Fast'].map((name) => `<button data-pace="${name}" aria-pressed="${paceChoice === name}">${name}</button>`).join('')}</fieldset>`;
+}
+function bindPace(d: HTMLElement) {
+  d.querySelectorAll<HTMLButtonElement>('[data-pace]').forEach((b) => {
+    b.addEventListener('click', () => {
+      paceChoice = required(b.dataset.pace);
+      selectedRate = ({ Slow: 0.8, Steady: 1.4, Fast: 2.4 } as Record<string, number>)[paceChoice] ?? 1.4;
+      d.querySelectorAll('[data-pace]').forEach((x) => {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+    });
+  });
+}
 function gameMenu() {
   if (fileMode) {
     writeSave();
     const d = dialog(
       'file-menu',
       'Game menu',
-      `<p>Progress stays in memory. Download this run before closing the page.</p><button id="file-download">Download this run</button><button id="choose-another">Choose another file</button><button id="file-departure">Pause chapter for departure</button>${recordSwitch('record-file-menu')}<p>Recording links new play across games on this device. Your browser’s privacy signal keeps recording off unless you choose to turn it on.</p>`,
+      `<p>Progress stays in memory. Download this run before closing the page.</p>${paceSetting()}<button id="file-download">Download this run</button><button id="choose-another">Choose another file</button><button id="file-departure">Pause chapter for departure</button>${recordSwitch('record-file-menu')}<p>Recording links new play across games on this device. Your browser’s privacy signal keeps recording off unless you choose to turn it on.</p>`,
       '<button class="primary" id="dialog-back">Resume current file</button>',
     );
     bindRecord(d, 'record-file-menu');
+    bindPace(d);
     d.querySelector('#file-download')?.addEventListener('click', download);
     d.querySelector('#choose-another')?.addEventListener('click', () => {
       d.remove();
@@ -709,10 +647,11 @@ function gameMenu() {
     'game-menu',
     `Game menu${s ? ` · ${planOf(s).title} ${clock(s.minute)}` : ''}`,
     `<p>Time stops while this menu is open.</p>
-    ${labMode() ? `<fieldset class="pace-setting"><legend>The night’s pace</legend>${['Automatic', 'Slow', 'Steady', 'Fast'].map((name) => `<button data-pace="${name}" aria-pressed="${paceChoice === name}">${name}</button>`).join('')}</fieldset><button class="reading-row" id="browser-people">People between chapters</button><button class="reading-row" id="to-title">To the title page</button>` : ''}
-    <button class="reading-row" id="send-word">Feedback</button><button class="reading-row" id="fullscreen">Full screen</button><a class="reading-row" href="${GAMES}" target="_top">All games</a>${recordSwitch('record-menu')}<button id="menu-new">New game</button><div id="menu-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="menu-confirm-new">Yes, start again</button><button id="menu-cancel-new">Cancel</button></div>`,
+    ${paceSetting()}<button class="reading-row" id="to-title">To the title page</button>
+    <button class="reading-row" id="send-word">Feedback</button><button class="reading-row" id="fullscreen">Full screen</button><a class="reading-row" href="${GAMES}" target="_top">All games</a>${recordSwitch('record-menu')}<button id="menu-new">New game</button><div id="menu-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="menu-confirm-new">Yes, start again</button><button id="menu-cancel-new">Cancel</button></div>${debugFooter()}`,
     '<button class="primary" id="dialog-back">Resume</button>',
   );
+  d.querySelector('#debug-download')?.addEventListener('click', download);
   d.querySelector('#menu-new')?.addEventListener('click', () => {
     required(d.querySelector<HTMLElement>('#menu-confirm')).hidden = false;
   });
@@ -727,16 +666,7 @@ function gameMenu() {
     }
   });
   bindRecord(d, 'record-menu');
-  d.querySelectorAll<HTMLButtonElement>('[data-pace]').forEach((b) => {
-    b.addEventListener('click', () => {
-      paceChoice = required(b.dataset.pace);
-      selectedRate = ({ Slow: 0.8, Steady: 1.4, Fast: 2.4 } as Record<string, number>)[paceChoice] ?? 1.4;
-      d.querySelectorAll('[data-pace]').forEach((x) => {
-        x.setAttribute('aria-pressed', String(x === b));
-      });
-    });
-  });
-  d.querySelector('#browser-people')?.addEventListener('click', continuityMenu);
+  bindPace(d);
   d.querySelector('#to-title')?.addEventListener('click', title);
   d.querySelector('#send-word')?.addEventListener('click', sendWord);
   d.querySelector('#fullscreen')?.addEventListener('click', () => {
@@ -1793,7 +1723,7 @@ function ending() {
     <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong readings during ${s.rules ? 'the longer watch' : 'the week'}.` : ''}</p>
     ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(l.aboutYou)}</p></div>`).join('')}
     <div id="closing-tally"></div><button class="reading-row" id="back">${EXTENDED_PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
-    <div class="actionbar ending-actions"><div><button id="send">Feedback</button>${labMode() || fileMode ? '<button id="export">Download this run</button>' : ''}</div><button class="primary" id="again">${fileMode ? 'Choose another file' : 'New game'}</button></div></div>`;
+    <div class="actionbar ending-actions"><div><button id="send">Feedback</button><button id="export">Download this run</button><a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">Continue people in another game</a></div><button class="primary" id="again">${fileMode ? 'Choose another file' : 'New game'}</button></div></div>`;
   bindTopbar();
   updateTally();
   document.getElementById('again')?.addEventListener('click', () => {

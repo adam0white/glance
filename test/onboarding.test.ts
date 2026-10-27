@@ -68,15 +68,6 @@ function tap(button: HTMLElement) {
   button.dispatchEvent(new Event('pointerdown'));
   button.dispatchEvent(new Event('pointerup'));
 }
-async function importRun(run: ReturnType<typeof exportRun>) {
-  await click('other');
-  const file = document.getElementById('file') as HTMLInputElement;
-  Object.defineProperty(file, 'files', { value: [{ text: async () => JSON.stringify(run) }] });
-  file.dispatchEvent(new Event('change'));
-  await vi.waitFor(() => expect(document.getElementById('load-result')?.textContent).toContain('matches'));
-  await click('dialog-back');
-}
-
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
@@ -95,7 +86,7 @@ afterEach(() => {
 });
 
 describe('title and first call', () => {
-  it('shows the sample and the week end, while keeping import in Other ways in', async () => {
+  it('shows the sample and offers safe file play in collapsed Debug', async () => {
     await boot();
     expect(document.querySelector('#sample-chart')).not.toBeNull();
     expect(document.querySelector('#goal')?.textContent).toContain("Friday's first light");
@@ -103,8 +94,8 @@ describe('title and first call', () => {
     await click('sample');
     expect(document.querySelector('#sample-page .legend')?.textContent).toContain('actual reading time');
     await click('dialog-back');
-    await click('other');
-    expect(document.querySelector('#load')).not.toBeNull();
+    expect(document.querySelector('#debug a')?.getAttribute('href')).toBe('?file=1');
+    expect(document.querySelector<HTMLDetailsElement>('#debug')?.open).toBe(false);
   });
   it('starts on the whole desk with no inspection or queued input', async () => {
     const debug = await boot();
@@ -142,15 +133,13 @@ describe('title and first call', () => {
     await click('cont');
     expect(fingerprint(state(debug))).toBe(fingerprint(expected));
   });
-  it('imports inline and resumes the same replay fingerprint without alert', async () => {
-    const alert = vi.fn();
-    vi.stubGlobal('alert', alert);
-    const run = newGame(7);
-    for (let i = 0; i < 20; i++) step(run);
-    const debug = await boot();
-    await importRun(exportRun(run, '3.0.0'));
-    expect(fingerprint(state(debug))).toBe(fingerprint(run));
-    expect(alert).not.toHaveBeenCalled();
+  it('offers file play without an in-place diagnostic importer or native-save mutation', async () => {
+    const saved = JSON.stringify(localFixture(newGame(7)));
+    localStorage.setItem('glance-cast-local-v3', saved);
+    await boot();
+    expect(document.querySelector('#debug a')?.getAttribute('href')).toBe('?file=1');
+    expect(document.querySelector('#load')).toBeNull();
+    expect(localStorage.getItem('glance-cast-local-v3')).toBe(saved);
   });
 });
 
@@ -553,16 +542,16 @@ it('shows the effective privacy default and opts in with the single recording sw
 });
 
 it.each(['', '?lab=0', '?lab=true', '?lab=01'])(
-  'keeps diagnostics out of ordinary URL %s',
+  'offers public pace and collapsed diagnostics at ordinary URL %s',
   async (search) => {
     window.history.replaceState({}, '', `/${search}`);
     await boot();
-    expect(document.getElementById('other')).toBeNull();
+    expect(document.querySelector<HTMLDetailsElement>('#debug')?.open).toBe(false);
     expect(document.querySelector('.credit')).toBeNull();
     await click('menu');
     expect(document.getElementById('browser-people')).toBeNull();
-    expect(document.querySelector('[data-pace]')).toBeNull();
-    expect(document.getElementById('to-title')).toBeNull();
+    expect(document.querySelectorAll('[data-pace]')).toHaveLength(4);
+    expect(document.getElementById('to-title')).not.toBeNull();
     expect(document.getElementById('send-word')?.textContent).toBe('Feedback');
     expect(document.querySelector('#game-menu a')?.getAttribute('href')).toBe(
       'https://human.adamwhite.work/games/',
@@ -584,7 +573,7 @@ it('preserves the saved run and receipts when shared admission fails', async () 
   await click('confirm-new');
   expect(localStorage.getItem('glance-cast-local-v3')).toBe(saved);
   expect(document.querySelector('#start-error')?.textContent).toContain('saved week is unchanged');
-  expect(document.querySelector('#start-error')?.textContent).not.toMatch(/Shelf|local file/);
+  expect(document.querySelector<HTMLDetailsElement>('#start-error details')?.open).toBe(false);
   expect(document.querySelector('#retry-start')).not.toBeNull();
   expect(document.querySelector('#error-feedback')).not.toBeNull();
   expect(document.querySelector('#continuity')).toBeNull();
@@ -743,4 +732,16 @@ it('accounts real frame minutes under the admitted inspector and holds menus and
   await click('dialog-back');
   advance(12);
   expect(state(debug).minute).toBe(beforeMenu + 1);
+});
+
+it('offers all implemented scenes in a new longer watch without feature switches', async () => {
+  window.history.replaceState({}, '', '/');
+  const debug = await boot();
+  expect(document.getElementById('shift-outcomes')).toBeNull();
+  expect(document.getElementById('private-scenes')).toBeNull();
+  (document.getElementById('extended-watch') as HTMLInputElement).checked = true;
+  await click('new');
+  expect(state(debug).rules).toEqual({ edition: 'extended-2', dam: 'valley', outcomes: 'private-scenes-1' });
+  expect(state(debug).outcomes).toBeDefined();
+  expect(state(debug).privateScenes).toBeDefined();
 });
