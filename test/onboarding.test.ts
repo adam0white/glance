@@ -96,7 +96,7 @@ describe('title and first call', () => {
     await click('sample');
     expect(document.querySelector('#sample-page .legend')?.textContent).toContain('actual reading time');
     await click('dialog-back');
-    expect(document.querySelector('#debug a')?.getAttribute('href')).toBe('?file=1');
+    expect(document.querySelector('#debug a')?.getAttribute('href')).toBe('/file/');
     expect(document.querySelector<HTMLDetailsElement>('#debug')?.open).toBe(false);
   });
   it('starts on the whole desk with no inspection or queued input', async () => {
@@ -139,7 +139,7 @@ describe('title and first call', () => {
     const saved = JSON.stringify(localFixture(newGame(7)));
     localStorage.setItem('glance-cast-local-v3', saved);
     await boot();
-    expect(document.querySelector('#debug a')?.getAttribute('href')).toBe('?file=1');
+    expect(document.querySelector('#debug a')?.getAttribute('href')).toBe('/file/');
     expect(document.querySelector('#load')).toBeNull();
     expect(localStorage.getItem('glance-cast-local-v3')).toBe(saved);
   });
