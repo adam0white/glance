@@ -2217,14 +2217,51 @@ export function replay(
   until?: number,
   chapter?: Chapter,
   rules?: WatchRules,
+  applied?: number,
 ): GameState {
+  if (
+    applied !== undefined &&
+    (!Number.isInteger(applied) ||
+      applied < 0 ||
+      applied > inputs.length ||
+      until === undefined ||
+      !Number.isInteger(until))
+  )
+    throw new Error('Invalid replay frontier.');
   const s = newGame(seed, chapter, rules);
+  let previous = s.minute;
   for (const inp of inputs) {
+    if (applied !== undefined && (!Number.isInteger(inp.at) || inp.at < previous || inp.at > until!))
+      throw new Error('Invalid replay input time.');
+    previous = inp.at;
     while (s.phase === 'watch' && !s.chapterPaused && s.minute < inp.at) step(s);
     s.inputs.push(inp);
     if (s.phase !== 'watch' || s.chapterPaused) applyPending(s);
+    // The complete exported state distinguishes queued from applied final controls.
+    // A pause can finish a public step without advancing the world clock. Reproduce
+    // that actual step before a same-minute resume is queued; never force flags.
+    if (
+      applied !== undefined &&
+      s.minute === until &&
+      s.applied < applied &&
+      s.inputs.length <= applied &&
+      inp.kind === 'pause' &&
+      !s.chapterPaused
+    ) {
+      // Validate that this is a zero-time public step before advancing anything.
+      // The preview retains all Person/RNG data and applies the same pending batch;
+      // it is never installed or used in place of the strict replay comparison.
+      const preview = restoreState(cloneState(s));
+      applyPending(preview);
+      if (!preview.chapterPaused) throw new Error('The requested frontier requires elapsed time.');
+      const minute = s.minute;
+      step(s);
+      if (s.minute !== minute) throw new Error('The requested frontier requires elapsed time.');
+    }
   }
   if (until !== undefined) while (s.phase === 'watch' && !s.chapterPaused && s.minute < until) step(s);
+  if (applied !== undefined && (s.applied !== applied || s.minute !== until))
+    throw new Error('The requested replay frontier is not reachable.');
   return s;
 }
 

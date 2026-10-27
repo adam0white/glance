@@ -1,3 +1,19 @@
+# Native file source candidate — 2026-10-26
+
+Remaining: parent ONE independent review of this coupled nine-path candidate, then integration/exact CI/deployment gates. SDK preservation capability, marker adoption, active-service-worker behavior and occupied-profile runtime admission remain separate and unproved. Adam accepts feel separately. No source publication, commit, push, deployment, owner browser or player run in this author stage.
+
+The explicit `?file=1` route selects a memory-only file session before native continuity construction. Unknown or duplicate file parameters refuse startup. No parameter keeps the ordinary local saved-week route. File entry shows a chooser; reload requires choosing a file again. Menu Resume continues the current file. Download the complete run before closing. File play neither reads nor writes/removes `glance-cast-local-v3` or recovery data, constructs personaChannel/Shelf, changes shared continuity consent, publishes/forks/closes people, nor trims source archives. Native fresh/practice/owned-Resume controls are unavailable in file mode. New SW registration is skipped; an already active worker can still act before app startup.
+
+`glance-file-session/1` retains exact original text and SHA256, complete original native wrapper provenance when present, and current complete exportCurrent packet plus full castSources. Native wrapper and public export inputs use the real complete importer; active owned heads stay empty. Original claims/receipts remain provenance. Reimport checks original digest, source provenance, unchanged archive/chapter/rules, original input prefix and nondecreasing continuation, then compares the entire replayed state. No state, Person, RNG, clocks, water, calendar, obligations, history or written times are normalized. Rules stay glance@4-deterministic-water / glance-4, HF3, engine2.23.
+
+Admission bounds are16MiB UTF8, depth128, one million JSON values, finite numbers and no unsafe object keys. A complete envelope must fit before installation. Each file-mode input/frame preflights an exact snapshot/restore of the next full state and export before installing it; at capacity it keeps the complete current state and offers Download. Nothing is truncated to fit. Source snapshots must round-trip the actual HF snapshot/restore contract. Failed imports leave the active session and caller data unchanged.
+
+The coupled replay repair uses the existing exported `state.applied` frontier. A final-minute pause can complete a public step without advancing time; a same-minute resume then applies through ordinary queue semantics. Explicit replay reconstructs these actual public operations and rejects a frontier requiring an extra elapsed minute. Queued controls remain queued. The complete comparator is unchanged; default replay without a frontier is unchanged. The exact32290-byte technical prepared native candidate SHA25659cc6a4bea559dc8b7aa66654b632b798d30ae17e543b388063e33640b3662de remains source proof, never owner-observed Resume. Portable tests retain its exact compressed bytes and verify its hash. The original blocked report/RED/misconfigured SDK test logs remain in the external author archive.
+
+Actual public Lab trackRun/captureSave receive the complete file-session envelope only after acceptance; existing recording/privacy choices apply. Client11 can still change SDK identity/preferences/queues during normal initialization/retry. This host boundary promises no whole-profile preservation. Sole SDK publisher owns the supported preservation contract and marker14 adoption; no invented SDK options, queue rollback or agent labels are used.
+
+Reports: `/Users/abdul/code/.lab-scratch/games-deferred/glance-native-file-author-report.md` and `glance-native-file-author-manifest.json`. Candidate checkpoint2026-10-27T00:10Z. B owns Hearsay only; no Hearsay writer overlap.
+
 # Handoff
 
 ## Dependency installation — 2026-10-26

@@ -21,7 +21,7 @@ import {
   sendFeedbackLabel,
   watchPersonaCheckpoint,
 } from '@adam0white/lab-client';
-import { Continuity, LOCAL_KEY, watchShelfPreference } from '../continuity.ts';
+import { Continuity, fileEntry, LOCAL_KEY, watchShelfPreference } from '../continuity.ts';
 import {
   ALLOCATION,
   CAST,
@@ -32,6 +32,7 @@ import {
 } from '../sim/cast.ts';
 import {
   clock,
+  cloneState,
   EXTENDED_PLANS,
   exportRun,
   type GameState,
@@ -41,6 +42,7 @@ import {
   type Job,
   keeperAsleep,
   keeperOf,
+  type NewInput,
   nightsOf,
   PLANS,
   personOf,
@@ -48,6 +50,7 @@ import {
   queueInput,
   type Report,
   reportWords,
+  restoreState,
   type Said,
   step,
   type WatchRules,
@@ -76,11 +79,18 @@ import { readingTime } from './time.ts';
 const labMode = () => new URLSearchParams(location.search).get('lab') === '1';
 
 const SAVE = LOCAL_KEY;
-const continuity = new Continuity(lab, personaChannel(), () => {
-  if (s) writeSave();
-  const status = document.getElementById('continuity-status');
-  if (status) status.textContent = continuity.status;
-});
+const entryMode = fileEntry(location.search);
+const fileMode = entryMode !== 'native';
+const continuity = new Continuity(
+  lab,
+  fileMode ? undefined : personaChannel(),
+  () => {
+    if (s && !fileMode) writeSave();
+    const status = document.getElementById('continuity-status');
+    if (status) status.textContent = continuity.status;
+  },
+  fileMode,
+);
 let selectedRate = 1.4;
 let paceChoice = 'Automatic';
 let skipUntil = 0;
@@ -121,14 +131,55 @@ const fx: SceneFx = { flashAt: -1e9 };
 let wake: { release(): Promise<void> } | null = null;
 const seen = { hold: false };
 
-lab.trackRun(() => (s ? exportRun(s, FRAMEWORK_VERSION) : null), {
-  runKey: () => s?.seed ?? 'title',
-  getLogs: () => s?.said.slice(-40).map((line) => line.text) ?? [],
-});
+let tracked = false;
+function trackRun() {
+  if (tracked) return;
+  tracked = true;
+  lab.trackRun(
+    () => (s ? (fileMode ? continuity.exportSession(s) : exportRun(s, FRAMEWORK_VERSION)) : null),
+    {
+      runKey: () => s?.seed ?? 'title',
+      getLogs: () => s?.said.slice(-40).map((line) => line.text) ?? [],
+    },
+  );
+}
+if (!fileMode) trackRun();
+
+// File play checks the complete next export before installing a simulation change.
+// Snapshot/restore preserves every Person and raw RNG; admission still uses replay.
+function fileMutation(state: GameState, change: (candidate: GameState) => void) {
+  if (!fileMode) {
+    change(state);
+    return;
+  }
+  const candidate = restoreState(cloneState(state));
+  change(candidate);
+  try {
+    continuity.exportSession(candidate);
+  } catch {
+    cancelAnimationFrame(raf);
+    const d = dialog(
+      'file-capacity',
+      'Download this run',
+      '<p>This file has reached the size this page can reopen. Download the complete current run before closing.</p><button id="capacity-download">Download this run</button>',
+    );
+    d.querySelector('#capacity-download')?.addEventListener('click', download);
+    return;
+  }
+  for (const key of Object.keys(state)) if (!(key in candidate)) Reflect.deleteProperty(state, key);
+  Object.assign(state, candidate);
+}
+function inputNow(state: GameState, input: NewInput) {
+  fileMutation(state, (candidate) => queueInput(candidate, input));
+}
+function stepNow(state: GameState) {
+  fileMutation(state, (candidate) => step(candidate));
+}
 
 // ---------- save ----------
 
 function readSave(): Save | null {
+  if (fileMode) return null;
   try {
     const raw = localStorage.getItem(SAVE);
     return raw ? (JSON.parse(raw) as Save) : null;
@@ -137,6 +188,7 @@ function readSave(): Save | null {
   }
 }
 function saveNow() {
+  if (fileMode) throw new Error('File sessions stay in memory.');
   if (!s) throw new Error('No run to save');
   const text = continuity.localSave(s);
   localStorage.setItem(SAVE, text);
@@ -144,6 +196,10 @@ function saveNow() {
 }
 function writeSave() {
   if (!s) return;
+  if (fileMode) {
+    lab.captureSave(continuity.exportSession(s));
+    return;
+  }
   closeOwnedDeaths();
   try {
     saveNow();
@@ -164,6 +220,7 @@ function writeSave() {
   } else if (!saveFailed) warning?.remove();
 }
 function clearSave() {
+  if (fileMode) return;
   try {
     localStorage.removeItem(SAVE);
   } catch {}
@@ -278,6 +335,14 @@ function needleAngle(r: Report | null, g: Gauge): number {
 // ---------- title ----------
 
 export function start() {
+  if (entryMode === 'invalid') {
+    app.innerHTML = '<p>This file address is invalid. Use ?file=1 to choose a saved file.</p>';
+    return;
+  }
+  if (fileMode) {
+    fileChooser();
+    return;
+  }
   if (
     !import.meta.env.DEV &&
     'serviceWorker' in navigator &&
@@ -295,6 +360,10 @@ export function start() {
 }
 
 function title() {
+  if (fileMode) {
+    fileChooser();
+    return;
+  }
   destroyStage();
   continuity.invalidate();
   cancelAnimationFrame(raf);
@@ -367,6 +436,48 @@ function title() {
   document.getElementById('other')?.addEventListener('click', otherWays);
 }
 
+function fileChooser() {
+  continuity.beginFileSelection();
+  destroyStage();
+  cancelAnimationFrame(raf);
+  screen = 'title';
+  sheet = null;
+  app.innerHTML = `<div class="page"><div class="page-body"><h1>Play a saved file</h1>
+    <p>Progress stays in memory. Download this run before closing the page. Reload this page to choose a file again.</p>
+    <button id="choose-file">${s ? 'Choose another file' : 'Choose a saved file'}</button>
+    <input type="file" id="file" accept="application/json" hidden>
+    <p id="file-result" role="status"></p>
+    ${s ? '<button id="file-download">Download this run</button><button id="file-resume">Resume current file</button>' : ''}</div></div>`;
+  const file = required(document.querySelector<HTMLInputElement>('#file'));
+  document.getElementById('choose-file')?.addEventListener('click', () => file.click());
+  document.getElementById('file-download')?.addEventListener('click', download);
+  document.getElementById('file-resume')?.addEventListener('click', () => {
+    continuity.beginFileSelection();
+    enter();
+  });
+  file.addEventListener('change', async () => {
+    const selection = continuity.beginFileSelection();
+    const selected = file.files?.[0];
+    if (!selected) return;
+    const result = document.getElementById('file-result');
+    try {
+      if (selected.size > 16 * 1024 * 1024) throw new Error('File exceeds complete import capacity.');
+      const loaded = await continuity.importSelected(await selected.arrayBuffer(), selection);
+      if (!continuity.isFileSelection(selection)) return;
+      s = loaded;
+      await continuity.recording();
+      if (!continuity.isFileSelection(selection)) return;
+      trackRun();
+      enter();
+    } catch {
+      if (continuity.isFileSelection(selection) && result?.isConnected)
+        result.textContent =
+          'That saved file could not be loaded. Your current file is unchanged. Choose another file.';
+    }
+    if (continuity.isFileSelection(selection)) file.value = '';
+  });
+}
+
 function otherWays() {
   if (!labMode()) return;
   const d = dialog(
@@ -399,6 +510,7 @@ function otherWays() {
 }
 
 async function beginWeek(localOnly = false, chosen?: WatchRules) {
+  if (fileMode) return;
   const extended = (document.getElementById('extended-watch') as HTMLInputElement | null)?.checked;
   const rules: WatchRules | undefined =
     chosen ??
@@ -451,6 +563,7 @@ function startError(error: unknown, retry: () => void, action = 'start') {
 }
 
 function continuityMenu() {
+  if (fileMode) return;
   if (!labMode()) return;
   const d = dialog(
     'continuity',
@@ -476,7 +589,7 @@ function continuityMenu() {
   });
   d.querySelector('#departure')?.addEventListener('click', () => {
     if (!s) return;
-    queueInput(s, { kind: s.chapterPaused ? 'resume' : 'pause' });
+    inputNow(s, { kind: s.chapterPaused ? 'resume' : 'pause' });
     writeSave();
     closeDialogs();
   });
@@ -556,6 +669,29 @@ function bindRecord(d: HTMLElement, id: string, changed?: () => void) {
   });
 }
 function gameMenu() {
+  if (fileMode) {
+    writeSave();
+    const d = dialog(
+      'file-menu',
+      'Game menu',
+      '<p>Progress stays in memory. Download this run before closing the page.</p><button id="file-download">Download this run</button><button id="choose-another">Choose another file</button><button id="file-departure">Pause chapter for departure</button>',
+      '<button class="primary" id="dialog-back">Resume current file</button>',
+    );
+    d.querySelector('#file-download')?.addEventListener('click', download);
+    d.querySelector('#choose-another')?.addEventListener('click', () => {
+      d.remove();
+      fileChooser();
+    });
+    d.querySelector('#file-departure')?.addEventListener('click', () => {
+      if (s) inputNow(s, { kind: s.chapterPaused ? 'resume' : 'pause' });
+      writeSave();
+    });
+    d.querySelector('#dialog-back')?.addEventListener('click', () => {
+      if (s?.chapterPaused) inputNow(s, { kind: 'resume' });
+      writeSave();
+    });
+    return;
+  }
   writeSave();
   const d = dialog(
     'game-menu',
@@ -574,7 +710,7 @@ function gameMenu() {
   d.querySelector('#menu-confirm-new')?.addEventListener('click', () => void beginWeek());
   d.querySelector('#dialog-back')?.addEventListener('click', () => {
     if (s?.chapterPaused) {
-      queueInput(s, { kind: 'resume' });
+      inputNow(s, { kind: 'resume' });
       writeSave();
     }
   });
@@ -831,7 +967,7 @@ function frame(t: number) {
       carry -= 1;
       const before = eventStamp(s);
       const concernBefore = concernLines(s).join('|');
-      step(s);
+      stepNow(s);
       stepped = true;
       if (
         eventStamp(s) !== before ||
@@ -1102,7 +1238,7 @@ function drawSheet() {
     document.getElementById('x')?.addEventListener('click', () => openSheet(null));
     document.getElementById('ring')?.addEventListener('click', () => {
       if (!s) return;
-      queueInput(s, { kind: 'ring' });
+      inputNow(s, { kind: 'ring' });
       writeSave();
       openSheet(null);
     });
@@ -1116,7 +1252,7 @@ function drawSheet() {
           return;
         }
         if (!s) return;
-        queueInput(s, { kind: 'warn' });
+        inputNow(s, { kind: 'warn' });
         writeSave();
         openSheet(null);
       });
@@ -1234,7 +1370,7 @@ function bindReadingNote(el: HTMLElement) {
   const button = el.querySelector<HTMLButtonElement>('#reading-note');
   button?.addEventListener('click', () => {
     if (!s || !button) return;
-    queueInput(s, {
+    inputNow(s, {
       kind: 'doubt',
       report: Number(button.dataset.report),
       marked: button.getAttribute('aria-pressed') !== 'true',
@@ -1333,7 +1469,7 @@ function bindConversations(el: HTMLElement) {
       event.target instanceof Element ? event.target.closest<HTMLButtonElement>('[data-private]') : null;
     if (!s || !target || !el.contains(target) || target.disabled) return;
     const action = target.dataset.private as PrivateAction;
-    queueInput(s, {
+    inputNow(s, {
       kind: 'private',
       action,
       ...(target.dataset.corner ? { corner: target.dataset.corner as Corner } : {}),
@@ -1351,7 +1487,7 @@ function bindConversations(el: HTMLElement) {
   el.querySelectorAll<HTMLButtonElement>('[data-outcome]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!s) return;
-      queueInput(s, { kind: 'outcome', task: button.dataset.outcome as OutcomeTask });
+      inputNow(s, { kind: 'outcome', task: button.dataset.outcome as OutcomeTask });
       writeSave();
       openSheet(null);
     });
@@ -1359,7 +1495,7 @@ function bindConversations(el: HTMLElement) {
   el.querySelectorAll<HTMLButtonElement>('[data-talk]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!s) return;
-      queueInput(s, { kind: 'talk', person: button.dataset.talk as CastId });
+      inputNow(s, { kind: 'talk', person: button.dataset.talk as CastId });
       writeSave();
       openSheet(null);
     });
@@ -1495,7 +1631,7 @@ function ask(who: KeeperId, job: Job, target: number | undefined, insist: boolea
     target === undefined
       ? { kind: 'ask' as const, keeper: who, job, insist }
       : { kind: 'ask' as const, keeper: who, job, target, insist };
-  queueInput(s, inp);
+  inputNow(s, inp);
   writeSave();
   openSheet(null);
 }
@@ -1516,7 +1652,7 @@ function dawn() {
     ${s.phase === 'end' ? `<p class="week-end" role="status">${d.daytimeLoss ? 'The watch ends here. The dam went over during the following day.' : d.overtopped ? (s.rules ? 'The watch ends here. Water came over the top of the dam.' : 'The week ends here. Water came over the top of the dam.') : s.rules ? 'It is first light after the second Friday night. Your watch is done.' : 'It is first light after Friday night. Your watch is done.'}</p>` : ''}
     ${reportBody(d, planOf(s).keepers.length > 1)}
     </div><div class="actionbar">
-      <button id="practice">Try this night again for practice</button>
+      ${fileMode ? '' : '<button id="practice">Try this night again for practice</button>'}
       ${s.phase === 'dawn' && next ? `<button class="primary" id="next">${esc(next.title)} night</button>` : ''}
       ${s.phase === 'end' ? '<button class="primary" id="end">Read the watch’s outcome</button>' : ''}
     </div>
@@ -1526,7 +1662,7 @@ function dawn() {
   drawDawn(chart, d);
   document.getElementById('next')?.addEventListener('click', () => {
     if (!s) return;
-    queueInput(s, { kind: 'next' });
+    inputNow(s, { kind: 'next' });
     writeSave();
     if (s.phase === 'watch') watch();
     else dawn();
@@ -1540,6 +1676,7 @@ function dawn() {
 }
 
 function practiceDialog() {
+  if (fileMode) return;
   if (!s || s.phase === 'watch') return;
   const actual = s;
   const d = dialog(
@@ -1644,10 +1781,14 @@ function ending() {
     <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong readings during ${s.rules ? 'the longer watch' : 'the week'}.` : ''}</p>
     ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(l.aboutYou)}</p></div>`).join('')}
     <div id="closing-tally"></div><button class="reading-row" id="back">${EXTENDED_PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
-    <div class="actionbar ending-actions"><div><button id="send">Feedback</button>${labMode() ? '<button id="export">Download this run</button>' : ''}</div><button class="primary" id="again">New game</button></div></div>`;
+    <div class="actionbar ending-actions"><div><button id="send">Feedback</button>${labMode() || fileMode ? '<button id="export">Download this run</button>' : ''}</div><button class="primary" id="again">${fileMode ? 'Choose another file' : 'New game'}</button></div></div>`;
   bindTopbar();
   updateTally();
   document.getElementById('again')?.addEventListener('click', () => {
+    if (fileMode) {
+      fileChooser();
+      return;
+    }
     gameMenu();
     document.getElementById('menu-new')?.click();
   });
@@ -1659,7 +1800,7 @@ function ending() {
 
 function download() {
   if (!s) return;
-  const ex = continuity.export(s);
+  const ex = fileMode ? continuity.exportSession(s) : continuity.export(s);
   const blob = new Blob([JSON.stringify(ex)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1684,10 +1825,10 @@ function releaseWake() {
   wake?.release().catch(() => {});
   wake = null;
 }
-watchShelfPreference(() => continuity.invalidate());
+if (!fileMode) watchShelfPreference(() => continuity.invalidate());
 const terminalAttempts = new Set<string>();
 function closeOwnedDeaths() {
-  if (!s || !continuity.shelf.enabled) return;
+  if (fileMode || !s || !continuity.shelf.enabled) return;
   for (const person of s.people) {
     const cast = ALLOCATION.find((c) => c.id === person.id);
     const key = `${continuity.runId}/${continuity.generation}/${cast?.castId}`;
@@ -1705,9 +1846,10 @@ function closeOwnedDeaths() {
     }
   }
 }
-watchPersonaCheckpoint(() => {
-  if (s?.chapterPaused || s?.phase === 'end') void continuity.checkpointAll().catch(() => {});
-});
+if (!fileMode)
+  watchPersonaCheckpoint(() => {
+    if (s?.chapterPaused || s?.phase === 'end') void continuity.checkpointAll().catch(() => {});
+  });
 window.addEventListener('pagehide', () => writeSave());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
@@ -1722,7 +1864,7 @@ document.addEventListener('visibilitychange', () => {
 
 export const _debug = {
   step: (n: number) => {
-    for (let i = 0; i < n && s && s.phase === 'watch'; i++) step(s);
+    for (let i = 0; i < n && s && s.phase === 'watch'; i++) stepNow(s);
     if (s) s.phase === 'watch' ? drawAll() : dawn();
   },
   get state() {
