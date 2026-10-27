@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { discoveriesFor } from '../src/sim/cast.ts';
 import {
   exportRun,
   fingerprint,
@@ -11,6 +12,7 @@ import {
   replay,
   step,
 } from '../src/sim/dam.ts';
+import { keeperSceneAvailable } from '../src/sim/keeper-scenes.ts';
 import { SAMPLE_DAWN } from '../src/ui/opener.ts';
 import { reportBody } from '../src/ui/report.ts';
 import { required } from './required.ts';
@@ -763,4 +765,43 @@ it('automatically checkpoints a finished native run and exposes a truthful recei
   expect(document.getElementById('continuity-result')?.textContent).toContain('2 histories saved');
   expect(document.getElementById('continuity-result')?.textContent).toContain('3 could not');
   expect(document.querySelector('#export')).not.toBeNull();
+});
+
+// Break caught: a public scene button must record a real input and show the elapsed result.
+it('offers costed keeper proposals publicly and records a chosen attended draft through the actual control', async () => {
+  window.history.replaceState({}, '', '/');
+  const run = newGame(7, undefined, { edition: 'extended-2', dam: 'valley', outcomes: 'private-scenes-1' });
+  for (let i = 0; i < 6000 && !keeperSceneAvailable(run, 'dai-proposal'); i++) {
+    if (run.phase === 'dawn') {
+      queueInput(run, { kind: 'next' });
+      continue;
+    }
+    if (run.minute % 1440 === 1321) queueInput(run, { kind: 'ask', keeper: 'dai', job: 'gate', target: 4 });
+    for (const person of discoveriesFor(run)) {
+      const first = run.conversations[person];
+      if (first === undefined || run.minute - first >= 20) queueInput(run, { kind: 'talk', person });
+    }
+    step(run);
+  }
+  expect(keeperSceneAvailable(run, 'dai-proposal')).toBe(true);
+  localStorage.setItem('glance-cast-local-v3', JSON.stringify(localFixture(run)));
+  const debug = await boot();
+  expect(document.body.textContent).toContain('retirement and home-rest proposals');
+  await click('cont');
+  (document.querySelector('#concern [data-k="dai"]') as HTMLButtonElement).click();
+  const button = document.querySelector<HTMLButtonElement>('[data-outcome="dai-proposal"]');
+  expect(button?.disabled).toBe(false);
+  button!.click();
+  expect(state(debug).inputs.at(-1)?.kind).toBe('outcome');
+  debug.step(1);
+  expect(state(debug).outcomes?.keeperScenes?.active).toBeDefined();
+  debug.step(20);
+  (document.querySelector('#concern [data-k="dai"]') as HTMLButtonElement).click();
+  expect(state(debug).outcomes?.keeperScenes?.daiProposal?.status).toBe('proposal-awaiting-response');
+  expect(document.querySelector('[aria-label="Keeper family records"]')?.textContent).toContain(
+    'forty minutes',
+  );
+  expect(document.querySelector('[aria-label="Keeper family records"]')?.textContent).toContain(
+    'awaits responses',
+  );
 });

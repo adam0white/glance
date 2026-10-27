@@ -1,3 +1,13 @@
+# Keeper family story candidate — 2026-10-27
+
+Remaining: one director-launched independent review, then signed source, exact CI and clean deployment. Adam accepts feel/readiness separately on 2026-11-03. GDI978 fictional reply remains next batch. GDI979 habitat finding still needs retained source input; no measurement is invented. This candidate does not close GDI975/976 in full.
+
+Additive recorded public actions offer costed Dai cover/retirement and Callum rota/home-rest proposals, retained voicemail and a chosen fictional invitation. Proposals retain unanswered agency/partner responses; no approved retirement/rota/home rest follows. A visit needs willing Dai attendance and Callum cover: ten minutes out, twenty attending, ten back. Duty, lost participation, radio loss, pause or stop prevents completion. An interrupted visit leaves Dai away until a separate chosen ten-minute return; no dam job is queued for him while absent. The next ordinary watch arrival can restore his duty location without awarding the interrupted visit. Daughter remains an incidental reference.
+
+Delivered joint twenty-minute transfer, Callum’s later ten-minute test, filed correction awaiting review and thirty-minute covered hut rest remain unchanged. Without a new scene action, default and saved longer-watch state/Person/RNG/history remain exact. Full imports, compact replay reconstruction and the real file controller retain complete scene fields. Evidence is engineering control only; no player, family consultation, employer response, safety or medical improvement is claimed.
+
+Plan, checks, exact footprint and READY packet use `/Users/abdul/code/.lab-scratch/games-deferred/gd-resume-glance-family-*`. No source commit or deployment is implied by this checkpoint.
+
 # Checkpoint/archive/end-screen safety candidate — 2026-10-27
 
 Remaining: director-launched independent review of this exact candidate, then signed source, exact green CI, clean deployment and two-size engineering verification. This batch ends at delivery and cleanup. No player round or retest; Adam accepts feel/readiness separately on 2026-11-03. HF remains 3.0.0.
