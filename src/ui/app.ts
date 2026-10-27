@@ -78,7 +78,7 @@ import { tallyBody } from './tally.ts';
 import { readingTime } from './time.ts';
 
 const SAVE = LOCAL_KEY;
-const entryMode = fileEntry(location.search);
+const entryMode = fileEntry(location.search, location.pathname);
 const fileMode = entryMode !== 'native';
 const continuity = new Continuity(
   lab,
@@ -345,7 +345,7 @@ export function start() {
     }
   }
   if (entryMode === 'invalid') {
-    app.innerHTML = '<p>This file address is invalid. Use ?file=1 to choose a saved file.</p>';
+    app.innerHTML = '<p>This file address is invalid. Use /file/ to choose a saved file.</p>';
     return;
   }
   if (fileMode) {
@@ -489,7 +489,7 @@ function fileChooser() {
 }
 
 function debugFooter() {
-  return `<div class="debug-footer"><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a><details id="debug"><summary>Debug</summary>${s ? '<button id="debug-download">Download this run</button>' : ''}<a href="?file=1">Play a saved file without replacing the local week</a><small>HF ${FRAMEWORK_VERSION}</small></details></div>`;
+  return `<div class="debug-footer"><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a><details id="debug"><summary>Debug</summary>${s ? '<button id="debug-download">Download this run</button>' : ''}<a href="/file/">Play a saved file without replacing the local week</a><small>HF ${FRAMEWORK_VERSION}</small></details></div>`;
 }
 
 async function beginWeek(localOnly = false, chosen?: WatchRules) {

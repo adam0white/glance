@@ -22,11 +22,7 @@ export const LOCAL_KEY = 'glance-cast-local-v3';
 // Native archive capacity is serialized JSON UTF-16 code units, as on local load/import.
 const maxArchive = 1_000_000;
 
-/** Pure entry selection, shared by the pre-SDK module and app evaluation. */
-export function fileEntry(search: string): 'native' | 'file' | 'invalid' {
-  const values = new URLSearchParams(search).getAll('file');
-  return values.length === 0 ? 'native' : values.length === 1 && values[0] === '1' ? 'file' : 'invalid';
-}
+export { fileEntry } from './entry.ts';
 
 /** Run-scoped ownership, recording and source archive. No current shelf reads on local load. */
 export class Continuity {

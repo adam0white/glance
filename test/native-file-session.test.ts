@@ -58,7 +58,7 @@ afterEach(() => {
 });
 it('foreign Glance file keeps owner week through pause hide and completion', async () => {
   vi.resetModules();
-  window.history.replaceState({}, '', '/?file=1');
+  window.history.replaceState({}, '', '/file/');
   document.body.innerHTML = '<div id="app"></div>';
   localStorage.setItem('glance-cast-local-v3', 'synthetic occupied native sentinel');
   localStorage.setItem('glance-recovery-sentinel', 'synthetic recovery sentinel');
@@ -347,7 +347,7 @@ it('refuses file play before a complete next snapshot exceeds reimport capacity'
   const baseBytes = Buffer.byteLength(JSON.stringify(probe.exportSession(state)));
   stress.capacityPadding = 'x'.repeat(16 * 1024 * 1024 - baseBytes - 8);
   const text = JSON.stringify(stress);
-  window.history.replaceState({}, '', '/?file=1');
+  window.history.replaceState({}, '', '/file/');
   document.body.innerHTML = '<div id="app"></div>';
   vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', () => {});
@@ -379,7 +379,7 @@ it('refuses file play before a complete next snapshot exceeds reimport capacity'
 
 async function bootSelectedByteControl() {
   vi.resetModules();
-  window.history.replaceState({}, '', '/?file=1');
+  window.history.replaceState({}, '', '/file/');
   document.body.innerHTML = '<div id="app"></div>';
   vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', () => {});
@@ -716,7 +716,7 @@ it('published SDK preserves the synthetic file profile and exposes real public R
   vi.doUnmock('../src/ui/lab.ts');
   vi.doUnmock('@adam0white/lab-client');
   vi.resetModules();
-  const browser = sdkTestWindow('https://glance.example.test/?file=1&labRunSource=agent');
+  const browser = sdkTestWindow('https://glance.example.test/file/?labRunSource=agent');
   document.body.innerHTML = '<div id="app"></div>';
   localStorage.clear();
   sessionStorage.clear();
@@ -772,7 +772,7 @@ it('published SDK preserves the synthetic file profile and exposes real public R
   try {
     app.start();
     expect(sdk.lab.preservationStatus).toBe('existing-local');
-    expect(location.search).toBe('?file=1');
+    expect(location.pathname).toBe('/file/');
     expect(document.querySelector('iframe')).toBeNull();
     const toggle = document.getElementById('record-file') as HTMLInputElement;
     expect(toggle).not.toBeNull();
@@ -886,7 +886,7 @@ it('published preserving SDK refuses incompatible profiles and invalid file entr
   expect(document.querySelector('iframe')).toBeNull();
   first.lab.dispose();
   vi.resetModules();
-  window.history.replaceState({}, '', '/?file=1');
+  window.history.replaceState({}, '', '/file/');
   document.body.innerHTML = '<div id="app"></div>';
   // A malformed existing session must remain byte-exact; no replacement session.
   sessionStorage.setItem('hf-lab-session:glance', 'synthetic incompatible session');
