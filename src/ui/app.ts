@@ -335,6 +335,16 @@ function needleAngle(r: Report | null, g: Gauge): number {
 // ---------- title ----------
 
 export function start() {
+  if (fileMode) {
+    const notice = telemetryNotice(undefined, { preservation: 'preserve' });
+    if (notice) document.body.append(notice);
+    if (lab.preservationStatus !== 'existing-local') {
+      lab.dispose();
+      app.innerHTML =
+        '<p>File play cannot start with this browser’s recording profile. No native save was opened. Use a compatible existing lab profile or return to the ordinary address.</p>';
+      return;
+    }
+  }
   if (entryMode === 'invalid') {
     app.innerHTML = '<p>This file address is invalid. Use ?file=1 to choose a saved file.</p>';
     return;
@@ -447,7 +457,8 @@ function fileChooser() {
     <button id="choose-file">${s ? 'Choose another file' : 'Choose a saved file'}</button>
     <input type="file" id="file" accept="application/json" hidden>
     <p id="file-result" role="status"></p>
-    ${s ? '<button id="file-download">Download this run</button><button id="file-resume">Resume current file</button>' : ''}</div></div>`;
+    ${s ? '<button id="file-download">Download this run</button><button id="file-resume">Resume current file</button>' : ''}${recordSwitch('record-file')}<p>Recording links new play across games on this device. Your browser’s privacy signal keeps recording off unless you choose to turn it on.</p></div></div>`;
+  bindRecord(app, 'record-file');
   const file = required(document.querySelector<HTMLInputElement>('#file'));
   document.getElementById('choose-file')?.addEventListener('click', () => file.click());
   document.getElementById('file-download')?.addEventListener('click', download);
@@ -674,9 +685,10 @@ function gameMenu() {
     const d = dialog(
       'file-menu',
       'Game menu',
-      '<p>Progress stays in memory. Download this run before closing the page.</p><button id="file-download">Download this run</button><button id="choose-another">Choose another file</button><button id="file-departure">Pause chapter for departure</button>',
+      `<p>Progress stays in memory. Download this run before closing the page.</p><button id="file-download">Download this run</button><button id="choose-another">Choose another file</button><button id="file-departure">Pause chapter for departure</button>${recordSwitch('record-file-menu')}<p>Recording links new play across games on this device. Your browser’s privacy signal keeps recording off unless you choose to turn it on.</p>`,
       '<button class="primary" id="dialog-back">Resume current file</button>',
     );
+    bindRecord(d, 'record-file-menu');
     d.querySelector('#file-download')?.addEventListener('click', download);
     d.querySelector('#choose-another')?.addEventListener('click', () => {
       d.remove();

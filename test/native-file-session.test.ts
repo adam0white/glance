@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { personaChannel } from '@adam0white/lab-client';
+import { Window } from 'happy-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Continuity } from '../src/continuity.ts';
 import { queueInput, step } from '../src/sim/dam.ts';
@@ -37,6 +38,8 @@ vi.mock('@adam0white/lab-client', async (original) => ({
 vi.mock('../src/ui/lab.ts', () => ({
   lab: {
     build: () => ({ c: 'synthetic-source-test' }),
+    preservationStatus: 'existing-local',
+    dispose() {},
     setPersonaRecording() {},
     screen() {},
     milestone() {},
@@ -689,4 +692,219 @@ it('public Resume preserves continued complete play and BOM provenance across pe
   await tickSelection();
   validation.mockRestore();
   await assertPreserved(afterValidationResume);
+});
+
+function sdkTestWindow(url: string) {
+  const browser = new Window({ url });
+  for (const key of [
+    'window',
+    'document',
+    'location',
+    'history',
+    'navigator',
+    'localStorage',
+    'sessionStorage',
+  ] as const) {
+    vi.stubGlobal(key, key === 'window' ? browser : browser[key]);
+  }
+  for (const key of ['addEventListener', 'removeEventListener', 'dispatchEvent'] as const)
+    vi.stubGlobal(key, browser[key].bind(browser));
+  return browser;
+}
+
+it('published SDK preserves the synthetic file profile and exposes real public Recording controls', async () => {
+  vi.doUnmock('../src/ui/lab.ts');
+  vi.doUnmock('@adam0white/lab-client');
+  vi.resetModules();
+  const browser = sdkTestWindow('https://glance.example.test/?file=1&labRunSource=agent');
+  document.body.innerHTML = '<div id="app"></div>';
+  localStorage.clear();
+  sessionStorage.clear();
+  const player = 'a'.repeat(32);
+  localStorage.setItem('hf-lab-player', player);
+  localStorage.setItem('hf-lab-top-level-player', player);
+  localStorage.setItem('hf-lab:once:telemetry-notice-v1', 'synthetic-existing-notice');
+  localStorage.setItem('glance-cast-local-v3', 'synthetic occupied native sentinel');
+  sessionStorage.setItem('hf-lab-session:glance', `${'b'.repeat(32)}:1234`);
+  sessionStorage.setItem('hf-lab-run:glance', 'c'.repeat(32));
+  const baseline = new Map([
+    ['hf-lab-player', localStorage.getItem('hf-lab-player')],
+    ['hf-lab-top-level-player', localStorage.getItem('hf-lab-top-level-player')],
+    ['hf-lab:once:telemetry-notice-v1', localStorage.getItem('hf-lab:once:telemetry-notice-v1')],
+    ['glance-cast-local-v3', localStorage.getItem('glance-cast-local-v3')],
+  ]);
+  const oldJournalKey = `hf-lab-navigation:glance:${'d'.repeat(32)}`;
+  const oldJournal = JSON.stringify({
+    id: 'd'.repeat(32),
+    kind: 'events',
+    count: 1,
+    data: { vp: 'desktop', started: 1234, e: [{ name: 'synthetic retained source' }] },
+    link: { player, session: 'b'.repeat(32), runId: 'c'.repeat(32) },
+    build: {},
+    override: false,
+    at: Date.now(),
+  });
+  localStorage.setItem(oldJournalKey, oldJournal);
+  baseline.set(oldJournalKey, oldJournal);
+  const session = sessionStorage.getItem('hf-lab-session:glance');
+  const runId = sessionStorage.getItem('hf-lab-run:glance');
+  Object.defineProperty(navigator, 'doNotTrack', { configurable: true, value: '1' });
+  const requests: RequestInit[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url, init) => {
+      if (init?.method === 'POST') requests.push(init);
+      return new Response('', { status: 503 });
+    }),
+  );
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', () => {});
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  const access: string[] = [];
+  const get = Storage.prototype.getItem;
+  vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key: string) {
+    if (key.startsWith('glance-')) access.push(key);
+    return get.call(this, key);
+  });
+  const sdk = await import('../src/ui/lab.ts');
+  const app = await import('../src/ui/app.ts');
+  const captured = vi.spyOn(sdk.lab, 'captureSave');
+  try {
+    app.start();
+    expect(sdk.lab.preservationStatus).toBe('existing-local');
+    expect(location.search).toBe('?file=1');
+    expect(document.querySelector('iframe')).toBeNull();
+    const toggle = document.getElementById('record-file') as HTMLInputElement;
+    expect(toggle).not.toBeNull();
+    expect(toggle.checked).toBe(false);
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change'));
+    expect(toggle.checked).toBe(true);
+    expect(sdk.lab.telemetryOn).toBe(true);
+    expect(sdk.lab.privacyOverride).toBe(true);
+    const bytes = new TextEncoder().encode('\ufeff' + fixtureText);
+    selectedBytes(document.getElementById('file') as HTMLInputElement, bytes);
+    await vi.waitFor(() => expect(app._debug.state).not.toBeNull());
+    document.querySelector<HTMLElement>('[data-g="level"]')!.click();
+    document.querySelector<HTMLElement>('.sheet [data-job="level"]')!.click();
+    document.getElementById('menu')!.click();
+    const envelope = captured.mock.calls.at(-1)![0] as ReturnType<Continuity['exportSession']>;
+    expect(envelope.original?.text).toBe('\ufeff' + fixtureText);
+    expect(envelope.original?.sha256).toBe(createHash('sha256').update(bytes).digest('hex'));
+    const actual = exportCurrent(app._debug.state!);
+    const c = new Continuity(sdk.lab, undefined, () => {}, true);
+    const restored = await c.importFile(JSON.stringify(envelope));
+    expect(exportCurrent(restored)).toEqual(actual);
+    expect(c.exportSession(restored).provenance).toEqual(envelope.provenance);
+    const control = importCurrent(actual);
+    queueInput(restored, { kind: 'ring' });
+    queueInput(control, { kind: 'ring' });
+    step(restored);
+    step(control);
+    expect(exportCurrent(restored)).toEqual(exportCurrent(control));
+    sdk.lab.flush(); // Public capture call; no private transport or fake acknowledgment.
+    await tickSelection();
+    const journal = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)!)
+      .filter((key) => key.startsWith('hf-lab-navigation:glance:'))
+      .map((key) => JSON.parse(localStorage.getItem(key)!));
+    expect(journal.some((entry) => entry.runSource === 'agent')).toBe(true);
+    expect(JSON.parse(localStorage.getItem(oldJournalKey)!).runSource).toBeUndefined();
+    expect(localStorage.getItem(oldJournalKey)).toBe(oldJournal);
+    // Happy DOM has no durable IndexedDB queue. The real preserving SDK refuses it.
+    await expect(sdk.lab.sendRun(envelope)).rejects.toThrow('queue is full');
+    const menuToggle = document.getElementById('record-file-menu') as HTMLInputElement;
+    expect(menuToggle.checked).toBe(true);
+    menuToggle.checked = false;
+    menuToggle.dispatchEvent(new Event('change'));
+    expect(sdk.lab.telemetryOn).toBe(false);
+    expect(menuToggle.checked).toBe(false);
+    window.dispatchEvent(new Event('pagehide'));
+    document.dispatchEvent(new Event('visibilitychange'));
+    document.getElementById('choose-another')!.click();
+    expect((document.getElementById('record-file') as HTMLInputElement).checked).toBe(false);
+    expect(access).toEqual([]);
+    vi.mocked(Storage.prototype.getItem).mockRestore();
+    for (const [key, value] of baseline) expect(localStorage.getItem(key)).toBe(value);
+    expect(sessionStorage.getItem('hf-lab-session:glance')).toBe(session);
+    expect(sessionStorage.getItem('hf-lab-run:glance')).toBe(runId);
+    expect(sdk.lab.preservationStatus).toBe('existing-local');
+    sdk.lab.dispose();
+    vi.resetModules();
+    document.body.innerHTML = '<div id="app"></div>';
+    const reloadedSDK = await import('../src/ui/lab.ts');
+    const reloaded = await import('../src/ui/app.ts');
+    try {
+      reloaded.start();
+      expect(reloaded._debug.state).toBeNull();
+      expect(document.getElementById('file')).not.toBeNull();
+      expect((document.getElementById('record-file') as HTMLInputElement).checked).toBe(false);
+      expect(reloadedSDK.lab.preservationStatus).toBe('existing-local');
+      for (const [key, value] of baseline) expect(localStorage.getItem(key)).toBe(value);
+      expect(sessionStorage.getItem('hf-lab-session:glance')).toBe(session);
+      expect(sessionStorage.getItem('hf-lab-run:glance')).toBe(runId);
+    } finally {
+      reloadedSDK.lab.dispose();
+    }
+    // 503 is refusal, never an ingestion or preservation receipt.
+    expect(requests.every((r) => r.method === 'POST')).toBe(true);
+  } finally {
+    sdk.lab.dispose();
+    delete (navigator as unknown as { doNotTrack?: string }).doNotTrack;
+    await browser.happyDOM.close();
+  }
+});
+
+it('published preserving SDK refuses incompatible profiles and invalid file entry without opening native storage', async () => {
+  vi.doUnmock('../src/ui/lab.ts');
+  vi.doUnmock('@adam0white/lab-client');
+  vi.resetModules();
+  const browser = sdkTestWindow('http://localhost:3000/?file=unknown');
+  document.body.innerHTML = '<div id="app"></div>';
+  localStorage.clear();
+  sessionStorage.clear();
+  localStorage.setItem('hf-lab-player', 'a'.repeat(32));
+  sessionStorage.setItem('hf-lab-session:glance', `${'b'.repeat(32)}:1234`);
+  sessionStorage.setItem('hf-lab-run:glance', 'c'.repeat(32));
+  const fetch = vi.fn(
+    async (_url: RequestInfo | URL, _init?: RequestInit) => new Response('', { status: 503 }),
+  );
+  vi.stubGlobal('fetch', fetch);
+  const nativeAccess: string[] = [];
+  for (const method of ['getItem', 'setItem', 'removeItem'] as const) {
+    const original = Storage.prototype[method];
+    vi.spyOn(Storage.prototype, method).mockImplementation(function (this: Storage, ...args: string[]) {
+      if (args[0]?.startsWith('glance-')) nativeAccess.push(method + ':' + args[0]);
+      return Reflect.apply(original, this, args);
+    });
+  }
+  const first = await import('../src/ui/lab.ts');
+  const invalid = await import('../src/ui/app.ts');
+  invalid.start();
+  expect(first.lab.preservationStatus).toBe('existing-local');
+  expect(document.body.textContent).toContain('file address is invalid');
+  expect(invalid._debug.state).toBeNull();
+  expect(document.querySelector('iframe')).toBeNull();
+  first.lab.dispose();
+  vi.resetModules();
+  window.history.replaceState({}, '', '/?file=1');
+  document.body.innerHTML = '<div id="app"></div>';
+  // A malformed existing session must remain byte-exact; no replacement session.
+  sessionStorage.setItem('hf-lab-session:glance', 'synthetic incompatible session');
+  const blocked = await import('../src/ui/lab.ts');
+  const app = await import('../src/ui/app.ts');
+  try {
+    app.start();
+    expect(blocked.lab.preservationStatus).toBe('incompatible-session');
+    expect(document.body.textContent).toContain('File play cannot start');
+    expect(document.getElementById('file')).toBeNull();
+    expect(app._debug.state).toBeNull();
+    expect(nativeAccess).toEqual([]);
+    expect(sessionStorage.getItem('hf-lab-session:glance')).toBe('synthetic incompatible session');
+    expect(localStorage.getItem('hf-lab-player')).toBe('a'.repeat(32));
+    expect(document.querySelector('iframe')).toBeNull();
+    expect(fetch.mock.calls.every(([, init]) => init?.method !== 'POST')).toBe(true);
+  } finally {
+    blocked.lab.dispose();
+    await browser.happyDOM.close();
+  }
 });
