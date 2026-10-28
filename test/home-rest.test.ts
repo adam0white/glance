@@ -3,7 +3,7 @@
 // No actor/body/RNG mutation or winning stub. Synthetic shelf IO is isolated from simulation.
 import { precommit, setDozeContext, snapshot, tick } from '@adam0white/human-framework';
 import type { Lab } from '@adam0white/lab-client';
-import { expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { Continuity } from '../src/continuity.ts';
 import { discoveriesFor } from '../src/sim/cast.ts';
 import {
@@ -246,100 +246,123 @@ it('allows real HF refusal and loss of cover during return', () => {
 });
 
 // Replay is admission evidence; matching editable source/status copies cannot manufacture execution.
-it('retains complete native/file histories and durably refuses unsupported publication before any write', async () => {
-  const s = departed(),
-    checkpoints = [copy(s)];
-  until(s, () => home(s)!.homeMinutes === 9);
-  checkpoints.push(copy(s));
-  const cut = copy(s);
-  queueInput(cut, { kind: 'outcome', task: 'stop-family' });
-  step(cut);
-  checkpoints.push(copy(cut));
-  returnHome(cut);
-  checkpoints.push(copy(cut));
-  until(s, () => home(s)?.restCompletedAt !== undefined);
-  returnHome(s);
-  checkpoints.push(copy(s));
-  const ended = copy(s);
-  until(ended, () => ended.phase === 'end');
-  checkpoints.push(ended);
-  const source = {
-    revision: 'a'.repeat(64),
-    source: { game: 'glance', rules: 'glance-4', engine: '2.23.0', build: 'synthetic-original-source' },
-    snapshot: snapshot(ready().people[0]!),
-  };
-  for (const state of checkpoints) {
-    const requests: unknown[] = [];
-    const shelf = {
-      ready: Promise.resolve(),
-      enabled: true,
-      request: async (r: unknown) => {
-        requests.push(r);
-        throw Error('Unexpected shelf write');
-      },
+// Each independent checkpoint keeps the existing deadline and every original admission assertion.
+// Only serialized strings are shared; each case restores fresh people and creates fresh controllers.
+describe('complete home-rest native/file histories', () => {
+  let states: readonly string[];
+  let sourceText: string;
+  beforeAll(() => {
+    const s = departed(),
+      checkpoints = [copy(s)];
+    until(s, () => home(s)!.homeMinutes === 9);
+    checkpoints.push(copy(s));
+    const cut = copy(s);
+    queueInput(cut, { kind: 'outcome', task: 'stop-family' });
+    step(cut);
+    checkpoints.push(copy(cut));
+    returnHome(cut);
+    checkpoints.push(copy(cut));
+    until(s, () => home(s)?.restCompletedAt !== undefined);
+    returnHome(s);
+    checkpoints.push(copy(s));
+    const ended = copy(s);
+    until(ended, () => ended.phase === 'end');
+    checkpoints.push(ended);
+    const source = {
+      revision: 'a'.repeat(64),
+      source: { game: 'glance', rules: 'glance-4', engine: '2.23.0', build: 'synthetic-original-source' },
+      snapshot: snapshot(ready().people[0]!),
     };
-    const lab = {
-      setPersonaRecording() {},
-      build: () => ({ c: 'synthetic-home-control' }),
-    } as unknown as Lab;
-    const io = new Continuity(lab, shelf as never);
-    const wrapper = {
-      run: exportCurrent(state),
-      runId: 'synthetic-home-run',
-      fileOrigin: false,
-      heads: [],
-      sources: [source],
-    };
-    const raw = JSON.stringify(wrapper);
-    const loaded = await io.loadLocal(raw);
-    const before = io.localSave(loaded);
-    await expect(io.checkpoint('hf.cast.callum.glance')).rejects.toThrow('passport');
-    expect(await io.checkpointAll()).toEqual({ published: 0, refused: 5 });
-    expect(io.localSave(loaded)).toBe(before);
-    expect(requests).toEqual([]);
-    const file = new Continuity({} as Lab, undefined, () => {}, true);
-    const admitted = await file.importFile(raw);
-    expect(exportCurrent(admitted)).toEqual(exportCurrent(state));
-    expect(file.exportSession(admitted).original.text).toBe(raw);
-    expect(file.exportSession(admitted).provenance).toEqual(wrapper);
-    const small = replay(
-      state.seed,
-      state.inputs,
-      state.minute,
-      state.chapter ?? undefined,
-      state.rules,
-      state.applied,
-    );
-    expect(exportCurrent(small)).toEqual(exportCurrent(state));
-    if (state === checkpoints[0]) {
-      for (const field of ['requestedAt', 'inputIndex', 'sourceAnchor', 'events'] as const) {
-        const forgedReceipt = structuredClone(wrapper);
-        const receipt = forgedReceipt.run.state.outcomes!.keeperScenes!.homeRequests![0]!;
-        if (field === 'sourceAnchor') receipt.sourceAnchor = 'invented-source' as never;
-        else if (field === 'events') receipt.events[0]!.at++;
-        else receipt[field]++;
-        await expect(io.loadLocal(JSON.stringify(forgedReceipt))).rejects.toThrow('replay');
-        expect(io.localSave(loaded)).toBe(before);
+    states = Object.freeze(checkpoints.map((state) => JSON.stringify(cloneState(state))));
+    sourceText = JSON.stringify(source);
+  });
+  it.each([
+    ['departed', 0],
+    ['resting', 1],
+    ['interrupted', 2],
+    ['returned-interrupted', 3],
+    ['completed', 4],
+    ['closed', 5],
+  ] as const)(
+    'retains %s native/file/save state and refuses publication before any write',
+    async (stage, index) => {
+      const text = states[index];
+      if (text === undefined) throw new Error('Missing home-rest checkpoint.');
+      const state = restoreState(JSON.parse(text));
+      const source = JSON.parse(sourceText);
+      const requests: unknown[] = [];
+      const shelf = {
+        ready: Promise.resolve(),
+        enabled: true,
+        request: async (r: unknown) => {
+          requests.push(r);
+          throw Error('Unexpected shelf write');
+        },
+      };
+      const lab = {
+        setPersonaRecording() {},
+        build: () => ({ c: 'synthetic-home-control' }),
+      } as unknown as Lab;
+      const io = new Continuity(lab, shelf as never);
+      const wrapper = {
+        run: exportCurrent(state),
+        runId: 'synthetic-home-run',
+        fileOrigin: false,
+        heads: [],
+        sources: [source],
+      };
+      const raw = JSON.stringify(wrapper);
+      const loaded = await io.loadLocal(raw);
+      const before = io.localSave(loaded);
+      await expect(io.checkpoint('hf.cast.callum.glance')).rejects.toThrow('passport');
+      expect(await io.checkpointAll()).toEqual({ published: 0, refused: 5 });
+      expect(io.localSave(loaded)).toBe(before);
+      expect(requests).toEqual([]);
+      const file = new Continuity({} as Lab, undefined, () => {}, true);
+      const admitted = await file.importFile(raw);
+      expect(exportCurrent(admitted)).toEqual(exportCurrent(state));
+      expect(file.exportSession(admitted).original.text).toBe(raw);
+      expect(file.exportSession(admitted).provenance).toEqual(wrapper);
+      const small = replay(
+        state.seed,
+        state.inputs,
+        state.minute,
+        state.chapter ?? undefined,
+        state.rules,
+        state.applied,
+      );
+      expect(exportCurrent(small)).toEqual(exportCurrent(state));
+      if (stage === 'departed') {
+        for (const field of ['requestedAt', 'inputIndex', 'sourceAnchor', 'events'] as const) {
+          const forgedReceipt = structuredClone(wrapper);
+          const receipt = forgedReceipt.run.state.outcomes!.keeperScenes!.homeRequests![0]!;
+          if (field === 'sourceAnchor') receipt.sourceAnchor = 'invented-source' as never;
+          else if (field === 'events') receipt.events[0]!.at++;
+          else receipt[field]++;
+          await expect(io.loadLocal(JSON.stringify(forgedReceipt))).rejects.toThrow('replay');
+          expect(io.localSave(loaded)).toBe(before);
+        }
       }
-    }
-    const forged = structuredClone(wrapper);
-    forged.run.state.outcomes!.keeperScenes!.homeRequests![0]!.homeMinutes = 120;
-    forged.run.state.outcomes!.keeperScenes!.homeRequests![0]!.completedAt = state.minute;
-    await expect(io.loadLocal(JSON.stringify(forged))).rejects.toThrow('replay');
-    expect(io.localSave(loaded)).toBe(before);
-    await expect(file.importFile(JSON.stringify(forged))).rejects.toThrow('replay');
-    expect(file.exportSession(admitted).original.text).toBe(raw);
-    const continuation = copy(state),
-      restored = importCurrent(exportCurrent(state));
-    for (let n = 0; n < 30; n++) for (const x of [continuation, restored]) minute(x);
-    expect(exportCurrent(restored)).toEqual(exportCurrent(continuation));
-    const session = file.exportSession(continuation),
-      again = new Continuity({} as Lab, undefined, () => {}, true);
-    expect(exportCurrent(await again.importFile(JSON.stringify(session)))).toEqual(
-      exportCurrent(continuation),
-    );
-  }
-}, 15000);
+      const forged = structuredClone(wrapper);
+      forged.run.state.outcomes!.keeperScenes!.homeRequests![0]!.homeMinutes = 120;
+      forged.run.state.outcomes!.keeperScenes!.homeRequests![0]!.completedAt = state.minute;
+      await expect(io.loadLocal(JSON.stringify(forged))).rejects.toThrow('replay');
+      expect(io.localSave(loaded)).toBe(before);
+      await expect(file.importFile(JSON.stringify(forged))).rejects.toThrow('replay');
+      expect(file.exportSession(admitted).original.text).toBe(raw);
+      const continuation = copy(state),
+        restored = importCurrent(exportCurrent(state));
+      for (let n = 0; n < 30; n++) for (const x of [continuation, restored]) minute(x);
+      expect(exportCurrent(restored)).toEqual(exportCurrent(continuation));
+      const session = file.exportSession(continuation),
+        again = new Continuity({} as Lab, undefined, () => {}, true);
+      expect(exportCurrent(await again.importFile(JSON.stringify(session)))).toEqual(
+        exportCurrent(continuation),
+      );
+    },
+    15000,
+  );
+});
 
 // Regression: no actual onsite observer exists when the scheduled keeper remains away.
 it('keeps an interrupted home absence through the actual next watch without fabricating a handover', () => {
