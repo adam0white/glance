@@ -401,6 +401,18 @@ export class Continuity {
       runId = this.runId;
     const task = this.operation.then(async () => {
       const current = () => generation === this.generation && state === this.state && runId === this.runId;
+      // Durable opt-in history exceeds the published passport, even after return, reload or death.
+      // Refuse before envelope creation, source archive, shelf or head writes. Never trust editable receipts alone.
+      if (
+        state &&
+        (state.inputs.some(
+          (i) => i.kind === 'outcome' && (i.task === 'callum-home-rest' || i.task === 'callum-home-return'),
+        ) ||
+          state.outcomes?.keeperScenes?.homeRequests)
+      )
+        throw new Error(
+          'This home-rest history exceeds the published Glance person passport. Download the complete run; no person or source history was published.',
+        );
       if (
         !state ||
         !current() ||

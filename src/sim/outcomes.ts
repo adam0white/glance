@@ -8,6 +8,7 @@ import type { GameState, KeeperState } from './dam.ts';
 
 import {
   advanceKeeperScenes,
+  callumAway,
   cancelKeeperScene,
   isKeeperScene,
   type KeeperSceneAction,
@@ -85,6 +86,7 @@ function free(s: GameState, id: 'dai' | 'callum') {
 export function outcomeAvailable(s: GameState, task: OutcomeTask) {
   if (isKeeperScene(task)) return keeperSceneAvailable(s, task);
   if (!['handover', 'handover-test', 'correction'].includes(task)) return false;
+  if (callumAway(s)) return false;
   if (s.outcomes?.keeperScenes?.active !== undefined || s.outcomes?.keeperScenes?.away !== undefined)
     return false;
   const o = s.outcomes;

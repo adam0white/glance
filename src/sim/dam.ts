@@ -42,7 +42,7 @@ import {
 import { canonicalPersona } from '@adam0white/lab-client';
 import { required } from '../required.ts';
 import { ALLOCATION, type CastId, lifeReady, makeVisitor, talk, VISIT_FROM, VISIT_UNTIL } from './cast.ts';
-import { recallDai } from './keeper-scenes.ts';
+import { callumAway, recallCallum, recallDai } from './keeper-scenes.ts';
 import { ENGINEER, KEEPERS, type KeeperId, makeKeeper, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
 import {
   advanceOutcomes,
@@ -493,6 +493,8 @@ const SECOND_WEEK_BEATS: NightPlan['beats'][] = [
       who: 'narrator',
       text: (s) => {
         const last = s.dawns.at(-1);
+        if (callumAway(s))
+          return 'Callum remains away. No dam reading can be attributed to him until he returns.';
         return `Friday’s morning page ${last?.misses.some((m) => m.who === 'callum') ? 'shows a wrong reading from Callum' : last?.reports.some((r) => r.who === 'callum' && (r.gauge === 'level' || r.gauge === 'weir')) ? 'shows no large error in Callum’s readings' : 'has no level or weir reading from Callum to check'}. Tonight he works alone. Another reading will still be his; Nerys can give you a separate view from the bridge.`;
       },
     },
@@ -516,6 +518,8 @@ const SECOND_WEEK_BEATS: NightPlan['beats'][] = [
           s.reports.findLast((r) => r.who === who && r.gauge === 'level' && !s.held.includes(r)),
         );
         const [dai, callum] = readings;
+        if (callumAway(s) && !callum)
+          return 'Callum remains away. The desk has no new level reading from him.';
         return dai && callum
           ? `Dai’s latest level report says ${spoken(dai.value)}; Callum’s says ${spoken(callum.value)}. They were written at ${clock(dai.wrote)} and ${clock(callum.wrote)}. A difference can come from the reader or from water moving between readings.`
           : 'Both keepers are on duty, but the desk has not received a level reading from each of them tonight. One keeper’s figure does not check the other’s.';
@@ -527,9 +531,11 @@ const SECOND_WEEK_BEATS: NightPlan['beats'][] = [
       at: 300,
       who: 'narrator',
       text: (s) =>
-        s.treeKnown
-          ? 'Callum has reported a tree on the screen. He is the only keeper tonight. Clearing it takes him away from reading gauges and turning the wheel.'
-          : 'The desk has had no report of a tree on the screen tonight. That does not tell you whether anyone has looked. Callum is alone; checking the screen takes him away from the gauges.',
+        callumAway(s)
+          ? 'Callum remains away. The desk cannot send him to check the screen until he returns.'
+          : s.treeKnown
+            ? 'Callum has reported a tree on the screen. He is the only keeper tonight. Clearing it takes him away from reading gauges and turning the wheel.'
+            : 'The desk has had no report of a tree on the screen tonight. That does not tell you whether anyone has looked. Callum is alone; checking the screen takes him away from the gauges.',
     },
   ],
   [
@@ -591,9 +597,10 @@ export function weatherOutlook(s: GameState): string {
 
 /** A keeper's scripted line is heard only when he is on, awake and the radio carries; the narrator, radio and inn always speak. */
 function beatHeard(s: GameState, beat: NightPlan['beats'][number]): boolean {
-  if (beat.if && !keeperOf(s, beat.if).on) return false;
+  if (beat.if && (!keeperOf(s, beat.if).on || (beat.if === 'callum' && callumAway(s)))) return false;
+  if (callumAway(s) && s.night === 3 && beat.who === 'dai' && beat.at === 90) return false;
   if (beat.who !== 'dai' && beat.who !== 'callum') return true;
-  if (!keeperOf(s, beat.who).on || s.radioOut) return false;
+  if (!keeperOf(s, beat.who).on || s.radioOut || (beat.who === 'callum' && callumAway(s))) return false;
   const a = personOf(s, beat.who).activity?.affordanceId;
   return a !== 'doze' && a !== 'nap' && a !== 'sleep';
 }
@@ -803,7 +810,12 @@ export const keeperOf = (s: GameState, id: KeeperId): KeeperState =>
 export function keeperAsleep(s: GameState, id: KeeperId): boolean {
   const p = personOf(s, id);
   const activity = p.activity?.affordanceId;
-  return activity === 'doze' || activity === 'nap' || readDoze(p)?.asleep === true;
+  return (
+    activity === 'doze' ||
+    activity === 'nap' ||
+    (id === 'callum' && callumAway(s) && p.activity?.mode === 'sleep') ||
+    readDoze(p)?.asleep === true
+  );
 }
 export const trustOf = (p: Person) => p.will.voices.find((v) => v.voiceId === ENGINEER)?.trust ?? 0.5;
 
@@ -872,7 +884,7 @@ function startNight(s: GameState, night: number) {
   for (const k of s.keepers) {
     const p = personOf(s, k.id);
     k.on = plan.keepers.includes(k.id);
-    k.place = 'hut';
+    if (!(k.id === 'callum' && callumAway(s))) k.place = 'hut';
     k.job = null;
     k.pending = null;
     k.deferred = null;
@@ -904,16 +916,35 @@ function startNight(s: GameState, night: number) {
       say(
         s,
         'narrator',
-        s.rules.edition === 'extended-2'
-          ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers have come back from their time at home.'
-          : 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers return after their actual rest.',
+        callumAway(s)
+          ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. Callum remains away; his return has not been recorded.'
+          : s.rules.edition === 'extended-2'
+            ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers have come back from their time at home.'
+            : 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers return after their actual rest.',
         'journal',
       );
   }
-  for (const line of plan.intro) say(s, 'narrator', line, 'journal');
+  if (callumAway(s) && [6, 7, 8, 9, 10].includes(night))
+    say(
+      s,
+      'narrator',
+      'Callum remains away from the dam. His exact location is not recorded; a separate return is needed.',
+      'journal',
+    );
+  else for (const line of plan.intro) say(s, 'narrator', line, 'journal');
   // The handover: the day man's figures, written at ten, read fresh.
   const w = s.water;
-  const lead = plan.keepers[0] as KeeperId;
+  const lead = callumAway(s) ? plan.keepers.find((id) => id !== 'callum') : plan.keepers[0];
+  if (!lead) {
+    say(
+      s,
+      'narrator',
+      'No scheduled keeper is at the dam to read the gate or level. The desk has no new handover readings.',
+      'journal',
+    );
+    recordSeries(s);
+    return;
+  }
   const gateR = handover(s, lead, 'gate', w.gate);
   const levelR = handover(s, lead, 'level', w.level);
   s.board.gate = gateR;
@@ -1068,6 +1099,17 @@ export interface Hint {
 
 /** How he would likely answer, right now. Pure: no state change, no randomness. */
 export function hint(s: GameState, id: KeeperId, job: Job, target?: number, insist = false): Hint {
+  if (id === 'callum' && callumAway(s))
+    return {
+      job,
+      ...(target !== undefined ? { target } : {}),
+      verdict: 'refused',
+      says: '',
+      short:
+        'He is away. A call interrupts active home rest or return; no dam work is queued. Invite a separate ten-minute return.',
+      forecast: '',
+      minutes: 0,
+    };
   const p = personOf(s, id);
   const k = keeperOf(s, id);
   const saved = k.pending;
@@ -1232,6 +1274,7 @@ function apply(s: GameState, inp: Input) {
         return;
       }
       if (inp.keeper === 'dai' && recallDai(s)) return;
+      if (inp.keeper === 'callum' && recallCallum(s)) return;
       const p = personOf(s, inp.keeper);
       if (s.rules && readDoze(p)?.asleep) {
         tick(p, s.minute);
@@ -1514,7 +1557,9 @@ function weatherAt(s: GameState): number {
 function keeperMinute(s: GameState, k: KeeperState, rain: number) {
   const p = personOf(s, k.id);
   if (s.rules) {
-    const sitting = k.place === 'hut' && k.job?.job === 'stove' && s.minute >= k.job.startedAt + k.job.walk;
+    const sitting =
+      (k.place === 'hut' && k.job?.job === 'stove' && s.minute >= k.job.startedAt + k.job.walk) ||
+      (callumAway(s) && p.activity?.affordanceId === 'family-home-rest');
     setDozeContext(p, { posture: sitting ? 'seated' : 'upright', stimulation: sitting ? 0.1 : 1 });
   }
   tick(p, s.minute);
