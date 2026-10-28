@@ -76,6 +76,7 @@ import {
   spokenFine,
 } from './reading.ts';
 import { DRAW, hashNormal, hashUnit } from './rng.ts';
+import { recallRota, rotaAway, rotaBusy, rotaStatus } from './rota.ts';
 import {
   advanceViewing,
   requestViewing,
@@ -608,6 +609,15 @@ export function weatherOutlook(s: GameState): string {
 
 /** A keeper's scripted line is heard only when he is on, awake and the radio carries; the narrator and radio remain available; a new Nerys absence also suppresses inn speech. */
 function beatHeard(s: GameState, beat: NightPlan['beats'][number]): boolean {
+  if (rotaAway(s, 'dai') || rotaAway(s, 'callum')) {
+    if (beat.who === 'dai' || beat.who === 'callum' || beat.if) return false;
+    if (
+      ['dai', 'callum'].some(
+        (id) => rotaAway(s, id) && (typeof beat.text !== 'string' || beat.text.toLowerCase().includes(id)),
+      )
+    )
+      return false;
+  }
   if (beat.who === 'nerys' && viewingInnUnavailable(s)) return false;
   if (beat.if && (!keeperOf(s, beat.if).on || (beat.if === 'callum' && callumAway(s)))) return false;
   if (callumAway(s) && s.night === 3 && beat.who === 'dai' && beat.at === 90) return false;
@@ -825,7 +835,7 @@ export function keeperAsleep(s: GameState, id: KeeperId): boolean {
   return (
     activity === 'doze' ||
     activity === 'nap' ||
-    (id === 'callum' && callumAway(s) && p.activity?.mode === 'sleep') ||
+    ((rotaAway(s, id) || (id === 'callum' && callumAway(s))) && p.activity?.mode === 'sleep') ||
     readDoze(p)?.asleep === true
   );
 }
@@ -839,6 +849,10 @@ function offer(id: string, over: Partial<Affordance> = {}): Affordance {
 function dayHours(s: GameState, night: number) {
   const d = nightStart(night);
   for (const p of s.people) {
+    if (rotaAway(s, p.id)) {
+      tick(p, Math.max(p.now, d + 21 * 60 + 50));
+      continue;
+    }
     if (p.id === 'nerys' && viewingAway(s)) {
       tick(p, Math.max(p.now, d + 21 * 60 + 50));
       continue;
@@ -854,6 +868,10 @@ function dayHours(s: GameState, night: number) {
 function morningHours(s: GameState, night: number) {
   const d = nightStart(night) + 1440;
   for (const p of s.people) {
+    if (rotaAway(s, p.id)) {
+      tick(p, Math.max(p.now, d + 15 * 60));
+      continue;
+    }
     if (p.id === 'nerys' && viewingAway(s)) {
       tick(p, Math.max(p.now, d + 15 * 60));
       continue;
@@ -904,7 +922,7 @@ function startNight(s: GameState, night: number) {
   for (const k of s.keepers) {
     const p = personOf(s, k.id);
     k.on = plan.keepers.includes(k.id);
-    if (!(k.id === 'callum' && callumAway(s))) k.place = 'hut';
+    if (!rotaAway(s, k.id) && !(k.id === 'callum' && callumAway(s))) k.place = 'hut';
     k.job = null;
     k.pending = null;
     k.deferred = null;
@@ -936,15 +954,24 @@ function startNight(s: GameState, night: number) {
       say(
         s,
         'narrator',
-        callumAway(s)
-          ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. Callum remains away; his return has not been recorded.'
-          : s.rules.edition === 'extended-2'
-            ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers have come back from their time at home.'
-            : 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers return after their actual rest.',
+        rotaAway(s, 'dai') || rotaAway(s, 'callum')
+          ? 'The day keeper covered the dam. A keeper remains physically away under the retained rota; no arrival is inferred.'
+          : callumAway(s)
+            ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. Callum remains away; his return has not been recorded.'
+            : s.rules.edition === 'extended-2'
+              ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers have come back from their time at home.'
+              : 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers return after their actual rest.',
         'journal',
       );
   }
-  if (callumAway(s) && [6, 7, 8, 9, 10].includes(night))
+  if (rotaAway(s, 'dai') || rotaAway(s, 'callum'))
+    say(
+      s,
+      'narrator',
+      'The scheduled watch starts with the retained keeper absence. Calls and on-site reports wait for actual return.',
+      'journal',
+    );
+  else if (callumAway(s) && [6, 7, 8, 9, 10].includes(night))
     say(
       s,
       'narrator',
@@ -954,7 +981,12 @@ function startNight(s: GameState, night: number) {
   else for (const line of plan.intro) say(s, 'narrator', line, 'journal');
   // The handover: the day man's figures, written at ten, read fresh.
   const w = s.water;
-  const lead = callumAway(s) ? plan.keepers.find((id) => id !== 'callum') : plan.keepers[0];
+  const lead =
+    rotaAway(s, 'dai') || rotaAway(s, 'callum')
+      ? plan.keepers.find((id) => !rotaAway(s, id) && !(id === 'callum' && callumAway(s)))
+      : callumAway(s)
+        ? plan.keepers.find((id) => id !== 'callum')
+        : plan.keepers[0];
   if (!lead) {
     say(
       s,
@@ -1119,6 +1151,16 @@ export interface Hint {
 
 /** How he would likely answer, right now. Pure: no state change, no randomness. */
 export function hint(s: GameState, id: KeeperId, job: Job, target?: number, insist = false): Hint {
+  if (rotaAway(s, id))
+    return {
+      job,
+      ...(target !== undefined ? { target } : {}),
+      verdict: 'refused',
+      says: '',
+      short: `${rotaStatus(s, id)} A call interrupts attendance or return and queues no dam work.`,
+      forecast: '',
+      minutes: 0,
+    };
   if (id === 'callum' && callumAway(s))
     return {
       job,
@@ -1266,7 +1308,7 @@ function apply(s: GameState, inp: Input) {
       stopViewing(s, 'The player asked to pause.');
       s.pauseRequested = true;
       if (s.privateScenes) cancelPrivate(s, 'The player asked to pause.');
-      if (s.outcomes?.keeperScenes) cancelOutcome(s, 'The player asked to pause.');
+      if (s.outcomes?.keeperScenes || rotaBusy(s)) cancelOutcome(s, 'The player asked to pause.');
       s.chapterPaused = s.people.every((p) => !p.activity) && !s.privateScenes?.active;
       say(
         s,
@@ -1298,6 +1340,7 @@ function apply(s: GameState, inp: Input) {
         );
         return;
       }
+      if (recallRota(s, inp.keeper)) return;
       if (inp.keeper === 'dai' && recallDai(s)) return;
       if (inp.keeper === 'callum' && recallCallum(s)) return;
       const p = personOf(s, inp.keeper);
@@ -1549,7 +1592,10 @@ export function step(s: GameState): void {
   for (const p of s.people) if (!s.keepers.some((k) => k.id === p.id)) tick(p, s.minute);
   if (s.rules) reliefMinute(s);
   // People.
-  for (const k of s.keepers) if (k.on) keeperMinute(s, k, rain);
+  for (const k of s.keepers) {
+    if (k.on) keeperMinute(s, k, rain);
+    else if (rotaAway(s, k.id)) tick(personOf(s, k.id), s.minute);
+  }
   if (s.outcomes) advanceOutcomes(s);
   if (s.privateScenes) advancePrivate(s);
   advanceViewing(s);
@@ -1597,7 +1643,8 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
   if (s.rules) {
     const sitting =
       (k.place === 'hut' && k.job?.job === 'stove' && s.minute >= k.job.startedAt + k.job.walk) ||
-      (callumAway(s) && p.activity?.affordanceId === 'family-home-rest');
+      (callumAway(s) && p.activity?.affordanceId === 'family-home-rest') ||
+      (rotaAway(s, k.id) && p.activity?.mode === 'sleep');
     setDozeContext(p, { posture: sitting ? 'seated' : 'upright', stimulation: sitting ? 0.1 : 1 });
   }
   tick(p, s.minute);
@@ -2203,7 +2250,7 @@ function closeNight(s: GameState, overtopped: boolean) {
   if (s.rules)
     for (const k of s.keepers) {
       const p = personOf(s, k.id);
-      if (readDoze(p)?.asleep) {
+      if (readDoze(p)?.asleep && !rotaAway(s, k.id)) {
         tick(p, s.minute);
         perceive(p, [
           {
@@ -2257,7 +2304,7 @@ function closeNight(s: GameState, overtopped: boolean) {
     dozes: s.keepers.flatMap((k) => k.dozes.map((d) => ({ who: k.id, from: d.from, to: d.to }))),
     strain: s.keepers.filter((k) => k.strained && k.on).map((k) => k.id),
     lines: s.keepers
-      .filter((k) => k.on)
+      .filter((k) => k.on && !rotaAway(s, k.id))
       .map((k) => ({
         id: k.id,
         line: s.rules

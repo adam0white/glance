@@ -18,9 +18,22 @@ import {
   requestKeeperScene,
 } from './keeper-scenes.ts';
 
+import {
+  advanceRota,
+  isRota,
+  type ReceivedRota,
+  type RotaAction,
+  requestRota,
+  rotaAvailable,
+  rotaBusy,
+  rotaOccupies,
+  stopRota,
+} from './rota.ts';
+
 type JointTask = 'handover' | 'handover-test' | 'correction';
-export type OutcomeTask = JointTask | KeeperSceneAction;
+export type OutcomeTask = JointTask | KeeperSceneAction | RotaAction;
 export interface ShiftOutcomes {
+  rota?: ReceivedRota;
   keeperScenes?: KeeperScenes;
   handover: {
     original: string;
@@ -84,6 +97,8 @@ function free(s: GameState, id: 'dai' | 'callum') {
   );
 }
 export function outcomeAvailable(s: GameState, task: OutcomeTask) {
+  if (isRota(task)) return rotaAvailable(s, task) === null;
+  if (rotaBusy(s)) return false;
   if (isKeeperScene(task)) return keeperSceneAvailable(s, task);
   if (!['handover', 'handover-test', 'correction'].includes(task)) return false;
   if (callumAway(s)) return false;
@@ -143,6 +158,11 @@ function choose(s: GameState, id: 'dai' | 'callum', proposed: Affordance) {
   };
 }
 export function requestOutcome(s: GameState, task: OutcomeTask) {
+  if (isRota(task)) {
+    requestRota(s, task);
+    return;
+  }
+  if (rotaBusy(s)) return;
   if (isKeeperScene(task)) {
     requestKeeperScene(s, task);
     return;
@@ -226,6 +246,7 @@ export function requestOutcome(s: GameState, task: OutcomeTask) {
   );
 }
 export function cancelOutcome(s: GameState, reason: string) {
+  stopRota(s, reason);
   cancelKeeperScene(s, reason);
   const o = s.outcomes;
   if (!o) return;
@@ -262,6 +283,7 @@ export function cancelOutcome(s: GameState, reason: string) {
 }
 /** Keep an actually attended scene/rest from being treated as a dam job. Body time still advances. */
 export function outcomeOccupies(s: GameState, k: KeeperState): boolean {
+  if (rotaOccupies(s, k.id)) return true;
   if (keeperSceneOccupies(s, k.id)) return true;
   const o = s.outcomes;
   if (!o) return false;
@@ -274,6 +296,7 @@ export function outcomeOccupies(s: GameState, k: KeeperState): boolean {
   );
 }
 export function advanceOutcomes(s: GameState) {
+  advanceRota(s);
   advanceKeeperScenes(s);
   const o = s.outcomes;
   if (!o) return;

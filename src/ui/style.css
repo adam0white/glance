@@ -1486,3 +1486,25 @@ input[type="text"],
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Keep the map steady while the received rota inspection changes its status. */
+.watch:has(section[aria-label="Received keeper rota"]) #latest-radio {
+  display: none;
+}
+.watch:has(section[aria-label="Received keeper rota"]) .scene {
+  height: clamp(120px, 20vw, 180px);
+}
+.watch:has(section[aria-label="Received keeper rota"]) .desk-picture {
+  overflow: hidden;
+}
+.watch:has(section[aria-label="Received keeper rota"]) #concern {
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+}
+.watch:has(section[aria-label="Received keeper rota"]) #concern .keeper-chip {
+  width: 145px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
