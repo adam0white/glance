@@ -4,6 +4,7 @@
 import { createPerson, MINUTES_PER_YEAR, type Person, type PersonSpec } from '@adam0white/human-framework';
 import { canonicalCast, castForGame } from '@adam0white/lab-client';
 import type { GameState } from './dam.ts';
+import { rotaAway } from './rota.ts';
 
 /** Both visitors' authored five-day arrangements start on the opening Monday afternoon.
  * Keeping their Person history after this boundary does not renew local work or conversation access.
@@ -73,6 +74,7 @@ export function lifeReady(s: GameState, id: CastId): boolean {
 export function discoveriesFor(s: GameState): CastId[] {
   if (s.phase !== 'watch' || s.radioOut) return [];
   return (Object.keys(CAST) as CastId[]).filter((id) => {
+    if (rotaAway(s, id)) return false;
     if (!lifeReady(s, id)) return false;
     if (s.discoveries[id]) return false;
     if (id === 'nerys') return s.night >= 2 && s.nerys.ringing === null && s.nerys.goodwill >= 0.35;

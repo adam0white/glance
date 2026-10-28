@@ -7,6 +7,7 @@ import {
 } from '@adam0white/lab-kit';
 import { required } from '../required.ts';
 import { callumAway, daiAway, type KeeperSceneAction, keeperSceneAvailable } from '../sim/keeper-scenes.ts';
+import { type RotaAction, rotaAvailable, rotaAway, rotaStatus, rotaTerms } from '../sim/rota.ts';
 import { catchWords, durationWords } from './watch-copy.ts';
 /**
  * The Glance UI: DOM for the board, the radio log and the sheets; one canvas for the dam. The UI reads state and
@@ -1127,11 +1128,15 @@ function drawConcern() {
   const el = document.getElementById('concern');
   if (!el) return;
   const lines = concernLines(s).map((line) =>
-    callumAway(s as GameState) && line.startsWith('Callum:')
-      ? 'Callum: He is away. Dam work waits for his actual return.'
-      : daiAway(s as GameState) && line.startsWith('Dai:')
-        ? 'Dai: He is away. Dam work waits for his return.'
-        : line,
+    rotaAway(s as GameState, 'dai') && line.startsWith('Dai:')
+      ? `Dai: ${rotaStatus(s as GameState, 'dai')}`
+      : rotaAway(s as GameState, 'callum') && line.startsWith('Callum:')
+        ? `Callum: ${rotaStatus(s as GameState, 'callum')}`
+        : callumAway(s as GameState) && line.startsWith('Callum:')
+          ? 'Callum: He is away. Dam work waits for his actual return.'
+          : daiAway(s as GameState) && line.startsWith('Dai:')
+            ? 'Dai: He is away. Dam work waits for his return.'
+            : line,
   );
   const ids = planOf(s).keepers;
   const body = `${s.rules ? `<button class="keeper-chip" data-watch-arrangements="1">Watch arrangements</button>` : ''}${s.radioOut ? '<span class="radio-chip">The radio has static.</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(viewingInnUnavailable(s) ? (s.viewing?.stage === 'watching' ? 'Watching the sky.' : s.viewing?.stage === 'returning' ? 'Walking back.' : 'Unavailable at the inn.') : telescopeReturning(s) ? 'She is returning from the telescope and cannot witness the river steps yet.' : shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: She is available.'))}</button>` : ''}`;
@@ -1245,7 +1250,7 @@ function drawSheet() {
       <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">How ${NAMES[who]} expects to feel after this job:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'He has not said how he expects to feel.'}</span></p>
       <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every reading is what a keeper saw. It may be wrong.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
-    head = `<b>${NAMES[who]}</b><span class="soft">${esc(who === 'callum' && callumAway(s) ? whereWords(who) : (concernLines(s).find((line) => line.startsWith(`${NAMES[who]}:`)) ?? whereWords(who)))}</span>`;
+    head = `<b>${NAMES[who]}</b><span class="soft">${esc(rotaAway(s, who) || (who === 'callum' && callumAway(s)) ? whereWords(who) : (concernLines(s).find((line) => line.startsWith(`${NAMES[who]}:`)) ?? whereWords(who)))}</span>`;
     const jobs: { job: Job; label: string }[] = [
       { job: 'level', label: 'Read the level' },
       { job: 'stove', label: 'Sit by the stove' },
@@ -1345,7 +1350,36 @@ function observation(st: GameState): string {
 function castConversations(ids: CastId[]): string {
   if (!s) return '';
   const available = discoveriesFor(s);
-  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. ${s?.outcomes ? 'The shift continues slowly while this inspection is open.' : 'Close this inspection to let the shift continue.'} Dam requests still go to the keepers.</p>${outcomeRecord(ids)}${keeperFamilyRecord(ids)}${privateRecord(ids)}</details>`;
+  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. ${s?.outcomes ? 'The shift continues slowly while this inspection is open.' : 'Close this inspection to let the shift continue.'} Dam requests still go to the keepers.</p>${rotaRecord(ids)}${outcomeRecord(ids)}${keeperFamilyRecord(ids)}${privateRecord(ids)}</details>`;
+}
+function rotaRecord(ids: CastId[]): string {
+  if (!s?.outcomes) return '';
+  const st = s,
+    r = st.outcomes?.rota;
+  const button = (action: RotaAction, label: string) => {
+    const reason = rotaAvailable(st, action);
+    return `<button data-outcome="${action}" ${reason ? 'disabled' : ''}>${label}</button>${reason ? `<p class="hint">${esc(reason)}</p>` : ''}`;
+  };
+  return ids
+    .filter(
+      (id): id is 'dai' | 'callum' =>
+        (id === 'dai' || id === 'callum') &&
+        !!st.discoveries[id] &&
+        !!(id === 'dai' ? st.outcomes?.keeperScenes?.daiProposal : st.outcomes?.keeperScenes?.callumProposal),
+    )
+    .map((id) => {
+      const o = r?.offers.findLast((o) => o.person === id && o.night === st.night);
+      const t = r?.trips.findLast((t) => t.person === id);
+      const status = rotaStatus(st, id);
+      return `<section aria-label="Received keeper rota"><h3>Received keeper rota</h3><p>${esc(rotaTerms(id))}</p>
+      ${o ? `<p>Received ${clock(o.offeredAt)}. Earliest departure ${clock(o.notBefore)}; departure deadline ${clock(o.departBy)}, offer expires ${clock(o.expiresAt)}. ${o.readAt !== undefined ? 'Both keepers completed the five-minute reading. No acceptance is inferred.' : o.stoppedAt !== undefined ? `Reading declined or stopped: ${esc(o.reason ?? '')}` : 'Reading together; no agreement or departure yet.'}</p>` : button(id === 'dai' ? 'rota-dai-read' : 'rota-callum-read', 'Read the new rota together · five minutes')}
+      ${o?.readAt !== undefined && !t ? button(id === 'dai' ? 'rota-dai-leave' : 'rota-callum-home', id === 'dai' ? 'Invite Dai’s bounded leave with Callum covering · two hours plus travel' : 'Invite Callum’s agreed home block with Dai covering · two hours plus travel') : ''}
+      ${t ? `<p>Departed ${clock(t.departedAt)}. Actual attendance ${t.attended} minutes; cover ${t.coveredMinutes} minutes, ending by ${clock(t.coverUntil)}. ${t.intervalFinishedAt !== undefined ? 'The 120-minute interval is complete; physical return is separate.' : 'No completed interval is recorded.'} ${t.reason ? esc(t.reason) : ''} ${t.returnedAt !== undefined ? `Actually returned ${clock(t.returnedAt)}.` : ''}</p>` : ''}
+      ${status ? `<p>${esc(status)}</p>${button('rota-return', 'Invite the separate return · ten minutes')}` : ''}
+      ${r?.reading !== undefined || (status && t?.interruptedAt === undefined) ? button('rota-stop', 'Stop the rota activity') : ''}
+    </section>`;
+    })
+    .join('');
 }
 function outcomeRecord(ids: CastId[]): string {
   if (!s?.outcomes || !ids.some((id) => id === 'dai' || id === 'callum')) return '';
@@ -1451,9 +1485,15 @@ function bindConversations(el: HTMLElement) {
   el.onclick = (event) => {
     const target =
       event.target instanceof Element
-        ? event.target.closest<HTMLButtonElement>('[data-private], [data-viewing]')
+        ? event.target.closest<HTMLButtonElement>('[data-private], [data-viewing], [data-outcome^="rota-"]')
         : null;
     if (!s || !target || !el.contains(target) || target.disabled) return;
+    if (target.dataset.outcome?.startsWith('rota-')) {
+      inputNow(s, { kind: 'outcome', task: target.dataset.outcome as OutcomeTask });
+      writeSave();
+      openSheet(null);
+      return;
+    }
     if (target.dataset.viewing) {
       inputNow(s, { kind: 'viewing', action: target.dataset.viewing as ViewingAction });
       writeSave();
@@ -1476,6 +1516,7 @@ function bindConversations(el: HTMLElement) {
     writeSave();
   };
   el.querySelectorAll<HTMLButtonElement>('[data-outcome]').forEach((button) => {
+    if (button.dataset.outcome?.startsWith('rota-')) return;
     button.addEventListener('click', () => {
       if (!s) return;
       inputNow(s, { kind: 'outcome', task: button.dataset.outcome as OutcomeTask });
@@ -1531,6 +1572,10 @@ function patchSheet(el: HTMLElement, html: string, stable: boolean) {
 /** Describe the call before commitment; sleeping and radio silence do not promise queued work. */
 function deskHint(st: GameState, who: KeeperId, job: Job, target?: number, insist = false): Hint {
   const h = hint(st, who, job, target, insist);
+  if (rotaAway(st, who))
+    return st.radioOut
+      ? { ...h, short: 'The radio is out. The call cannot get through.', minutes: 0, forecast: '' }
+      : h;
   const activity = personOf(st, who).activity?.affordanceId;
   if (who === 'callum' && callumAway(st))
     return st.radioOut
@@ -1567,6 +1612,8 @@ function lastWords(st: GameState, g: Gauge): string {
 
 function whereWords(id: KeeperId): string {
   if (!s) return '';
+  const rota = rotaStatus(s, id);
+  if (rota) return rota;
   if (id === 'callum' && callumAway(s)) {
     const f = s.outcomes?.keeperScenes;
     const h = f?.homeAway === undefined ? undefined : f.homeRequests?.[f.homeAway];
@@ -1823,7 +1870,7 @@ function ending() {
     <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong readings during ${s.rules ? 'the longer watch' : 'the week'}.` : ''}</p>
     ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(l.aboutYou)}</p></div>`).join('')}
     ${fileMode ? '' : '<p id="continuity-result" role="status">Checking the browser shelf. No transfer is confirmed yet.</p>'}<div id="closing-tally"></div><button class="reading-row" id="back">${EXTENDED_PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
-    <div class="actionbar ending-actions"><div><button id="send">Feedback</button><button id="export">Download this run</button><a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">Continue people in another game</a></div><button class="primary" id="again">${fileMode ? 'Choose another file' : 'New game'}</button></div></div>`;
+    <div class="actionbar ending-actions"><div><button id="send">Feedback</button><button id="export">Download this run</button><a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">People across games</a></div><button class="primary" id="again">${fileMode ? 'Choose another file' : 'New game'}</button></div></div>`;
   bindTopbar();
   publishEnding(s);
   updateTally();

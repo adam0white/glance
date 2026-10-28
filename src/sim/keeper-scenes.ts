@@ -3,6 +3,7 @@
  */
 import { type Affordance, begin, decide, finish, type Person, readDoze } from '@adam0white/human-framework';
 import type { GameState } from './dam.ts';
+import { rotaAway, rotaBusy } from './rota.ts';
 
 export type KeeperSceneAction =
   | 'callum-home-rest'
@@ -126,7 +127,7 @@ const say = (s: GameState, text: string) =>
   s.said.push({ at: s.minute, who: 'narrator', kind: 'answer', text });
 export const callumAway = (s: GameState) => record(s)?.homeAway !== undefined;
 export const keeperAway = (s: GameState, id: string) =>
-  id === 'callum' ? callumAway(s) : id === 'dai' && daiAway(s);
+  rotaAway(s, id) || (id === 'callum' ? callumAway(s) : id === 'dai' && daiAway(s));
 export const daiAway = (s: GameState) => record(s)?.away !== undefined;
 function free(s: GameState, id: 'dai' | 'callum') {
   const k = keeper(s, id),
@@ -146,6 +147,7 @@ function oldRest(s: GameState) {
   return c?.restFrom !== undefined && c.restedAt === undefined && c.restStoppedAt === undefined;
 }
 export function keeperSceneAvailable(s: GameState, action: KeeperSceneAction) {
+  if (rotaBusy(s)) return false;
   const f = record(s);
   if (!s.outcomes || s.phase !== 'watch') return false;
   if (action === 'callum-home-rest') return homeAvailable(s);

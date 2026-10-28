@@ -400,7 +400,26 @@ export class Continuity {
       state = this.state,
       runId = this.runId;
     const task = this.operation.then(async () => {
-      const current = () => generation === this.generation && state === this.state && runId === this.runId;
+      // Full native replay remains authority. Exact complete bytes bind that validation
+      // to the world and source records across asynchronous shelf/envelope operations.
+      // A changed run is never authorized by a stale validated object or editable marker.
+      let verifiedRun: string | undefined;
+      let verifiedSources: string | undefined;
+      const sourceRecords = () =>
+        JSON.stringify({ heads: this.heads, sources: this.sources, fileOrigin: this.fileOrigin });
+      const current = () =>
+        generation === this.generation &&
+        state === this.state &&
+        runId === this.runId &&
+        (verifiedRun === undefined || (!!state && JSON.stringify(exportRun(state)) === verifiedRun)) &&
+        (verifiedSources === undefined || sourceRecords() === verifiedSources);
+      if (
+        state &&
+        (state.outcomes?.rota || state.inputs.some((i) => i.kind === 'outcome' && i.task.startsWith('rota-')))
+      )
+        throw new Error(
+          'This rota history exceeds the published Glance person passport. Download the complete run; no person or source history was published.',
+        );
       if (state && (state.viewing || state.inputs.some((i) => i.kind === 'viewing')))
         throw new Error(
           'This viewing history exceeds the published Glance person passport. Download the complete run; no person or source history was published.',
@@ -420,7 +439,12 @@ export class Continuity {
       // Known unsupported history can only refuse; do not replay it for each actor.
       // Labels never authorize publication: stripped and potentially supported histories
       // still bind the complete Person/world state to creation and recorded execution.
-      if (state) importRun(exportRun(state));
+      if (state) {
+        const complete = exportRun(state);
+        importRun(complete);
+        verifiedRun = JSON.stringify(complete);
+        verifiedSources = sourceRecords();
+      }
       if (
         !state ||
         !current() ||
@@ -451,6 +475,7 @@ export class Continuity {
         if (parent.terminal) return false;
         raw = snapshot(villager.person);
         const closed = await closePersonaBranch(parent, this.source(), villager.person.now);
+        if (!current()) throw new Error('The game changed before this history could be saved.');
         const { revision: _revision, ...body } = closed;
         envelope = await createPersona({ ...body, transfer: { ...body.transfer, hostRun: runId } });
       } else {
@@ -462,6 +487,7 @@ export class Continuity {
             'Work and family duties still keep this person here. Finish the storm week before they leave.',
           );
         const captured = await residentTransfer(villager.person);
+        if (!current()) throw new Error('The game changed before this history could be saved.');
         raw = captured.raw;
         const branchId = fork ? crypto.randomUUID() : (parent?.branchId ?? crypto.randomUUID());
         const life =
@@ -491,6 +517,7 @@ export class Continuity {
             'Complete source archive exceeds capacity. Download this run. This history was not published.',
           );
         this.sources = retained;
+        verifiedSources = sourceRecords();
         this.changed();
       }
       if (!current()) throw new Error('The game changed before this history could be saved.');
