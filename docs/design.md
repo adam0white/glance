@@ -2,7 +2,7 @@
 
 **One line.** A storm week on the night desk at the river authority. Up the valley, one old dam above a town, and on it a keeper with a torch and a radio. Every number on your board is what a tired man saw.
 
-**Done for the first playable** (set 2026-10-19 by the coordinator's brief; the owner accepts feel separately): five playable nights with one new pressure each, a dawn logbook that draws the truth over the reports, an ending, a playtest export that replays, tests, a headless measure, a polish round with at least three source-unread playtesters recorded verbatim, live at https://glance.adamwhite.work.
+**Historical first-playable goal** (set 2026-10-19 by the coordinator's brief; the owner accepts feel separately): five playable nights with one new pressure each, a dawn logbook that draws the truth over the reports, an ending, a playtest export that replays, tests, a headless measure, a polish round with at least three source-unread playtesters recorded verbatim, live at https://glance.adamwhite.work.
 
 ## How it was chosen (2026-10-19)
 
@@ -27,7 +27,7 @@ Between crises the player plans his next walk ahead of the rain, trades his rest
 | --------- | ---------------------------------------------------------------------------------------------------------------- |
 | Monday    | Dai alone. The level, the gate, rain. Learn that he reads low.                                                   |
 | Tuesday   | The weir upstream and the Bridge Inn: Nerys at the window, and the town warning. False alarms cost her goodwill. |
-| Wednesday | Callum arrives. Two keepers: who walks, who sleeps. He never says no.                                            |
+| Wednesday | Callum arrives. Two keepers: who walks, who sleeps. HF still owns refusal.                                       |
 | Thursday  | The radio drops in the wind; a tree comes down on the screen. Silence is the warning.                            |
 | Friday    | The crest. Everything at once; the 1979 mark on the wall.                                                        |
 
@@ -35,7 +35,7 @@ The dam overtopping ends the week (the dawn page still comes). Achievement is th
 
 ## Rules taken from the consults
 
-1. A night is 22:00 to 06:00. Playback runs automatically: brisk quiet work, reading time for new radio words, and time held during an inspection or information popover. Each simulation minute still runs; the first new event ends a fast batch. The owner restored optional speed choices on 2026-10-22; see the updates below.
+1. A night is 22:00 to 06:00. Playback runs automatically: brisk quiet work, reading time for new radio words, and time slowed during a new public watch’s inspection and held during an information popover or menu. Loaded old watches retain their literal inspection clock rules. Each simulation minute still runs; the first new event ends a fast batch. The owner restored optional speed choices on 2026-10-22; see the updates below.
 2. No meter for a person. State shows in words, handwriting, gait on the map and the dawn notes.
 3. Every error has a cause in the keeper's true state and a tell the player could have read; the dawn page names the cause.
 4. World randomness is keyed by seed, night and minute (pattern from The Pass), so one input never moves the storm.
@@ -48,9 +48,9 @@ The dam overtopping ends the week (the dawn page still comes). Achievement is th
 - **Readings.** The keeper's read is the truth plus an error whose size grows as his true clarity falls and whose bias is his character (Dai low, Callum high, more so when afraid). His spoken confidence is computed the same way from his perceived state. Skipped walks and copied figures are host rolls from true sleepiness, keyed by the minute.
 - **Noticing.** At the dam the keeper perceives what is there (the rain, the gate, a tree on the screen) through HF `perceive`, whose limited attention narrows with fatigue and fear. He mentions only what got through.
 
-## Extended watch candidate (2026-10-25)
+## Current public watch and saved editions
 
-The original five nights remain the default. A new game can opt into “A longer watch”. New longer watches pin `extended-2`, with a Valley or Upper dam map. Saved `extended-1` watches retain their original catch rule, dialogue and empty later-night beat lists. No recorded history is rewritten. Unmarked runs keep their original decisions, RNG and replay. Both full imports and compact replay rebuild the pinned edition. The finite person-transfer projection stays `glance-4`: no new source dialect, skill recognition or body/calendar admission is added.
+Every ordinary new game now pins the existing `extended-2` / `private-scenes-1` rules and runs twelve nights through the second Friday, unless water overtops first. Valley is the default physical map; the title offers harder Upper dam. Water flows between nights. There is no duration or scene feature switch. Loaded original five-night watches and all saved longer-watch editions retain their literal rules. Saved `extended-1` watches retain their original catch rule, dialogue and empty later-night beat lists. No recorded history is rewritten. Unmarked runs keep their original decisions, RNG and replay. Both full imports and compact replay rebuild the pinned edition. The finite person-transfer projection stays `glance-4`: no new source dialect, skill recognition or body/calendar admission is added.
 
 - The longer watch runs through Saturday and Sunday to the second Friday. The same five HF people retain actual fatigue, sleep, strain and histories. Weather remains keyed by seed and absolute night.
 - Day cover sets the gate to one turn. Water flows through every intervening minute instead of assigning a new level. A daytime overtop ends the watch at its recorded time.
@@ -62,30 +62,30 @@ The original five nights remain the default. A new game can opt into “A longer
 - The live board retains each keeper’s latest actually received figure and written time. Radio-held reports stay hidden. A newer figure from one keeper does not erase another keeper’s disagreement.
 - Doubt marks in the longer watch are compared at dawn with actual known outcomes, including accurate figures that the player doubted. In `extended-2`, a reread request or a wall flash within twenty minutes also credits a wrong reading, as in the original watch; doubt marks add another way to catch it. Saved `extended-1` watches keep doubt-only credit, and their help says so. The original watch retains its original catch rule. Neither mark reveals correctness during play.
 - Nights 6–12 each add a desk observation from received reports or revealed morning pages: Callum’s Friday record, Saturday’s town outcome, the two keepers’ latest figures, the missing or received screen report, a report aging during radio silence, gate position versus screen clearance, and the need for a current town report. These lines do not inspect hidden water, held reports or private HF state. Storms, staffing, walking times and difficulty remain unchanged.
-- The short watch remains the lab panel default; the longer watch is optional. The coordinator holds Glance R1 until the catch and edition-copy corrections are deployed. Choosing a short watch gives no second-week playtest evidence.
+- Historical short-watch panel evidence does not establish twelve-night playtest coverage. This startup correction runs no panel or retest. Loaded short watches remain playable.
 - A separate dawn practice branch replays the same pinned opening and prior history, then submits an alternative opening gate request through HF. It does not change the actual logbook, local save, recording or browser shelf. Refusal remains possible.
 - The longer watch uses released HF `enableDoze` / `setDozeContext` and salient audible waking. The host resolves stopped work at `dozedAt`. It uses `estimateQuantity` only for real observations; character bias, poor light, fear and written-time slips stay host-authored. Unmarked runs keep the old workarounds.
 - Dawn retains the actual HF review of the watch before the later morning review replaces it. A requested nap that actually began can supply the ordered cause to `reviewLine`. Narration does not erase the recorded lapse. Dawn omits an unqualified kept-watch claim when actual doze spans overlap the watch; the raw HF review remains unchanged.
 
 Technical delivery and independent review receipts belong in the external games-deferred report. This source description is not owner acceptance or a playtest result.
 
-## Public controls — 2026-10-27 candidate
+## Public controls — 2026-10-27 source
 
-Pace choices are public in native and file menus. New longer watches include joint handover, correction, covered hut rest and all implemented private scenes. Choosing five or twelve nights selects game length; no separate scene switch remains. Existing saved rules remain exact for current-version replay.
+Pace choices are public in native and file menus. Every new game includes the implemented joint handover, correction, covered hut rest and private scenes through `extended-2` / `private-scenes-1`. Starting from the menu uses twelve nights at Valley; returning to the title offers the physical dam choice. Availability does not award completion: actions remain separately chosen, cost actual time, respect duties and allow HF refusal or interruption. Existing saved rules remain exact for current-version replay.
 
 New native chapters carry matching people automatically through the public shelf contract. Loaded chapters keep their pinned people. Cast controls live on the central shelf, linked from the ending. File play stays memory-only and does not acquire people. Its dedicated chooser/download path preserves the local saved week; Debug does not offer the former in-place native-save importer. Debug starts collapsed beside Lab privacy.
 
-This is an unreviewed source candidate. Source, live behavior and owner acceptance remain distinct.
+This startup correction awaits independent review and delivery. Source, live behavior and owner acceptance remain distinct.
 
-## Chosen keeper family scenes — 2026-10-27 candidate
+## Chosen keeper family scenes — 2026-10-27
 
 Public keeper inspections offer new recorded actions; no background reply or old history changes. Two keepers may spend twenty minutes drafting Dai’s cover/retirement proposal or Callum’s rota/home-rest proposal. Dai’s plan costs forty minutes of Callum’s own rest for a short visit; retirement date, pay and longer cover remain unknown. Callum requests removal of two future shift hours, with two paid hours potentially lost, and a separate two-hour home-rest discussion. Agency and partner replies remain unsupplied. These are proposals, not approved arrangements or completed home rest.
 
 Dai can choose five minutes to play the retained voicemail. A separate public choice supplies an explicitly fictional invitation for tonight; no outside person is consulted. A willing Dai can then leave work for ten minutes of travel, twenty minutes of actual attendance and ten minutes back. Callum must choose and maintain cover through an actual HF activity. Ordinary dam duty, loss of cover/participation, radio loss, pause or stop interrupts the visit. An interrupted Dai remains away until a separately chosen ten-minute return completes; a duty call cannot queue dam work for him while absent. Only attendance plus return completes the visit. No reconciliation, future family agreement, retirement, competence or safety result follows. The daughter remains incidental, without an HF Person.
 
-The delivered joint transfer, separate test, signed correction and covered hut rest retain their existing behavior. New scene fields are absent until a new action is chosen. Existing full exports and saved editions continue exactly; full and compact replay preserve complete new fields after opted actions. GDI975/976 remain partial until their unanswered proposal outcomes are actually supplied. GDI978 fictional reply is next batch; GDI979 habitat finding still needs retained source input. Owner acceptance remains 2026-11-03 and is separate from this engineering candidate.
+The delivered joint transfer, separate test, signed correction and covered hut rest retain their existing behavior. New scene fields are absent until a new action is chosen. Existing full exports and saved editions continue exactly; full and compact replay preserve complete new fields after chosen actions. GDI975/976 remain partial until their unanswered proposal outcomes are actually supplied. GDI978 has the chosen fictional improvement described below; GDI979 habitat finding still needs retained source input. Owner acceptance remains 2026-11-03 and is separate from this engineering candidate.
 
-## Chosen fictional readings — 2026-10-27 candidate
+## Chosen fictional readings — 2026-10-27
 
 The public “Choose the fictional stepchild reply” action asks Bilal to spend five actual minutes reading an authored improvement to his completed, fictionally posted drawing. A boat gains a suggested flag; a rabbit gains a suggested bent ear. The original drawing stays unchanged. The reply record pins fictional-reply-1, the posted drawing/time and actual attended reading times. No new input means no reply. Visit expiry, relief work, refusal or interrupted attendance prevents a completed reading. No outside message, family consent or reconciliation follows.
 
@@ -104,7 +104,7 @@ Resolved historical source: F-228 preserves written slips as “read HH:MM (as w
 
 ## Owner pacing update (2026-10-21)
 
-The desk uses automatic playback. New words, reports and flashes interrupt brisk time; an inspection waits for the player to close it or make a request. The information button opens native dismissible help with the existing sample report. The closing arithmetic is always computed and offered through “See tally” only at the end, without a start/menu preference. Simulation inputs, saves and replay rules are unchanged. Adam accepts feel.
+The desk uses automatic playback. New words, reports and flashes interrupt brisk time; new public-watch inspections slow time while a choice remains open. Loaded legacy inspections retain their saved clock rules. The information button opens native dismissible help with the existing sample report. The closing arithmetic is always computed and offered through “See tally” only at the end, without a start/menu preference. Simulation inputs, saves and replay rules are unchanged. Adam accepts feel.
 
 
 ## Owner speed restoration (2026-10-22)
