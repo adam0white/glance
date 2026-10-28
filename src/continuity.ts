@@ -401,9 +401,6 @@ export class Continuity {
       runId = this.runId;
     const task = this.operation.then(async () => {
       const current = () => generation === this.generation && state === this.state && runId === this.runId;
-      // Bind the actual full Person/world history to creation and recorded input execution.
-      // Two editable export copies and removable scene labels are not authority.
-      if (state) importRun(exportRun(state));
       if (state && (state.viewing || state.inputs.some((i) => i.kind === 'viewing')))
         throw new Error(
           'This viewing history exceeds the published Glance person passport. Download the complete run; no person or source history was published.',
@@ -420,6 +417,10 @@ export class Continuity {
         throw new Error(
           'This home-rest history exceeds the published Glance person passport. Download the complete run; no person or source history was published.',
         );
+      // Known unsupported history can only refuse; do not replay it for each actor.
+      // Labels never authorize publication: stripped and potentially supported histories
+      // still bind the complete Person/world state to creation and recorded execution.
+      if (state) importRun(exportRun(state));
       if (
         !state ||
         !current() ||
