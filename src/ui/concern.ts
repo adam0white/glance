@@ -1,5 +1,6 @@
 import { clock, type GameState, type Job, keeperOf, personOf, planOf, walkFor } from '../sim/dam.ts';
 import { NAMES } from '../sim/keepers.ts';
+import { viewingInnUnavailable, viewingStatus } from '../sim/viewing.ts';
 import { CREST, LIP } from '../sim/water.ts';
 
 const jobs: Record<Job, { doing: string; request: string }> = {
@@ -49,7 +50,8 @@ export function concernLines(s: GameState): string[] {
       words += `. Your request to ${jobs[k.deferred.job].request} is waiting for him to reconsider`;
     return `${NAMES[id]}: ${words}.`;
   });
-  if (s.nerys.ringing !== null)
+  if (viewingInnUnavailable(s)) lines.push(`Nerys: ${viewingStatus(s)}`);
+  else if (s.nerys.ringing !== null)
     lines.push(`Nerys: Her river report is expected ${expected(s.nerys.ringing)}.`);
   else if (queued.some((input) => input.kind === 'ring'))
     lines.push('Nerys: Your call is waiting for an answer.');

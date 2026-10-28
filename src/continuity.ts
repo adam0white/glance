@@ -401,6 +401,10 @@ export class Continuity {
       runId = this.runId;
     const task = this.operation.then(async () => {
       const current = () => generation === this.generation && state === this.state && runId === this.runId;
+      if (state && (state.viewing || state.inputs.some((i) => i.kind === 'viewing')))
+        throw new Error(
+          'This viewing history exceeds the published Glance person passport. Download the complete run; no person or source history was published.',
+        );
       // Durable opt-in history exceeds the published passport, even after return, reload or death.
       // Refuse before envelope creation, source archive, shelf or head writes. Never trust editable receipts alone.
       if (
@@ -413,6 +417,10 @@ export class Continuity {
         throw new Error(
           'This home-rest history exceeds the published Glance person passport. Download the complete run; no person or source history was published.',
         );
+      // Known unsupported history can only refuse; do not replay it for each actor.
+      // Labels never authorize publication: stripped and potentially supported histories
+      // still bind the complete Person/world state to creation and recorded execution.
+      if (state) importRun(exportRun(state));
       if (
         !state ||
         !current() ||

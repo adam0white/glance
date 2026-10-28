@@ -286,6 +286,11 @@ export function drawScene(
     ctx.fillRect(331, 200, 5, 5);
     ctx.fillStyle = soft;
     ctx.fillText('inn', 326, 230);
+    if (s.viewing?.away) {
+      ctx.fillText(s.viewing.stage === 'watching' ? 'watching sky' : 'Nerys away', 284, 180);
+      const known = s.viewing.known.at(-1);
+      if (known && s.minute - known.at <= 2) line(ctx, 306, 168, 328, 157, 47, 0);
+    }
   }
   // Tree on the screen: drawn only once he has said so.
   if (s.treeKnown && s.water.blocked) {

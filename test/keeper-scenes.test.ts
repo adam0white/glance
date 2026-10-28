@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import type { Lab } from '@adam0white/lab-client';
-import { expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { Continuity } from '../src/continuity.ts';
 import { discoveriesFor } from '../src/sim/cast.ts';
 import {
@@ -47,90 +47,104 @@ function ask(s: GameState, keeper: 'dai' | 'callum', job: 'level' | 'nap' = 'lev
   step(s);
 }
 
-// Would fail if a biography or an invitation awarded completion without chosen, elapsed activity.
-it('costs willing keeper time for proposals and voicemail; a visit needs departure, attendance and return', async () => {
-  const s = start();
-  expect(family(s)).toBeUndefined();
-  queueInput(s, { kind: 'outcome', task: 'daughter-visit' as OutcomeTask });
-  step(s);
-  expect(family(s)).toBeUndefined();
-  until(s, () => !!family(s)?.voicemail, 'daughter-voicemail');
-  expect(family(s)?.invitation).toBeUndefined();
-  queueInput(s, { kind: 'outcome', task: 'daughter-invitation' as OutcomeTask });
-  step(s);
-  expect(family(s)?.invitation?.night).toBe(s.night);
-  until(s, () => family(s)?.active !== undefined, 'daughter-visit');
-  const at = family(s)!.attempts[family(s)!.active!]!;
-  expect(at.action).toBe('daughter-visit');
-  expect(at.attended).toBe(0);
-  expect(at.completedAt).toBeUndefined();
-  const beginning = copy(s);
-  until(s, () => !!at.completedAt);
-  expect(at.arrivedAt).toBe(at.from + 10);
-  expect(at.attended).toBe(20);
-  expect(at.returnedAt).toBe(at.from + 40);
-  expect(at.completedAt).toBe(at.returnedAt);
-  expect(family(s)?.away).toBeUndefined();
-  until(s, () => !!family(s)?.daiProposal, 'dai-proposal');
-  const d = family(s)!.daiProposal!;
-  expect(d.at - d.startedAt).toBe(20);
-  expect(d.status).toBe('proposal-awaiting-response');
-  expect(d.costs.coverMinutes).toBe(40);
-  expect(d.costs.retirementDate).toBeNull();
-  until(s, () => !!family(s)?.callumProposal, 'callum-proposal');
-  const c = family(s)!.callumProposal!;
-  expect(c.at - c.startedAt).toBe(20);
-  expect(c.costs.requestedHomeRestMinutes).toBe(120);
-  expect(c.status).toBe('proposal-awaiting-response');
-  expect(c.responses).toEqual({ agency: 'unsupplied', partner: 'unsupplied' });
-  // Both complete export and compact replay reconstruction enter the real memory-only file controller.
-  for (const checkpoint of [beginning, s]) {
+// Build the real public trajectory once. Each independent file admission keeps its own
+// ordinary test deadline; all original replay, provenance and continuation checks remain.
+describe('chosen keeper time, attendance and independent file admissions', () => {
+  let scenes: { beginning: GameState; finished: GameState };
+  beforeAll(() => {
+    const s = start();
+    expect(family(s)).toBeUndefined();
+    queueInput(s, { kind: 'outcome', task: 'daughter-visit' as OutcomeTask });
+    step(s);
+    expect(family(s)).toBeUndefined();
+    until(s, () => !!family(s)?.voicemail, 'daughter-voicemail');
+    expect(family(s)?.invitation).toBeUndefined();
+    queueInput(s, { kind: 'outcome', task: 'daughter-invitation' as OutcomeTask });
+    step(s);
+    expect(family(s)?.invitation?.night).toBe(s.night);
+    until(s, () => family(s)?.active !== undefined, 'daughter-visit');
+    const at = family(s)!.attempts[family(s)!.active!]!;
+    expect(at.action).toBe('daughter-visit');
+    expect(at.attended).toBe(0);
+    expect(at.completedAt).toBeUndefined();
+    const beginning = copy(s);
+    until(s, () => !!at.completedAt);
+    expect(at.arrivedAt).toBe(at.from + 10);
+    expect(at.attended).toBe(20);
+    expect(at.returnedAt).toBe(at.from + 40);
+    expect(at.completedAt).toBe(at.returnedAt);
+    expect(family(s)?.away).toBeUndefined();
+    until(s, () => !!family(s)?.daiProposal, 'dai-proposal');
+    const d = family(s)!.daiProposal!;
+    expect(d.at - d.startedAt).toBe(20);
+    expect(d.status).toBe('proposal-awaiting-response');
+    expect(d.costs.coverMinutes).toBe(40);
+    expect(d.costs.retirementDate).toBeNull();
+    until(s, () => !!family(s)?.callumProposal, 'callum-proposal');
+    const c = family(s)!.callumProposal!;
+    expect(c.at - c.startedAt).toBe(20);
+    expect(c.costs.requestedHomeRestMinutes).toBe(120);
+    expect(c.status).toBe('proposal-awaiting-response');
+    expect(c.responses).toEqual({ agency: 'unsupplied', partner: 'unsupplied' });
+    scenes = { beginning, finished: s };
+  });
+  it.each([
+    ['departed', 'full'],
+    ['departed', 'compact'],
+    ['finished', 'full'],
+    ['finished', 'compact'],
+  ] as const)('retains %s %s file state, provenance and continued reimport', async (stage, format) => {
+    const checkpoint = stage === 'departed' ? scenes.beginning : scenes.finished;
     const rawCheckpoint = exportCurrent(checkpoint);
-    const compactCheckpoint = replay(
-      checkpoint.seed,
-      checkpoint.inputs,
-      checkpoint.minute,
-      checkpoint.chapter ?? undefined,
-      checkpoint.rules,
-      checkpoint.applied,
+    const source =
+      format === 'full'
+        ? rawCheckpoint
+        : {
+            run: exportCurrent(
+              replay(
+                checkpoint.seed,
+                checkpoint.inputs,
+                checkpoint.minute,
+                checkpoint.chapter ?? undefined,
+                checkpoint.rules,
+                checkpoint.applied,
+              ),
+            ),
+            runId: 'synthetic-family',
+            fileOrigin: false,
+            heads: [],
+            sources: [],
+          };
+    const controller = new Continuity({} as Lab, undefined, () => {}, true);
+    const loaded = await controller.importFile(JSON.stringify(source));
+    expect(exportCurrent(loaded)).toEqual(rawCheckpoint);
+    expect(controller.heads).toEqual([]);
+    for (let i = 0; i < 12; i++) minute(loaded);
+    const envelope = controller.exportSession(loaded);
+    const again = new Continuity({} as Lab, undefined, () => {}, true);
+    expect(exportCurrent(await again.importFile(JSON.stringify(envelope)))).toEqual(exportCurrent(loaded));
+    expect(envelope.original.text).toBe(JSON.stringify(source));
+    expect(envelope.provenance).toEqual('run' in source ? source : null);
+  });
+  // Removing actual choice, elapsed attendance or complete replay breaks these controls.
+  it('continues the departed full and compact histories exactly', () => {
+    const beginning = copy(scenes.beginning);
+    const raw = exportCurrent(beginning);
+    const full = importCurrent(raw);
+    const compact = replay(
+      raw.seed,
+      raw.inputs,
+      raw.state.minute,
+      raw.state.chapter ?? undefined,
+      raw.state.rules,
+      raw.state.applied,
     );
-    for (const source of [
-      rawCheckpoint,
-      {
-        run: exportCurrent(compactCheckpoint),
-        runId: 'synthetic-family',
-        fileOrigin: false,
-        heads: [],
-        sources: [],
-      },
-    ]) {
-      const controller = new Continuity({} as Lab, undefined, () => {}, true);
-      const loaded = await controller.importFile(JSON.stringify(source));
-      expect(exportCurrent(loaded)).toEqual(rawCheckpoint);
-      expect(controller.heads).toEqual([]);
-      for (let i = 0; i < 12; i++) minute(loaded);
-      const envelope = controller.exportSession(loaded);
-      const again = new Continuity({} as Lab, undefined, () => {}, true);
-      expect(exportCurrent(await again.importFile(JSON.stringify(envelope)))).toEqual(exportCurrent(loaded));
-      expect(envelope.original.text).toBe(JSON.stringify(source));
-      expect(envelope.provenance).toEqual('run' in source ? source : null);
-    }
-  }
-  const raw = exportCurrent(beginning);
-  const full = importCurrent(raw);
-  const compact = replay(
-    raw.seed,
-    raw.inputs,
-    raw.state.minute,
-    raw.state.chapter ?? undefined,
-    raw.state.rules,
-    raw.state.applied,
-  );
-  expect(exportCurrent(full)).toEqual(raw);
-  expect(exportCurrent(compact)).toEqual(raw);
-  for (let i = 0; i < 65; i++) for (const x of [beginning, full, compact]) minute(x);
-  expect(exportCurrent(full)).toEqual(exportCurrent(beginning));
-  expect(exportCurrent(compact)).toEqual(exportCurrent(beginning));
+    expect(exportCurrent(full)).toEqual(raw);
+    expect(exportCurrent(compact)).toEqual(raw);
+    for (let i = 0; i < 65; i++) for (const x of [beginning, full, compact]) minute(x);
+    expect(exportCurrent(full)).toEqual(exportCurrent(beginning));
+    expect(exportCurrent(compact)).toEqual(exportCurrent(beginning));
+  });
 });
 
 // Would fail if missing cover, duty interruption or an early return still awarded a visit.

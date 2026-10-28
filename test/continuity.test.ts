@@ -243,7 +243,7 @@ it('continues its exact accepted head after local reload, and refuses a competin
   expect(required(runtime.heads[0]).revision).not.toBe(h.data.heads[n.castId]);
 });
 
-it('terminal closure prevents another fresh admission and remains run-owned on reload', async () => {
+it('refuses an unrecorded death before terminal publication or ownership changes', async () => {
   const n = await source('nerys', true);
   const h = harness([n]);
   const runtime = new Continuity(h.lab, h.shelf);
@@ -251,10 +251,12 @@ it('terminal closure prevents another fresh admission and remains run-owned on r
   queueInput(s, { kind: 'ring' });
   step(s);
   required(s.people.find((p) => p.id === 'nerys')).body.alive = false; // synthetic actual-owned-death protocol control
-  await runtime.checkpoint(n.castId);
-  expect(required(runtime.heads[0]).terminal).toBeDefined();
-  const other = new Continuity(h.lab, h.shelf);
-  await expect(other.fresh(8)).rejects.toThrow();
+  // No authored lethal input exists. A mutable Person flag is not actual source authority.
+  const heads = structuredClone(runtime.heads);
+  await expect(runtime.checkpoint(n.castId)).rejects.toThrow(/replay/);
+  expect(runtime.heads).toEqual(heads);
+  expect(runtime.sources).toEqual([]);
+  expect(h.requests.some((r) => r.action === 'put')).toBe(false);
 });
 it('resumes a paused watch through the same logged control in live play and replay', () => {
   const s = newGame(7);
