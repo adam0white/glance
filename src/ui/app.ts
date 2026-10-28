@@ -6,7 +6,7 @@ import {
   telemetryOn,
 } from '@adam0white/lab-kit';
 import { required } from '../required.ts';
-import { daiAway, type KeeperSceneAction, keeperSceneAvailable } from '../sim/keeper-scenes.ts';
+import { callumAway, daiAway, type KeeperSceneAction, keeperSceneAvailable } from '../sim/keeper-scenes.ts';
 import { catchWords, durationWords } from './watch-copy.ts';
 /**
  * The Glance UI: DOM for the board, the radio log and the sheets; one canvas for the dam. The UI reads state and
@@ -1121,9 +1121,11 @@ function drawConcern() {
   const el = document.getElementById('concern');
   if (!el) return;
   const lines = concernLines(s).map((line) =>
-    daiAway(s as GameState) && line.startsWith('Dai:')
-      ? 'Dai: He is away. Dam work waits for his return.'
-      : line,
+    callumAway(s as GameState) && line.startsWith('Callum:')
+      ? 'Callum: He is away. Dam work waits for his actual return.'
+      : daiAway(s as GameState) && line.startsWith('Dai:')
+        ? 'Dai: He is away. Dam work waits for his return.'
+        : line,
   );
   const ids = planOf(s).keepers;
   const body = `${s.rules ? `<button class="keeper-chip" data-watch-arrangements="1">Watch arrangements</button>` : ''}${s.radioOut ? '<span class="radio-chip">The radio has static.</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(telescopeReturning(s) ? 'She is returning from the telescope and cannot witness the river steps yet.' : shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: She is available.'))}</button>` : ''}`;
@@ -1237,7 +1239,7 @@ function drawSheet() {
       <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">How ${NAMES[who]} expects to feel after this job:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'He has not said how he expects to feel.'}</span></p>
       <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every reading is what a keeper saw. It may be wrong.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
-    head = `<b>${NAMES[who]}</b><span class="soft">${esc(concernLines(s).find((line) => line.startsWith(`${NAMES[who]}:`)) ?? whereWords(who))}</span>`;
+    head = `<b>${NAMES[who]}</b><span class="soft">${esc(who === 'callum' && callumAway(s) ? whereWords(who) : (concernLines(s).find((line) => line.startsWith(`${NAMES[who]}:`)) ?? whereWords(who)))}</span>`;
     const jobs: { job: Job; label: string }[] = [
       { job: 'level', label: 'Read the level' },
       { job: 'stove', label: 'Sit by the stove' },
@@ -1362,6 +1364,7 @@ function keeperFamilyRecord(ids: CastId[]): string {
   const trip =
     f?.attempts.find((a) => a.action === 'daughter-visit' && a.completedAt !== undefined) ??
     f?.attempts.filter((a) => a.action === 'daughter-visit').at(-1);
+  const home = f?.homeRequests?.at(-1);
   const current = f?.active === undefined ? undefined : f.attempts[f.active];
   return `<section aria-label="Keeper family records"><h3>Time away from work</h3>
   <p>These optional fictional scenes take real shift time. Both keepers must be free to draft a plan. Each chooses whether to join. No employer or family agreement follows from a biography or a good shift.</p>
@@ -1370,6 +1373,9 @@ function keeperFamilyRecord(ids: CastId[]): string {
   <p>Separate choices below supply authored fictional refusals to the proposals. No real agency or partner is contacted. Both keepers must choose five minutes to read each response. Actual duty, travel, cover, lost work and rest costs remain theirs.</p>
   ${f?.daiProposal ? (f.fictionalResponses?.dai ? `<p>${esc(f.fictionalResponses.dai.text)}</p><p>Read at ${clock(f.fictionalResponses.dai.at)} after five attended minutes. Original proposal retained.</p>` : button('dai-fictional-response', 'Choose the fictional agency refusal and read with Dai · five minutes')) : ''}
   ${f?.callumProposal ? (f.fictionalResponses?.callum ? `<p>${esc(f.fictionalResponses.callum.text)}</p><p>Read at ${clock(f.fictionalResponses.callum.at)} after five attended minutes. Original proposal retained.</p>` : button('callum-fictional-responses', 'Choose the fictional agency and partner refusals and read with Callum · five minutes')) : ''}
+  ${f?.callumProposal ? `<h4>Callum’s home-rest window</h4><p>Author assumption, authored-home-window-1: a different fictional care window is available tonight after the completed proposal. This supplies new game terms, not a real partner reply. The old proposal and refusal remain unchanged. Allow ten minutes home, 120 minutes resting there and a separately chosen ten-minute return before dawn. Dai must choose and maintain dam cover throughout, for up to150 minutes including ten minutes to choose the return. He gives up his own rest and work flexibility. Pay and any lost pay are unknown. Duty, sleep, radio loss, pause or lost participation can interrupt it. No clinical benefit or safety guarantee follows.</p>${button('callum-home-rest', 'Invite Callum’s home rest with Dai covering · two hours plus travel')}` : ''}
+  ${home ? `<p>Home-rest request ${clock(home.requestedAt)}: ${esc(home.events.at(-1)?.status ?? 'pending')}. ${home.departedAt !== undefined ? `Departed ${clock(home.departedAt)}.` : 'No departure recorded.'} ${home.arrivedAt !== undefined ? `Arrived home ${clock(home.arrivedAt)}.` : ''} Actual home rest: ${home.homeMinutes} minutes. Actual uninterrupted cover: ${home.coveredMinutes} minutes. ${home.restCompletedAt !== undefined ? 'The rest time is finished; the return is separate.' : ''} ${home.interruptedAt !== undefined ? `Interrupted ${clock(home.interruptedAt)}. ${esc(home.reason ?? '')}` : ''} ${home.returnFrom !== undefined && home.returnedAt === undefined ? `Returning since ${clock(home.returnFrom)}; Callum is still away.` : ''} ${home.returnedAt !== undefined ? `Returned ${clock(home.returnedAt)}.` : ''} ${home.completedAt !== undefined ? 'The home-rest interval is complete.' : 'No completed interval is recorded.'}</p>` : ''}
+  ${callumAway(s) ? `<p>Callum is away and cannot do dam work. Return still costs ten actual minutes.</p>${button('callum-home-return', 'Invite Callum’s return · ten minutes')}${button('stop-family', 'Interrupt the home-rest arrangement')}` : ''}
   ${f?.voicemail ? `<p>${esc(f.voicemail.text)}</p>` : button('daughter-voicemail', 'Invite Dai to play his retained voicemail · about five minutes')}
   ${f?.voicemail ? button('daughter-invitation', 'Choose the fictional visit invitation for tonight') : ''}
   ${f?.invitation ? `<p>${esc(f.invitation.text)} The offered time ends at ${clock(f.invitation.until)} tonight.</p>` : ''}
@@ -1504,6 +1510,10 @@ function patchSheet(el: HTMLElement, html: string, stable: boolean) {
 function deskHint(st: GameState, who: KeeperId, job: Job, target?: number, insist = false): Hint {
   const h = hint(st, who, job, target, insist);
   const activity = personOf(st, who).activity?.affordanceId;
+  if (who === 'callum' && callumAway(st))
+    return st.radioOut
+      ? { ...h, short: 'The radio is out. The call cannot get through.', minutes: 0, forecast: '' }
+      : h;
   if (who === 'dai' && daiAway(st))
     return {
       ...h,
@@ -1535,6 +1545,16 @@ function lastWords(st: GameState, g: Gauge): string {
 
 function whereWords(id: KeeperId): string {
   if (!s) return '';
+  if (id === 'callum' && callumAway(s)) {
+    const f = s.outcomes?.keeperScenes;
+    const h = f?.homeAway === undefined ? undefined : f.homeRequests?.[f.homeAway];
+    if (h?.returnFrom !== undefined) return 'He is returning to the dam. He has not arrived.';
+    if (h?.arrivedAt !== undefined && h.interruptedAt === undefined)
+      return keeperAsleep(s, id)
+        ? 'He is asleep at home, away from the dam. A separate ten-minute return is needed.'
+        : 'He is away at home. A separate ten-minute return is needed.';
+    return 'He is away from the dam. His exact location is not recorded. A separate ten-minute return is needed.';
+  }
   if (id === 'dai' && daiAway(s))
     return 'He is away from the dam for the family scene. Dam work waits for his actual return.';
   const k = keeperOf(s, id);

@@ -5,7 +5,7 @@
  */
 import { readPerson } from '@adam0white/human-framework';
 import { clock, type GameState, keeperOf, type Place, personOf, planOf } from '../sim/dam.ts';
-import { daiAway } from '../sim/keeper-scenes.ts';
+import { keeperAway } from '../sim/keeper-scenes.ts';
 import { type KeeperId, NAMES, WATCH_FROM } from '../sim/keepers.ts';
 import { rainAt } from '../sim/water.ts';
 import { readingTime } from './time.ts';
@@ -336,7 +336,7 @@ function figure(
   soft: string,
   rope: string,
 ) {
-  if (id === 'dai' && daiAway(s)) return;
+  if (keeperAway(s, id)) return;
   const p = personOf(s, id);
   const pt = keeperPoint(s, id);
   const act = p.activity?.affordanceId;
@@ -388,7 +388,7 @@ export function sceneHit(
   const sy = y / k;
   if (sx < 0 || sx > W || sy < 0 || sy > SCENE_H) return null;
   for (const { id } of s.keepers) {
-    if (!keeperOf(s, id).on || (id === 'dai' && daiAway(s))) continue;
+    if (!keeperOf(s, id).on || keeperAway(s, id)) continue;
     const pt = keeperPoint(s, id);
     if (Math.hypot(sx - pt.x, sy - (pt.y - 8)) < 22) return id;
   }

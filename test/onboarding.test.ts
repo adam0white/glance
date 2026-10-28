@@ -867,3 +867,83 @@ it('labels a chosen fictional reply and retains posting when reading is unavaila
   expect(document.body.textContent).toContain('authored fiction');
   expect(control()).toBeNull();
 });
+
+// A public home-rest action must record an actual request, show absence, and wait for chosen return.
+it('offers the authored home window in an ordinary keeper inspection and reports actual rest and return', async () => {
+  window.history.replaceState({}, '', '/');
+  const run = newGame(7, undefined, { edition: 'extended-2', dam: 'valley', outcomes: 'private-scenes-1' });
+  for (let n = 0; n < 6000 && !keeperSceneAvailable(run, 'callum-home-rest'); n++) {
+    if (run.phase === 'dawn') queueInput(run, { kind: 'next' });
+    if (run.minute % 1440 === 1321) queueInput(run, { kind: 'ask', keeper: 'dai', job: 'gate', target: 4 });
+    for (const person of discoveriesFor(run)) {
+      const at = run.conversations[person];
+      if (at === undefined || run.minute - at >= 20) queueInput(run, { kind: 'talk', person });
+    }
+    if (keeperSceneAvailable(run, 'callum-proposal'))
+      queueInput(run, { kind: 'outcome', task: 'callum-proposal' });
+    step(run);
+  }
+  expect(keeperSceneAvailable(run, 'callum-home-rest')).toBe(true);
+  localStorage.setItem('glance-cast-local-v3', JSON.stringify(localFixture(run)));
+  const debug = await boot();
+  await click('cont');
+  const open = () => (document.querySelector('#concern [data-k="callum"]') as HTMLButtonElement).click();
+  open();
+  let button = document.querySelector<HTMLButtonElement>('[data-outcome="callum-home-rest"]');
+  expect(button?.disabled).toBe(false);
+  button!.click();
+  debug.step(1);
+  expect(state(debug).inputs.at(-1)).toMatchObject({ kind: 'outcome', task: 'callum-home-rest' });
+  expect(state(debug).outcomes?.keeperScenes?.homeAway).toBeDefined();
+  debug.step(130);
+  open();
+  expect(document.querySelector('[aria-label="Keeper family records"]')?.textContent).toContain(
+    'Actual home rest: 120 minutes',
+  );
+  expect(document.querySelector('#concern')?.textContent).toContain('He is away');
+  expect(state(debug).outcomes?.keeperScenes?.homeRequests?.at(-1)?.completedAt).toBeUndefined();
+  button = document.querySelector('[data-outcome="callum-home-return"]');
+  expect(button?.disabled).toBe(false);
+  button!.click();
+  debug.step(11);
+  open();
+  expect(document.querySelector('[aria-label="Keeper family records"]')?.textContent).toContain(
+    'The home-rest interval is complete',
+  );
+});
+
+// Real public sheet must state the effect before a call to an absent home-sleeping keeper.
+it('shows an absent sleeping Callum and the actual call consequence in the gauge sheet', async () => {
+  window.history.replaceState({}, '', '/');
+  const run = newGame(7, undefined, { edition: 'extended-2', dam: 'valley', outcomes: 'private-scenes-1' });
+  for (let n = 0; n < 6000 && !run.outcomes?.keeperScenes?.homeRequests?.at(-1)?.arrivedAt; n++) {
+    if (run.phase === 'dawn') queueInput(run, { kind: 'next' });
+    if (run.minute % 1440 === 1321) queueInput(run, { kind: 'ask', keeper: 'dai', job: 'gate', target: 4 });
+    for (const person of discoveriesFor(run)) {
+      const at = run.conversations[person];
+      if (at === undefined || run.minute - at >= 20) queueInput(run, { kind: 'talk', person });
+    }
+    if (keeperSceneAvailable(run, 'callum-proposal'))
+      queueInput(run, { kind: 'outcome', task: 'callum-proposal' });
+    if (keeperSceneAvailable(run, 'callum-home-rest'))
+      queueInput(run, { kind: 'outcome', task: 'callum-home-rest' });
+    step(run);
+  }
+  expect(run.outcomes?.keeperScenes?.homeAway).toBeDefined();
+  localStorage.setItem('glance-cast-local-v3', JSON.stringify(localFixture(run)));
+  const debug = await boot();
+  await click('cont');
+  debug.step(20);
+  (document.querySelector('#board [data-g="level"]') as HTMLButtonElement).click();
+  (document.querySelector('.crew [data-k="callum"]') as HTMLButtonElement).click();
+  const sheet = document.getElementById('sheet')!;
+  expect(sheet.textContent).toContain('away');
+  expect(sheet.textContent).toContain('interrupt');
+  expect(sheet.textContent).toContain('separate');
+  expect(sheet.querySelector('.crew [data-k="callum"]')?.textContent).not.toContain('He is in the hut.');
+  expect(sheet.textContent).not.toContain('I can do that, sir.');
+  (sheet.querySelector('[data-job="level"]') as HTMLButtonElement).click();
+  debug.step(1);
+  expect(state(debug).outcomes?.keeperScenes?.homeRequests?.at(-1)?.interruptedAt).toBeDefined();
+  expect(state(debug).keepers.find((k) => k.id === 'callum')?.pending).toBeNull();
+});
