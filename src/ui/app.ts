@@ -64,6 +64,12 @@ import { type OutcomeTask, outcomeAvailable } from '../sim/outcomes.ts';
 import { practiceNight } from '../sim/practice.ts';
 import { type Corner, cornerSky, type PrivateAction, privateAvailable } from '../sim/private-scenes.ts';
 import { importCurrent } from '../sim/run.ts';
+import {
+  type ViewingAction,
+  viewingAvailable,
+  viewingInnUnavailable,
+  viewingStatus,
+} from '../sim/viewing.ts';
 import { CREST, LIP, TURNS } from '../sim/water.ts';
 import { concernLines, thresholdWords } from './concern.ts';
 import { drawDawn } from './dawn.ts';
@@ -1128,7 +1134,7 @@ function drawConcern() {
         : line,
   );
   const ids = planOf(s).keepers;
-  const body = `${s.rules ? `<button class="keeper-chip" data-watch-arrangements="1">Watch arrangements</button>` : ''}${s.radioOut ? '<span class="radio-chip">The radio has static.</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(telescopeReturning(s) ? 'She is returning from the telescope and cannot witness the river steps yet.' : shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: She is available.'))}</button>` : ''}`;
+  const body = `${s.rules ? `<button class="keeper-chip" data-watch-arrangements="1">Watch arrangements</button>` : ''}${s.radioOut ? '<span class="radio-chip">The radio has static.</span>' : ''}${ids.map((id) => `<button class="keeper-chip ${lines.find((l) => l.startsWith(`${NAMES[id]}:`))?.includes('not answering') ? 'not-answering' : ''}" data-k="${id}" title="${esc(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? '')}"><b>${NAMES[id]}</b> · ${esc(shortConcern(lines.find((l) => l.startsWith(`${NAMES[id]}:`)) ?? ''))}</button>`).join('')}${planOf(s).inn ? `<button class="keeper-chip" data-inn="1"><b>Nerys</b> · ${esc(viewingInnUnavailable(s) ? (s.viewing?.stage === 'watching' ? 'Watching the sky.' : s.viewing?.stage === 'returning' ? 'Walking back.' : 'Unavailable at the inn.') : telescopeReturning(s) ? 'She is returning from the telescope and cannot witness the river steps yet.' : shortConcern(lines.find((l) => l.startsWith('Nerys:')) ?? 'Nerys: She is available.'))}</button>` : ''}`;
   if (!setHtml(el, body)) return;
   el.querySelectorAll<HTMLElement>('[data-k]').forEach((b) => {
     b.addEventListener('click', () => openSheet({ kind: 'keeper', who: b.dataset.k as KeeperId }));
@@ -1162,9 +1168,9 @@ function drawSheet() {
   if (sheet.kind === 'inn') {
     const ringing = s.nerys.ringing !== null;
     const warned = s.warnedAt !== null;
-    const html = `<div class="who"><b>Bridge Inn</b><span class="soft">Nerys, by the river stairs</span><button class="x" id="x" aria-label="Close inspection">×</button></div>
+    const html = `<div class="who"><b>Bridge Inn</b><span class="soft">${esc(s.viewing ? viewingStatus(s) : 'Nerys, by the river stairs')}</span><button class="x" id="x" aria-label="Close inspection">×</button></div>
       <div class="verbs two">
-        <button id="ring" ${ringing ? 'disabled' : ''}><span>Call Nerys</span><span class="h">${ringing ? 'She has gone to look.' : 'Ask how high the river is.'}</span></button>
+        <button id="ring" ${ringing ? 'disabled' : ''}><span>Call Nerys</span><span class="h">${viewingInnUnavailable(s) ? 'She cannot answer while away or asleep. A call stops attendance; return remains a separate choice.' : ringing ? 'She has gone to look.' : 'Ask how high the river is.'}</span></button>
         <button id="warn" ${warned ? 'disabled' : ''}><span class="fill"></span><span>Warn Mill Lane</span><span class="h">${warned ? `The warning was sent at ${clock(s.warnedAt ?? 0)}.` : 'Hold to send the warden to warn people.'}</span></button>
       </div>${readingNote(s, s.board.bridge)}${castConversations(['nerys', 'bilal', 'wren'])}`;
     if (!patchSheet(el, html, previousKey === structureKey)) return;
@@ -1386,6 +1392,15 @@ function keeperFamilyRecord(ids: CastId[]): string {
   ${daiAway(s) ? `<p>Dai is still away. He cannot do dam work from there.</p>${button('daughter-return', 'Invite Dai’s return · about ten minutes')}` : ''}
   </section>`;
 }
+function viewingRecord(ids: CastId[]): string {
+  if (!s?.privateScenes || !ids.includes('nerys') || !s.discoveries.nerys) return '';
+  const v = s.viewing;
+  const button = (action: 'invite' | 'return', label: string) => {
+    const reason = viewingAvailable(s as GameState, action);
+    return `<button data-viewing="${action}" ${reason ? 'disabled' : ''}>${label}</button>${reason ? `<p class="hint">${esc(reason)}</p>` : ''}`;
+  };
+  return `<section aria-label="Watch the sky"><h3>Watch the sky</h3><p>${esc(viewingStatus(s))}</p><p>Local sky at the inn now: ${cornerSky(s.seed, s.night, s.minute)}. Clear skies are not a service Nerys can promise. Inn cover ends at midnight. Five minutes carrying the telescope to the back wall, twenty watching, then a separately chosen five-minute walk back cost her inn work and river reports. A river call stops attendance; it cannot bring her back. Her notebook stays private.</p>${!v ? button('invite', 'Invite Nerys to watch the sky · thirty minutes plus time to choose the return') : v.away && v.stage !== 'returning' ? button('return', 'Invite Nerys to return to the inn · five minutes') : ''}${v?.away && ['walking', 'watching', 'returning'].includes(v.stage) ? '<button data-viewing="stop">Stop attending</button>' : ''}${v ? `<p>${esc(v.result ?? v.reason ?? 'No completed viewing is recorded.')}</p>${v.known.map((o) => `<p>${clock(o.at)}: ${esc(o.text)}</p>`).join('')}${v.returnedAt !== undefined ? `<p>Back at the inn at ${clock(v.returnedAt)}.</p>` : ''}` : ''}</section>`;
+}
 function privateRecord(ids: CastId[]): string {
   if (!s?.privateScenes || !ids.some((id) => ['nerys', 'bilal', 'wren'].includes(id))) return '';
   const o = s.privateScenes;
@@ -1423,7 +1438,7 @@ function privateRecord(ids: CastId[]): string {
     ids.includes('wren') && s.discoveries.wren
       ? `<h3>Wren’s appendix</h3><p>The omitted observation was ambiguous. The retained source page has no supplied identifier or observation detail here. Drafting takes twenty attended minutes. Filing takes a separate chosen five minutes. Filing does not establish approval or a habitat finding.</p>${button('appendix', 'Ask Wren to prepare the appendix · twenty minutes')}<p>${esc(o.appendix.text ?? 'No signed draft yet.')}</p>${o.appendix.filedAt !== undefined ? `<p>Filed in the in-game survey register at ${clock(o.appendix.filedAt)}. Awaiting review.</p><p>The desk may close tonight’s optional dam-owned riverbank corner pending review. This costs Nerys that corner until next night. Her two other corners, emergency access and Wren’s licensed survey duties remain available. This is a precaution, not a habitat finding.</p>${o.access.some((a) => a.night === s?.night) ? `<p>${o.access.find((a) => a.night === s?.night)?.closed ? 'Riverbank corner closed tonight.' : 'Existing optional access left unchanged tonight.'}</p>` : '<button data-private="close-access">Close optional riverbank access tonight pending review</button><button data-private="keep-access">Leave optional access unchanged tonight</button>'}` : button('file-appendix', 'Ask Wren to file the signed draft · five minutes')}`
       : '';
-  return `<section aria-label="Private scenes"><p>${esc(o.premise)}</p>${telescope}${lamp}${appendix}${o.active ? `${returning ? `<p>Nerys is returning from the telescope. She cannot witness the river steps until she returns. Viewing has stopped. ${attempt?.attended ?? 0} minutes attended. ${attempt?.observations?.length ?? 0} observations retained in the partial record. This attempt is not complete.</p>` : `<p>Attending ${esc(o.active.action)}. ${attempt?.attended ?? 0} minutes attended. No completed result yet.</p>`}${attempt?.stoppedAt === undefined ? '<button data-private="stop">Stop attending</button>' : ''}` : ''}${o.attempts
+  return `<section aria-label="Private scenes"><p>${esc(o.premise)}</p>${viewingRecord(ids)}${telescope}${lamp}${appendix}${o.active ? `${returning ? `<p>Nerys is returning from the telescope. She cannot witness the river steps until she returns. Viewing has stopped. ${attempt?.attended ?? 0} minutes attended. ${attempt?.observations?.length ?? 0} observations retained in the partial record. This attempt is not complete.</p>` : `<p>Attending ${esc(o.active.action)}. ${attempt?.attended ?? 0} minutes attended. No completed result yet.</p>`}${attempt?.stoppedAt === undefined ? '<button data-private="stop">Stop attending</button>' : ''}` : ''}${o.attempts
     .filter((a) => a.stoppedAt !== undefined)
     .map(
       (a) =>
@@ -1435,8 +1450,15 @@ function bindConversations(el: HTMLElement) {
   // Delegate these changing scene controls: a minute can replace a nested record node.
   el.onclick = (event) => {
     const target =
-      event.target instanceof Element ? event.target.closest<HTMLButtonElement>('[data-private]') : null;
+      event.target instanceof Element
+        ? event.target.closest<HTMLButtonElement>('[data-private], [data-viewing]')
+        : null;
     if (!s || !target || !el.contains(target) || target.disabled) return;
+    if (target.dataset.viewing) {
+      inputNow(s, { kind: 'viewing', action: target.dataset.viewing as ViewingAction });
+      writeSave();
+      return;
+    }
     const action = target.dataset.private as PrivateAction;
     inputNow(s, {
       kind: 'private',

@@ -1468,3 +1468,21 @@ input[type="text"],
 .debug-footer small {
   display: block;
 }
+
+/* Keep the optional sky inspection's map fixed while its costed actions update.
+   The sheet contains the complete status and observations; compact chips remain links. */
+.watch:has(section[aria-label="Watch the sky"]) #latest-radio {
+  display: none;
+}
+.watch:has(section[aria-label="Watch the sky"]) .scene {
+  height: clamp(120px, 20vw, 180px);
+}
+.watch:has(section[aria-label="Watch the sky"]) .desk-picture {
+  overflow: hidden;
+}
+.watch:has(section[aria-label="Watch the sky"]) #concern .keeper-chip {
+  width: 145px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

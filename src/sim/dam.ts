@@ -77,6 +77,15 @@ import {
 } from './reading.ts';
 import { DRAW, hashNormal, hashUnit } from './rng.ts';
 import {
+  advanceViewing,
+  requestViewing,
+  stopViewing,
+  type Viewing,
+  type ViewingAction,
+  viewingAway,
+  viewingInnUnavailable,
+} from './viewing.ts';
+import {
   bridgeOf,
   CREST,
   DAM_MAPS,
@@ -120,6 +129,7 @@ export type Place = 'hut' | 'gate' | 'staff' | 'weir';
 export type Job = 'level' | 'weir' | 'gate' | 'stove' | 'nap' | 'clear';
 
 export type Input =
+  | { at: number; kind: 'viewing'; action: ViewingAction }
   | { at: number; kind: 'ask'; keeper: KeeperId; job: Job; target?: number; insist?: boolean }
   | { at: number; kind: 'talk'; person: CastId }
   | { at: number; kind: 'outcome'; task: OutcomeTask }
@@ -232,6 +242,7 @@ export interface Dawn {
 }
 
 export interface GameState {
+  viewing?: Viewing;
   outcomes?: ShiftOutcomes;
   privateScenes?: PrivateScenes;
   rules?: WatchRules;
@@ -495,7 +506,7 @@ const SECOND_WEEK_BEATS: NightPlan['beats'][] = [
         const last = s.dawns.at(-1);
         if (callumAway(s))
           return 'Callum remains away. No dam reading can be attributed to him until he returns.';
-        return `Friday’s morning page ${last?.misses.some((m) => m.who === 'callum') ? 'shows a wrong reading from Callum' : last?.reports.some((r) => r.who === 'callum' && (r.gauge === 'level' || r.gauge === 'weir')) ? 'shows no large error in Callum’s readings' : 'has no level or weir reading from Callum to check'}. Tonight he works alone. Another reading will still be his; Nerys can give you a separate view from the bridge.`;
+        return `Friday’s morning page ${last?.misses.some((m) => m.who === 'callum') ? 'shows a wrong reading from Callum' : last?.reports.some((r) => r.who === 'callum' && (r.gauge === 'level' || r.gauge === 'weir')) ? 'shows no large error in Callum’s readings' : 'has no level or weir reading from Callum to check'}. Tonight he works alone. Another reading will still be his; ${viewingInnUnavailable(s) ? 'Nerys is unavailable at the inn; no new river view is promised.' : 'Nerys can give you a separate view from the bridge.'}`;
       },
     },
   ],
@@ -595,8 +606,9 @@ export function weatherOutlook(s: GameState): string {
     : 'The weather service expects rain over the hills, with heavier spells overnight. The heaviest band may miss this valley. Times and amounts are uncertain.';
 }
 
-/** A keeper's scripted line is heard only when he is on, awake and the radio carries; the narrator, radio and inn always speak. */
+/** A keeper's scripted line is heard only when he is on, awake and the radio carries; the narrator and radio remain available; a new Nerys absence also suppresses inn speech. */
 function beatHeard(s: GameState, beat: NightPlan['beats'][number]): boolean {
+  if (beat.who === 'nerys' && viewingInnUnavailable(s)) return false;
   if (beat.if && (!keeperOf(s, beat.if).on || (beat.if === 'callum' && callumAway(s)))) return false;
   if (callumAway(s) && s.night === 3 && beat.who === 'dai' && beat.at === 90) return false;
   if (beat.who !== 'dai' && beat.who !== 'callum') return true;
@@ -827,6 +839,10 @@ function offer(id: string, over: Partial<Affordance> = {}): Affordance {
 function dayHours(s: GameState, night: number) {
   const d = nightStart(night);
   for (const p of s.people) {
+    if (p.id === 'nerys' && viewingAway(s)) {
+      tick(p, Math.max(p.now, d + 21 * 60 + 50));
+      continue;
+    }
     if (p.activity) endActivity(p, 'interrupted', Math.max(p.now, p.activity.startedAt));
     hostAct(p, offer('meal', { duration: 30, advertises: { food: 0.6, water: 0.6 } }), d + 16 * 60);
     hostAct(p, offer('meal', { duration: 30, advertises: { food: 0.6, water: 0.6 } }), d + 20 * 60);
@@ -838,6 +854,10 @@ function dayHours(s: GameState, night: number) {
 function morningHours(s: GameState, night: number) {
   const d = nightStart(night) + 1440;
   for (const p of s.people) {
+    if (p.id === 'nerys' && viewingAway(s)) {
+      tick(p, Math.max(p.now, d + 15 * 60));
+      continue;
+    }
     if (p.activity) endActivity(p, 'interrupted', Math.max(p.now, p.activity.startedAt));
     hostAct(
       p,
@@ -1238,7 +1258,12 @@ function apply(s: GameState, inp: Input) {
         report.doubted = inp.marked;
       return;
     }
+    case 'viewing': {
+      requestViewing(s, inp.action);
+      return;
+    }
     case 'pause': {
+      stopViewing(s, 'The player asked to pause.');
       s.pauseRequested = true;
       if (s.privateScenes) cancelPrivate(s, 'The player asked to pause.');
       if (s.outcomes?.keeperScenes) cancelOutcome(s, 'The player asked to pause.');
@@ -1332,6 +1357,16 @@ function apply(s: GameState, inp: Input) {
       return;
     }
     case 'ring': {
+      if (viewingInnUnavailable(s)) {
+        stopViewing(s, 'An inn call interrupted attendance.');
+        say(
+          s,
+          'narrator',
+          'Nobody answers the inn phone. Nerys cannot witness the river steps from away or asleep. A call does not return her or queue a river report.',
+          'answer',
+        );
+        return;
+      }
       if (s.phase !== 'watch' || !planOf(s).inn || s.nerys.ringing !== null) return;
       if (s.privateScenes?.active?.action === 'telescope') returnForRiver(s);
       ringInn(s);
@@ -1427,6 +1462,7 @@ function ringInn(s: GameState) {
 }
 
 function innAnswers(s: GameState) {
+  if (viewingInnUnavailable(s)) return;
   const b = bridgeOf(s.water);
   const step = Math.max(0, Math.round(b + 0.45 * hashNormal(s.seed, DRAW.nerys, s.night, s.minute)));
   const r: Report = {
@@ -1505,7 +1541,8 @@ export function step(s: GameState): void {
   if (
     s.nerys.ringing !== null &&
     s.minute >= s.nerys.ringing &&
-    s.privateScenes?.active?.action !== 'telescope'
+    s.privateScenes?.active?.action !== 'telescope' &&
+    !viewingInnUnavailable(s)
   )
     innAnswers(s);
   // Supporting people have their own HF bodies, not dam operating skills.
@@ -1515,6 +1552,7 @@ export function step(s: GameState): void {
   for (const k of s.keepers) if (k.on) keeperMinute(s, k, rain);
   if (s.outcomes) advanceOutcomes(s);
   if (s.privateScenes) advancePrivate(s);
+  advanceViewing(s);
   if (m % 5 === 0) recordSeries(s, rain);
   s.minute += 1;
   if (s.pauseRequested && s.people.every((p) => !p.activity) && !s.privateScenes?.active)
@@ -2118,6 +2156,7 @@ function houseFate(firstAt: number | null, warnedAt: number | null): 'dry' | 'sa
 }
 
 function closeNight(s: GameState, overtopped: boolean) {
+  stopViewing(s, 'The watch has ended.');
   if (s.privateScenes) cancelPrivate(s, 'The watch has ended.');
   if (s.outcomes) cancelOutcome(s, 'The watch has ended.');
   const night = s.night;

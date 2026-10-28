@@ -13,6 +13,7 @@ import {
 import { lifeReady, rememberedConversation } from './cast.ts';
 import type { GameState } from './dam.ts';
 import { hashUnit } from './rng.ts';
+import { viewingAway } from './viewing.ts';
 
 export type Corner = 'riverbank' | 'yard' | 'back-wall';
 export type PrivateAction =
@@ -139,6 +140,7 @@ function say(s: GameState, who: Visitor | 'narrator', text: string) {
   s.said.push({ at: s.minute, who, kind: 'answer', text });
 }
 function occupied(s: GameState, id: Visitor): string | null {
+  if (id === 'nerys' && viewingAway(s)) return 'Nerys is away; a separate return is needed.';
   if (!lifeReady(s, id)) return 'Their visit or own routine does not allow this work.';
   const p = person(s, id),
     k = s.keepers.find((k) => k.id === id);
