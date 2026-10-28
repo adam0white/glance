@@ -390,18 +390,12 @@ function title() {
   app.innerHTML = `<div class="page screen title-screen">${topbar('', true)}
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">You work at a night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
-    <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(false)}</p>
-    <details><summary>A longer watch</summary><p>Keep working through the weekend and a second week. You work twelve nights, ending at the second Friday’s first light. Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing. These choices start a separate new game.</p><label><input id="extended-watch" type="checkbox">Play the longer watch</label><label for="dam-choice">Dam</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><p>The keepers may choose joint handover, record correction and covered rest. Dai’s visit and retirement and home-rest proposals take time; proposals await responses. A visit needs chosen cover, attendance and return. Nerys’s telescope trip, Bilal’s shadow play and post, and Wren’s appendix are available when their duties allow. Each person chooses; attended scenes take time. No sighting, reply or habitat finding is promised.</p></details>
+    <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(true)}</p>
+    <label for="dam-choice">Dam for a new game</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><details><summary>Life during the watch</summary><p>Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing.</p><p>The keepers may choose joint handover, record correction and covered rest. Dai’s visit and retirement and home-rest proposals take time; proposals await responses. A visit needs chosen cover, attendance and return. Nerys’s telescope trip, Bilal’s shadow play and post, and Wren’s appendix are available when their duties allow. Each person chooses; attended scenes take time. No sighting, reply or habitat finding is promised.</p></details>
     ${debugFooter()}</div>
     <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
     </div></div>`;
   bindTopbar();
-  document.getElementById('extended-watch')?.addEventListener('change', () => {
-    const extended = (document.getElementById('extended-watch') as HTMLInputElement).checked;
-    required(document.getElementById('goal')).textContent =
-      `Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(extended)}`;
-    showAbout();
-  });
   drawDawn(document.getElementById('sample-chart') as HTMLCanvasElement, SAMPLE_DAWN);
   document.getElementById('sample')?.addEventListener('click', () => {
     const d = dialog('sample-page', 'A sample morning', reportBody(SAMPLE_DAWN, false, true));
@@ -494,19 +488,14 @@ function debugFooter() {
 
 async function beginWeek(localOnly = false, chosen?: WatchRules) {
   if (fileMode) return;
-  const extended = (document.getElementById('extended-watch') as HTMLInputElement | null)?.checked;
-  const rules: WatchRules | undefined =
-    chosen ??
-    (extended
-      ? {
-          edition: 'extended-2',
-          outcomes: 'private-scenes-1',
-          dam:
-            (document.getElementById('dam-choice') as HTMLSelectElement)?.value === 'upper'
-              ? 'upper'
-              : 'valley',
-        }
-      : undefined);
+  const rules: WatchRules = chosen ?? {
+    edition: 'extended-2',
+    outcomes: 'private-scenes-1',
+    dam:
+      (document.getElementById('dam-choice') as HTMLSelectElement | null)?.value === 'upper'
+        ? 'upper'
+        : 'valley',
+  };
   continuity.invalidate();
   cancelAnimationFrame(raf);
   const previous = s;
@@ -546,10 +535,7 @@ function showAbout() {
   const about = document.createElement('div');
   about.setAttribute('popover', 'auto');
   about.id = 'about';
-  const extended =
-    screen === 'title'
-      ? (document.getElementById('extended-watch') as HTMLInputElement | null)?.checked === true
-      : !!s?.rules;
+  const extended = screen === 'title' || !!s?.rules;
   let heading = 'The night desk';
   let words = `You work at the river authority's night desk. One old dam stands above a town. A keeper reads the gauges with a flashlight and reports the readings by radio. Every reading on your board is what he saw. Tap a gauge to choose a job. Tap the job to ask him. Hold the job button to insist. ${durationWords(extended)}`;
   if (screen === 'watch') {

@@ -156,7 +156,9 @@ describe('desk sheets and reading labels', () => {
     expect(document.querySelector('.topbar')).toBe(top);
     expect(document.querySelector('[data-g="gate"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(document.querySelectorAll('.turns [data-job="gate"]')).toHaveLength(6);
-    expect(document.querySelector('#clock-rate')?.textContent).toBe('Time stops while you look.');
+    expect(document.querySelector('#clock-rate')?.textContent).toBe(
+      'Time continues slowly while this inspection is open.',
+    );
     expect(document.getElementById('skip-bar')?.hidden).toBe(true);
     const before = state(debug).inputs.length;
     await click('x');
@@ -328,7 +330,14 @@ it('holds menu time, keeps speeds in the menu, and stops Skip on the first deliv
   expect(document.querySelector('#skip')?.textContent).toBe('Skip ⏩');
   expect(fingerprint(state(debug))).toBe(
     fingerprint(
-      (await import('../src/sim/dam.ts')).replay(state(debug).seed, state(debug).inputs, state(debug).minute),
+      (await import('../src/sim/dam.ts')).replay(
+        state(debug).seed,
+        state(debug).inputs,
+        state(debug).minute,
+        state(debug).chapter ?? undefined,
+        state(debug).rules,
+        state(debug).applied,
+      ),
     ),
   );
 });
@@ -353,20 +362,14 @@ it('shows save failure without adding a manual Save action', async () => {
 it('uses phase information and keeps the final tally below people and closed', async () => {
   const debug = await boot();
   await click('help');
-  expect(document.querySelector('#about')?.textContent).toContain('five nights');
+  expect(document.querySelector('#about')?.textContent).toContain('twelve nights');
   await click('new');
   await click('help');
   expect(document.querySelector('#about')?.textContent).toContain('Let him rest');
-  const run = state(debug);
-  run.night = 4;
-  debug.step(0);
-  // Re-entering through the save refreshes phase-specific help.
-  await click('menu');
-  await click('to-title');
-  await click('cont');
+  // This rendering check does not forge a new night into the saved run.
   state(debug).water.overtopped = true;
   debug.step(1);
-  expect(document.querySelector('.week-end')?.textContent).toContain('week ends');
+  expect(document.querySelector('.week-end')?.textContent).toContain('watch ends');
   expect(document.querySelector('#about')?.textContent).toContain('red line');
   await click('end');
   expect(document.querySelector('#tally-result')?.hasAttribute('hidden')).toBe(true);
@@ -384,13 +387,13 @@ it('marks the final dawn and offers no further night', async () => {
   while (run.phase !== 'end') {
     if (run.phase === 'dawn') queueInput(run, { kind: 'next' });
     else {
-      run.water.gate = 4;
+      if (run.minute % 1440 === 1321) queueInput(run, { kind: 'ask', keeper: 'dai', job: 'gate', target: 4 });
       step(run);
     }
   }
+  localStorage.setItem('glance-cast-local-v3', JSON.stringify(localFixture(run)));
   const debug = await boot();
-  await click('new');
-  Object.assign(state(debug), run);
+  await click('cont');
   debug.step(0);
   expect(document.querySelector('.week-end')?.textContent).toContain('after Friday night');
   expect(document.getElementById('next')).toBeNull();
@@ -630,7 +633,14 @@ it('keeps the town goal beside gate orders and offers the saved lightning compar
   const exported = exportRun(run, '3.0.0');
   expect(
     fingerprint(
-      replay(exported.seed, exported.inputs, exported.state.minute, exported.state.chapter ?? undefined),
+      replay(
+        exported.seed,
+        exported.inputs,
+        exported.state.minute,
+        exported.state.chapter ?? undefined,
+        exported.state.rules,
+        exported.state.applied,
+      ),
     ),
   ).toBe(before);
 });
@@ -643,7 +653,7 @@ it('lets the player mark a received reading and remove the note through ordinary
   const run = state(debug);
   while (!run.board.level) debug.step(1);
   chooseGauge('level');
-  expect(document.getElementById('reading-note')?.textContent).toContain('Mark this reading');
+  expect(document.getElementById('reading-note')?.textContent).toContain('Doubt this reading');
   await click('reading-note');
   debug.step(1);
   expect(document.querySelector('[data-g="level"]')?.textContent).toContain('Marked for another check');
@@ -671,13 +681,9 @@ it('keeps quiet feedback choices local until Submit and uses the SDK literal lab
   expect(vi.mocked(lab.sendFeedback).mock.calls[0]?.[1]?.run).toEqual(exportRun(state(debug), '3.0.0'));
 });
 
-it('keeps the short watch default and updates the goal and About when the longer watch is selected', async () => {
+it('offers the twelve-night public watch directly and retains the physical dam choice', async () => {
   const debug = await boot();
-  const choice = document.getElementById('extended-watch') as HTMLInputElement;
-  expect(choice.checked).toBe(false);
-  expect(document.getElementById('goal')?.textContent).toContain('five nights');
-  choice.checked = true;
-  choice.dispatchEvent(new Event('change'));
+  expect(document.getElementById('extended-watch')).toBeNull();
   expect(document.getElementById('goal')?.textContent).toContain('twelve nights');
   expect(document.getElementById('goal')?.textContent).toContain('second Friday');
   expect(document.querySelector('#dam-choice option[value="upper"]')?.textContent).toContain('harder');
@@ -736,12 +742,12 @@ it('accounts real frame minutes under the admitted inspector and holds menus and
   expect(state(debug).minute).toBe(beforeMenu + 1);
 });
 
-it('offers all implemented scenes in a new longer watch without feature switches', async () => {
+it('offers all implemented scenes in every ordinary new game without feature switches', async () => {
   window.history.replaceState({}, '', '/');
   const debug = await boot();
   expect(document.getElementById('shift-outcomes')).toBeNull();
   expect(document.getElementById('private-scenes')).toBeNull();
-  (document.getElementById('extended-watch') as HTMLInputElement).checked = true;
+  expect(document.getElementById('extended-watch')).toBeNull();
   await click('new');
   expect(state(debug).rules).toEqual({ edition: 'extended-2', dam: 'valley', outcomes: 'private-scenes-1' });
   expect(state(debug).outcomes).toBeDefined();
