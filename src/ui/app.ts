@@ -1870,7 +1870,7 @@ function ending() {
     <p class="soft">${misses ? `You caught ${caught} of ${misses} wrong readings during ${s.rules ? 'the longer watch' : 'the week'}.` : ''}</p>
     ${(ds.at(-1)?.lines ?? []).map((l) => `<div class="keeperline"><b>${NAMES[l.id]}</b><p class="hand">${esc(l.aboutYou)}</p></div>`).join('')}
     ${fileMode ? '' : '<p id="continuity-result" role="status">Checking the browser shelf. No transfer is confirmed yet.</p>'}<div id="closing-tally"></div><button class="reading-row" id="back">${EXTENDED_PLANS[(ds.at(-1)?.night ?? 1) - 1]?.title}'s morning again ▸</button></div>
-    <div class="actionbar ending-actions"><div><button id="send">Feedback</button><button id="export">Download this run</button><a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">Continue people in another game</a></div><button class="primary" id="again">${fileMode ? 'Choose another file' : 'New game'}</button></div></div>`;
+    <div class="actionbar ending-actions"><div><button id="send">Feedback</button><button id="export">Download this run</button><a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">People across games</a></div><button class="primary" id="again">${fileMode ? 'Choose another file' : 'New game'}</button></div></div>`;
   bindTopbar();
   publishEnding(s);
   updateTally();

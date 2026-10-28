@@ -219,63 +219,86 @@ beforeAll(() => {
   until(c, () => c.phase === 'end');
   nativeStates.closed = JSON.stringify(exportCurrent(c));
 });
-it.each(['active', 'cancelled', 'completed', 'returned', 'paused', 'closed'])(
-  'retains %s native/file history and refuses all-five publication before writes',
-  async (stage) => {
-    const rawRun = JSON.parse(nativeStates[stage]!);
-    const requests: unknown[] = [];
-    const io = new Continuity(
-      { setPersonaRecording() {}, build: () => ({ c: 'synthetic-rota' }) } as unknown as Lab,
-      {
-        enabled: true,
-        ready: Promise.resolve(),
-        request: async (r: unknown) => {
-          requests.push(r);
-          throw Error('Unexpected source write');
-        },
-      } as never,
-    );
-    const wrapper = { run: rawRun, runId: 'synthetic-rota', fileOrigin: false, heads: [], sources: [] };
-    const raw = JSON.stringify(wrapper),
-      loaded = await io.loadLocal(raw),
-      before = io.localSave(loaded);
-    for (const actor of ALLOCATION) await expect(io.checkpoint(actor.castId)).rejects.toThrow('passport');
-    expect(await io.checkpointAll()).toEqual({ published: 0, refused: 5 });
-    expect(requests).toEqual([]);
-    const file = new Continuity({} as Lab, undefined, () => {}, true),
-      admitted = await file.importFile(raw);
-    expect(exportCurrent(admitted)).toEqual(rawRun);
-    expect(file.exportSession(admitted).original.text).toBe(raw);
-    expect(file.exportSession(admitted).provenance).toEqual(wrapper);
-    const again = new Continuity({} as Lab, undefined, () => {}, true);
-    expect(exportCurrent(await again.importFile(JSON.stringify(file.exportSession(admitted))))).toEqual(
-      rawRun,
-    );
+const stages = ['active', 'cancelled', 'completed', 'returned', 'paused', 'closed'] as const;
+function nativePacket(stage: (typeof stages)[number]) {
+  const rawRun = JSON.parse(nativeStates[stage]!);
+  const wrapper = { run: rawRun, runId: 'synthetic-rota', fileOrigin: false, heads: [], sources: [] };
+  return { rawRun, wrapper, raw: JSON.stringify(wrapper) };
+}
+function localContinuity(requests: unknown[]) {
+  return new Continuity(
+    { setPersonaRecording() {}, build: () => ({ c: 'synthetic-rota' }) } as unknown as Lab,
+    {
+      enabled: true,
+      ready: Promise.resolve(),
+      request: async (r: unknown) => {
+        requests.push(r);
+        throw Error('Unexpected source write');
+      },
+    } as never,
+  );
+}
+it.each(stages)('refuses %s publication before writes', async (stage) => {
+  const { wrapper, raw } = nativePacket(stage);
+  const requests: unknown[] = [];
+  const io = localContinuity(requests);
+  const loaded = await io.loadLocal(raw);
+  const before = io.localSave(loaded);
+  for (const actor of ALLOCATION) await expect(io.checkpoint(actor.castId)).rejects.toThrow('passport');
+  expect(await io.checkpointAll()).toEqual({ published: 0, refused: 5 });
+  expect(requests).toEqual([]);
+  if (stage === 'paused') {
     const forged = structuredClone(wrapper);
     forged.run.inputs = forged.run.inputs.filter(
       (i: { kind: string; task?: string }) => !(i.kind === 'outcome' && i.task?.startsWith('rota-')),
     );
-    forged.run.state.inputs = structuredClone(forged.run.inputs);
-    forged.run.state.applied = forged.run.inputs.length;
-    delete forged.run.state.outcomes.rota;
-    await expect(io.loadLocal(JSON.stringify(forged))).rejects.toThrow(/replay|frontier/);
-    await expect(file.importFile(JSON.stringify(forged))).rejects.toThrow(/replay|frontier/);
+    expect(loaded.people.every((p) => !p.activity)).toBe(true);
+    loaded.inputs = forged.run.inputs;
+    loaded.applied = loaded.inputs.length;
+    delete loaded.outcomes!.rota;
+    for (const actor of ALLOCATION)
+      await expect(io.checkpoint(actor.castId)).rejects.toThrow(/replay|frontier/);
+  } else {
     expect(io.localSave(loaded)).toBe(before);
-    expect(file.exportSession(admitted).original.text).toBe(raw);
-    if (stage === 'paused') {
-      expect(loaded.people.every((p) => !p.activity)).toBe(true);
-      loaded.inputs = forged.run.inputs;
-      loaded.applied = loaded.inputs.length;
-      delete loaded.outcomes!.rota;
-      for (const actor of ALLOCATION)
-        await expect(io.checkpoint(actor.castId)).rejects.toThrow(/replay|frontier/);
-    }
-    expect(io.sources).toEqual([]);
-    expect(io.heads).toEqual([]);
-    expect(requests).toEqual([]);
-    retain(`native-${stage}`, admitted);
-  },
-);
+  }
+  expect(io.sources).toEqual([]);
+  expect(io.heads).toEqual([]);
+  expect(requests).toEqual([]);
+});
+it.each(stages)('retains %s native file and reimports its full wrapper', async (stage) => {
+  const { rawRun, wrapper, raw } = nativePacket(stage);
+  const file = new Continuity({} as Lab, undefined, () => {}, true),
+    admitted = await file.importFile(raw);
+  expect(exportCurrent(admitted)).toEqual(rawRun);
+  expect(file.exportSession(admitted).original.text).toBe(raw);
+  expect(file.exportSession(admitted).provenance).toEqual(wrapper);
+  const again = new Continuity({} as Lab, undefined, () => {}, true);
+  expect(exportCurrent(await again.importFile(JSON.stringify(file.exportSession(admitted))))).toEqual(rawRun);
+  retain(`native-${stage}`, admitted);
+});
+it.each(stages)('rejects %s stripped history without changing accepted state or writing', async (stage) => {
+  const { wrapper, raw } = nativePacket(stage);
+  const requests: unknown[] = [];
+  const io = localContinuity(requests);
+  const loaded = await io.loadLocal(raw);
+  const before = io.localSave(loaded);
+  const file = new Continuity({} as Lab, undefined, () => {}, true);
+  const admitted = await file.importFile(raw);
+  const forged = structuredClone(wrapper);
+  forged.run.inputs = forged.run.inputs.filter(
+    (i: { kind: string; task?: string }) => !(i.kind === 'outcome' && i.task?.startsWith('rota-')),
+  );
+  forged.run.state.inputs = structuredClone(forged.run.inputs);
+  forged.run.state.applied = forged.run.inputs.length;
+  delete forged.run.state.outcomes.rota;
+  await expect(io.loadLocal(JSON.stringify(forged))).rejects.toThrow(/replay|frontier/);
+  await expect(file.importFile(JSON.stringify(forged))).rejects.toThrow(/replay|frontier/);
+  expect(io.localSave(loaded)).toBe(before);
+  expect(file.exportSession(admitted).original.text).toBe(raw);
+  expect(io.sources).toEqual([]);
+  expect(io.heads).toEqual([]);
+  expect(requests).toEqual([]);
+});
 
 // A pending checkpoint must not publish a newly changed world after an async wait.
 it('refuses a checkpoint if a new rota is recorded while shelf readiness is pending', async () => {
