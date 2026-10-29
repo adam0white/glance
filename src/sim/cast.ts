@@ -1,9 +1,10 @@
 /** Canonical content revision 1. Complete profiles come from the published shared cast artifact.
  * Supports bounded, invited conversations, not qualifications, free reading of secrets, or travel admission.
  */
-import { createPerson, MINUTES_PER_YEAR, type Person, type PersonSpec } from '@adam0white/human-framework';
+
 import { canonicalCast, castForGame } from '@adam0white/lab-client';
 import type { GameState } from './dam.ts';
+import type { Person, PersonSpec } from './hf4.ts';
 import { rotaAway } from './rota.ts';
 
 /** Both visitors' authored five-day arrangements start on the opening Monday afternoon.
@@ -51,20 +52,6 @@ export function canonicalSpec(id: CastId): Pick<PersonSpec, 'traits' | 'values'>
     throw new Error('This identity has not been assigned to this game.');
   return { traits: structuredClone(canonical.traits), values: structuredClone(canonical.values) };
 }
-export function makeVisitor(id: 'nerys' | 'bilal' | 'wren', seed: number, now: number): Person {
-  const c = CAST[id];
-  return createPerson({
-    id,
-    name: c.name,
-    seed: seed ^ c.age,
-    now,
-    bornAt: now - c.age * MINUTES_PER_YEAR,
-    sex: id === 'bilal' ? 'male' : 'female',
-    ...canonicalSpec(id),
-    lexicon: { plainEnglish: true },
-  });
-}
-
 /** Availability is operational, not permission to inspect somebody's private material. */
 export function lifeReady(s: GameState, id: CastId): boolean {
   if (s.rules && s.minute >= VISIT_UNTIL && (id === 'bilal' || id === 'wren')) return false;

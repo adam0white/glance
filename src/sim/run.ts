@@ -1,15 +1,18 @@
 import { canonicalPersona } from '@adam0white/lab-client';
 import { exportRun, GAME_VERSION, type GameState, replay } from './dam.ts';
-export const exportCurrent = (s: GameState) => exportRun(s, '3.0.0');
+import { FRAMEWORK_VERSION } from './hf4.ts';
+export const exportCurrent = (s: GameState) => exportRun(s, FRAMEWORK_VERSION);
 export function importCurrent(value: unknown): GameState {
   const ex = value as ReturnType<typeof exportCurrent>;
   if (
-    ex.framework !== '3.0.0' ||
+    ex.framework !== FRAMEWORK_VERSION ||
     ex.game !== GAME_VERSION ||
     ex.state?.version !== GAME_VERSION ||
     !Array.isArray(ex.inputs)
   )
-    throw new Error('This file is from a different version of The Glance. Start a new game.');
+    throw new Error(
+      'This saved watch uses an older or unsupported version. Keep the file. Start a new game to use the current version.',
+    );
   const s = replay(
     ex.seed,
     ex.inputs,

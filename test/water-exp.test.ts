@@ -37,8 +37,8 @@ it('refuses the previous game boundary and exact current-state tampering without
     if (field === 'game') old.game = 'glance@3-cast-life';
     else old.state.version = 'glance@3-cast-life';
     const saved = structuredClone(old);
-    expect(() => importCurrent(old)).toThrow('This file is from a different version');
-    expect(() => importCurrent(old)).toThrow('Start a new game.');
+    expect(() => importCurrent(old)).toThrow('older or unsupported version');
+    expect(() => importCurrent(old)).toThrow('Keep the file.');
     expect(old).toEqual(saved);
   }
   file.state.water.town = Number.MIN_VALUE;

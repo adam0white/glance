@@ -1,3 +1,7 @@
+# Current HF4 local bridge
+
+The current implementation and migration contract are [hf48-bridge.md](hf48-bridge.md). HF4.8 owns all five actors in one Run, always on. The historical HF3 compatibility, private bias and optional-faculty descriptions below record earlier delivered designs; they are not runtime paths in this version. HF3 files refuse before replacement. No historical receipt is rewritten or upgraded into a new guarantee.
+
 # The Glance: design
 
 **One line.** A storm week on the night desk at the river authority. Up the valley, one old dam above a town, and on it a keeper with a torch and a radio. Every number on your board is what a tired man saw.
@@ -108,9 +112,12 @@ The published glance-4/glance-calendar/1 passport lacks home-absence semantics. 
 ## Deferred — owner and player input
 
 - **Per-keeper bias readout (Priya): Adam, 2026-11-03.** Decide whether a numerical calibration would remove the information puzzle. The delivered comparison can use observed figures without exposing private bias.
-- **Dai’s trough-only bias (Gwen): Adam, 2026-11-03.** Her original report said “half a metre low every time is not tiredness”. Current `biasOf` already grows with impaired clarity; it is not uniform. The narrower choice of a bias that grows only after three remains the owner’s decision.
+- **Dai’s trough-only bias (Gwen): Adam, 2026-11-03.** Her original report said “half a metre low every time is not tiredness”. The old HF3 calibration is historical. HF4 now owns quantity perception and confidence; there is no local `biasOf` calibration. Whether the current received figures preserve the desired difficulty remains an owner/player question; no trough-only bias is silently added.
 - **Readiness and feel: Adam, 2026-11-03.** Keep the written-time retest (F-228), pacing/popovers/end tally (F-433/434), approved persistent desk (F-451/452), cast/receiving journey (F-465), recording linkage (F-491), plain English/setting/tablet reading (F-492/493) and current-build manifest behavior (F-496) as distinct owner/player checks. Their existing source receipts do not establish acceptance of this candidate.
 - **Lab panel and same-tester retest: playtest director, 2026-11-03.** This builder runs no rounds. Friends and Show HN remain paused until Adam accepts readiness. Historical after-first-play dates no longer defer engineering under Widened.
+- **Cross-host departure and return: shared HF/SDK and receiving-host owners, 2026-11-03.** Initial incoming role admission does not suspend a Glance actor or retire its producer. The published contract still lacks per-actor departure, suspension, reconciliation and producer retirement while the other four people and dam continue. Glance refuses outgoing publication before writes. Dai's Commonstead stay cannot ship through a local transfer substitute. Check the published contracts and receiving host again on this date; act earlier if they become available.
+- **Incoming write eligibility: shared SDK and peer-host owners, 2026-10-29.** The public gate requires verified live compatible readers with per-person skips in every other bound game. Unknown peer adoption keeps that person's write closed. A source pin or a merged port supplies no live certification. Keep the SDK's named skips and recheck the actual public deployment record on this date.
+- **Wren's habitat finding: canonical source author and games-deferred director, 2026-10-29.** The original retained field page or its exact input link is missing. Species, observation, measurement, date and location cannot be inferred from the limited filed appendix. Obtain the original input before authoring a finding.
 
 Resolved historical source: F-228 preserves written slips as “read HH:MM (as written)”; radio arrivals use reported time; dawn can reconstruct actual read time. Keep those differences. The 2026-10-20 player reports remain verbatim in `docs/playtests/`.
 

@@ -18,13 +18,13 @@
     "format": "biome format --write .",
     "measure": "node scripts/measure.ts",
     "check": "npm run lint && npm run typecheck && npm test",
-    "deploy": "npm run check && npm run build && wrangler deploy",
-    "check:lane": "npm run check"
+    "deploy": "npm run check:lane && npm run build && wrangler deploy",
+    "check:lane": "SUITE_LOCK=0 npm run check"
   },
   "dependencies": {
-    "@adam0white/human-framework": "3.0.0",
-    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.4.15/adam0white-lab-client-0.4.15.tgz",
-    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.17/adam0white-lab-kit-0.5.17.tgz"
+    "@adam0white/human-framework": "4.8.0",
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.6/adam0white-lab-client-0.5.6.tgz",
+    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.24/adam0white-lab-kit-0.5.24.tgz"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
@@ -33,7 +33,8 @@
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.0.5",
-    "wrangler": "4.152.0"
+    "wrangler": "4.152.0",
+    "fake-indexeddb": "6.2.6"
   },
   "packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6"
 }

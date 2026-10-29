@@ -1,5 +1,11 @@
-import { restore, snapshot } from '@adam0white/human-framework';
-import type { Lab, LifePreparation, PersonaEnvelope, PersonaLife } from '@adam0white/lab-client';
+import type {
+  Lab,
+  LifeBatchPreparation,
+  LifePreparation,
+  PersonaEnvelope,
+  PersonaLife,
+  PersonaRequest,
+} from '@adam0white/lab-client';
 import {
   anchorPersonaLife,
   canonicalCast,
@@ -11,10 +17,22 @@ import {
   type personaChannel,
   validatePersona,
 } from '@adam0white/lab-client';
+import { digestBytes, encodeText, safeFile } from './file-admission.ts';
+import { checkPreparation, PreparationStore, prepareRecord, type Reservation } from './preparation-store.ts';
 import { ALLOCATION as CAST } from './sim/cast.ts';
-import { newGame as createGame, type GameState as State, type WatchRules } from './sim/dam.ts';
-import { admitResident, type Chapter, DIALECT, RULES, residentTransfer } from './sim/passport.ts';
+import type { GameState as State, WatchRules } from './sim/dam.ts';
+import { FRAMEWORK_VERSION, restoreWatch, type WatchArchive, watchOpenings } from './sim/hf4.ts';
+import {
+  admitResident,
+  type Chapter,
+  chapterSources,
+  DIALECT,
+  plannedClaim,
+  RULES,
+  residentTransfer,
+} from './sim/passport.ts';
 import { exportCurrent as exportRun, importCurrent as importRun } from './sim/run.ts';
+import { CandidateValidation } from './validation.ts';
 
 type Shelf = ReturnType<typeof personaChannel>;
 type SourceArchive = { revision: string; source: PersonaEnvelope['source']; snapshot: unknown };
@@ -26,16 +44,20 @@ export { fileEntry } from './entry.ts';
 
 /** Run-scoped ownership, recording and source archive. No current shelf reads on local load. */
 export class Continuity {
+  inspectionChanged = () => {};
+  private validation = new CandidateValidation(() => this.inspectionChanged());
   generation = 0;
   heads: PersonaEnvelope[] = [];
   fileOrigin = false;
   busy = false;
   status = 'Browser continuity and lab recording are separate choices.';
-  runId = crypto.randomUUID();
+  runId: string = crypto.randomUUID();
   sources: SourceArchive[] = [];
   private key = crypto.randomUUID();
   private operation = Promise.resolve();
   private state: State | null = null;
+  private preparation: Reservation | undefined;
+  readonly preparations = new PreparationStore();
   constructor(
     readonly lab: Lab,
     private readonly channel: Shelf | undefined,
@@ -59,11 +81,12 @@ export class Continuity {
     return {
       game: 'glance',
       build: `${String(this.lab.build().c ?? 'local')}.run-${this.runId}`,
-      engine: '2.23.0',
+      engine: FRAMEWORK_VERSION,
       rules: RULES,
     };
   }
   invalidate() {
+    this.validation.cancel();
     this.generation++;
     this.key = crypto.randomUUID();
     if (!this.fileSession) this.lab.setPersonaRecording(this.key);
@@ -72,9 +95,46 @@ export class Continuity {
   clear() {
     this.nativeOnly();
     this.invalidate();
+    this.validation.clear();
     this.state = null;
     this.heads = [];
     this.sources = [];
+    this.preparation = undefined;
+  }
+  private currentNative() {
+    // The title can have a saved run without an installed in-memory state.
+    if (typeof localStorage !== 'undefined') return localStorage.getItem(LOCAL_KEY);
+    return this.state ? this.localSave(this.state) : null;
+  }
+  private async nativeBasis(text: string | null): Promise<Reservation['basis']> {
+    if (text === null) return null;
+    const native = safeFile(text);
+    return { runId: native.runId, sha256: await digestBytes(encodeText(text)) };
+  }
+  private activeNative() {
+    return this.state ? this.localSave(this.state) : undefined;
+  }
+  private async basisGuard(basis: Reservation['basis'], readCurrent: () => string | null) {
+    const saved = readCurrent();
+    const active = this.activeNative();
+    const matches =
+      canonicalPersona(await this.nativeBasis(saved)) === canonicalPersona(basis) &&
+      (active === undefined || canonicalPersona(await this.nativeBasis(active)) === canonicalPersona(basis));
+    // Digest completion is not a live-byte check. Invoke this synchronous guard after
+    // the final await, immediately before installation or dispatch, without another await.
+    return () => matches && readCurrent() === saved && this.activeNative() === active;
+  }
+  async pendingPreparations(readCurrent = () => this.currentNative()) {
+    const current = readCurrent();
+    const basis = await this.nativeBasis(current);
+    const active = this.state ? await this.nativeBasis(this.localSave(this.state)) : undefined;
+    const installedId = current === null ? undefined : safeFile(current).preparation?.id;
+    return (await this.preparations.list()).filter(
+      (record) =>
+        record.id !== installedId &&
+        canonicalPersona(record.basis) === canonicalPersona(basis) &&
+        (active === undefined || canonicalPersona(record.basis) === canonicalPersona(active)),
+    );
   }
   async fresh(seed: number, localOnly = false, rules?: WatchRules) {
     this.nativeOnly();
@@ -84,266 +144,347 @@ export class Continuity {
     const generation = this.generation;
     try {
       await this.shelf.ready;
-      // New chapters carry matching people automatically through the public SDK contract.
-      // File sessions never reach this native-only path; loaded chapters keep their pinned people.
       if (!localOnly && generation === this.generation && !this.shelf.enabled) {
         this.shelf.setEnabled(true);
         await this.shelf.ready;
       }
-      if (generation !== this.generation)
-        throw new Error('The game changed before the histories could be loaded.');
-      const base = createGame(seed, undefined, rules);
+      const current = () => generation === this.generation;
+      if (!current()) throw Error('The game changed before the histories could be loaded.');
       let chapter: Chapter | undefined;
+      let reservation: Reservation | undefined;
+      const runId = crypto.randomUUID();
+      const source = { ...this.source(), build: `${String(this.lab.build().c ?? 'local')}.run-${runId}` };
+      const basis = await this.nativeBasis(this.currentNative());
+      const accepted = new Map<string, { initial: Chapter['initial'][string]; claim: PersonaEnvelope }>();
+      let candidate: State | undefined;
       if (this.shelf.enabled && !localOnly) {
-        const result = await claimCastChapterBatch(
-          this.shelf,
-          CAST.map((c) => c.castId),
-          this.source(),
-          async (inputs: LifePreparation[]) => {
-            const initial = Object.fromEntries(
-              base.people.map((p) => {
-                const cast = CAST.find((c) => c.id === p.id);
-                if (!cast) throw new Error('The starting person is not part of this cast.');
-                return [cast.castId, structuredClone(p)];
-              }),
-            );
-            for (const input of inputs) {
-              const opening = initial[input.parent.castId];
-              if (!opening) throw new Error('This person is not part of this game.');
-              initial[input.parent.castId] = admitResident(input, opening);
-            }
-            return initial;
+        // An unreadable inventory is not an empty inventory.
+        const unresolved = await this.preparations.list();
+        if (unresolved.some((record) => record.phase !== 'acknowledged'))
+          throw Error(
+            'A saved prepared opening needs its claim checked first. Your current watch is unchanged.',
+          );
+        this.status = 'Checking saved people and preparing the complete opening…';
+        this.changed();
+        let batch: LifeBatchPreparation | undefined;
+        const staged: { kind: 'local-planning-only'; request?: PersonaRequest } = {
+          kind: 'local-planning-only',
+        };
+        // This adapter only plans. Its local return is NOT a transport acknowledgement.
+        // No shelf write occurs until the full returned SDK result has been durably prepared.
+        const plan = await claimCastChapterBatch(
+          {
+            request: async <T>(request: PersonaRequest): Promise<T> => {
+              if (request.action === 'prepareBatch') {
+                const value = await this.shelf.request<LifeBatchPreparation>(request);
+                const ids = CAST.map((c) => c.castId).sort();
+                if (
+                  canonicalPersona(Object.keys(value.expectedHeads).sort()) !== canonicalPersona(ids) ||
+                  value.inputs.some(
+                    (input, index) =>
+                      !ids.includes(input.parent.castId) ||
+                      value.inputs.findIndex((other) => other.parent.castId === input.parent.castId) !==
+                        index ||
+                      value.expectedHeads[input.parent.castId] !== input.parent.revision,
+                  ) ||
+                  Object.values(value.expectedHeads).some(
+                    (head) => head !== null && !/^[a-f0-9]{64}$/.test(head),
+                  )
+                )
+                  throw Error('The saved source heads are stale or incompatible.');
+                batch = structuredClone(value);
+                return value as T;
+              }
+              if (request.action !== 'putBatch' || staged.request)
+                throw Error('Unsupported planning operation.');
+              staged.request = structuredClone(request);
+              return undefined as T;
+            },
           },
-          { isCurrent: () => generation === this.generation },
+          CAST.map((c) => c.castId),
+          source,
+          async (inputs) =>
+            Object.fromEntries(
+              inputs.map((input) => {
+                const actor = accepted.get(input.parent.castId);
+                if (!actor) throw Error('Missing admitted actor.');
+                return [actor.initial.id, actor.initial];
+              }),
+            ),
+          {
+            isCurrent: current,
+            admitPerson: async (input) => {
+              const opening = watchOpenings().find(
+                (a) => CAST.find((c) => c.id === a.id)?.castId === input.parent.castId,
+              );
+              if (!opening) throw Error('No canonical Glance role.');
+              opening.biography = [];
+              opening.state.agenda.commitments = [];
+              const initial = admitResident(input, opening);
+              const claim = await plannedClaim(input);
+              await this.validation.create(
+                seed,
+                { version: DIALECT, inputs: [input], claims: [claim], initial: { [initial.id]: initial } },
+                rules,
+              );
+              accepted.set(input.parent.castId, { initial, claim });
+            },
+          },
         );
-        if (result)
+        if (!staged.request || !batch || !current()) throw Error('The game changed during planning.');
+        if (plan) {
+          // Pin the complete public SDK blocked list, including its early ownership refusals.
           chapter = {
             version: DIALECT,
-            initial: result.initial,
-            inputs: result.inputs,
-            claims: result.claims,
+            inputs: plan.inputs,
+            claims: plan.claims,
+            initial: plan.initial,
+            blocked: plan.blocked,
           };
+          if (
+            canonicalPersona(plan.claims) !==
+            canonicalPersona(plan.inputs.map((input) => accepted.get(input.parent.castId)!.claim))
+          )
+            throw Error('SDK claim differs from planned public claim.');
+        }
+        candidate = await this.validation.create(seed, chapter, rules);
+        if (!current()) throw Error('The game changed during preparation.');
+        if (chapter?.inputs.length) {
+          const native = JSON.stringify({
+            run: exportRun(candidate),
+            runId,
+            fileOrigin: false,
+            heads: chapter.claims,
+            sources: chapterSources(chapter),
+          });
+          reservation = await prepareRecord({
+            id: crypto.randomUUID(),
+            generation,
+            source,
+            expectedHeads: batch.expectedHeads,
+            candidate: native,
+            basis,
+          });
+          reservation = await this.preparations.commit(reservation);
+          if (!current()) throw Error('Preparation cancelled. The complete reserved opening remains saved.');
+          const request = staged.request;
+          if (
+            canonicalPersona(request.envelopes) !== canonicalPersona(chapter.claims) ||
+            canonicalPersona(request.expectedHeads) !== canonicalPersona(reservation.expectedHeads)
+          )
+            throw Error('SDK claim differs from durable preparation.');
+          // Exact IDB compare/write grants one dispatcher. The unknown marker precedes CAS.
+          reservation = await this.preparations.transition(reservation, 'unknown');
+        }
+        const canSend = await this.basisGuard(basis, () => this.currentNative());
+        if (!current() || !canSend()) {
+          if (reservation) await this.preparations.transition(reservation, 'prepared');
+          throw Error('Preparation cancelled before its claim.');
+        }
+        try {
+          // This is the only real transport call. Local SDK staging did not acknowledge it.
+          await this.shelf.request(staged.request);
+        } catch (error) {
+          this.status = reservation
+            ? 'The prepared opening remains saved. Its claim needs checking; your current watch is unchanged.'
+            : String(error);
+          throw error;
+        }
+        if (reservation) reservation = await this.preparations.transition(reservation, 'acknowledged');
       }
-      if (generation !== this.generation) throw new Error('The game changed. The new chapter did not start.');
-      const state = createGame(seed, chapter, rules);
+      if (!current())
+        throw Error('The game changed. The prepared opening remains saved; the current watch is unchanged.');
+      const state = candidate ?? (await this.validation.create(seed, undefined, rules));
+      const canInstall = await this.basisGuard(basis, () => this.currentNative());
+      if (!current() || !canInstall()) throw Error('The current watch changed before the new watch started.');
+      this.validation.keep(state);
       this.state = state;
-      this.runId = crypto.randomUUID();
-      this.sources = [];
+      this.runId = runId;
+      this.sources = chapterSources(chapter);
       this.heads = chapter?.claims ?? [];
+      this.preparation = reservation;
       this.fileOrigin = false;
-      this.status = chapter
-        ? `The game loaded ${chapter.inputs.length} matching ${chapter.inputs.length === 1 ? 'history' : 'histories'} after checking all five people together. The other people start with their original histories.`
-        : localOnly
-          ? 'A new local chapter has started. The histories saved in this browser are unchanged.'
+      const refused = chapter?.blocked ?? [];
+      const reasons = refused.map((x) => x.reason).join('; ');
+      this.status = chapter?.inputs.length
+        ? `${chapter.inputs.length} saved ${chapter.inputs.length === 1 ? 'person continues' : 'people continue'} in this prepared opening. ${refused.length ? `Could not carry: ${reasons}. Their local roles start fresh.` : 'Other roles keep their authored local histories.'} No other game's chapter was closed.`
+        : refused.length
+          ? `Saved people could not be carried: ${reasons}. The local people start fresh.`
           : 'A new chapter has started with the original people. No saved histories were carried over.';
-      // Caller installs the prepared state before opening any recording hook.
       return state;
     } finally {
+      this.validation.cancel();
       this.busy = false;
     }
   }
-  async validateRunEnvelopes(state: State) {
-    if (state.chapter)
-      await Promise.all(
-        [...state.chapter.claims, ...state.chapter.inputs.map((i) => i.parent)].map((p) =>
-          validatePersona(p),
-        ),
+  async recoverPrepared(id: string, readCurrent = () => this.currentNative()) {
+    this.nativeOnly();
+    const generation = this.generation;
+    try {
+      let record = await this.preparations.read(id);
+      const current = async () => {
+        const guard = await this.basisGuard(record.basis, readCurrent);
+        return () => {
+          if (generation !== this.generation) throw Error('Recovery cancelled.');
+          if (!guard())
+            throw Error(
+              'The current watch differs from this prepared opening’s prior native context. Keep the current watch.',
+            );
+        };
+      };
+      (await current())();
+      const native = JSON.parse(record.candidate);
+      await this.validation.load(native);
+      (await current())();
+      if (record.phase === 'prepared') {
+        // A historical prepared row is not current SDK permission to make an arrival write.
+        for (const input of native.run.state.chapter.inputs as LifePreparation[]) {
+          try {
+            const claim = await plannedClaim(input);
+            if (
+              canonicalPersona(claim) !==
+              canonicalPersona(
+                native.heads.find((head: PersonaEnvelope) => head.castId === input.parent.castId),
+              )
+            )
+              throw Error('The pinned claim differs from the public SDK claim.');
+          } catch (error) {
+            throw Error(`${canonicalCast(input.parent.castId).name}: ${String(error)}`);
+          }
+        }
+        (await current())();
+        record = await this.preparations.transition(record, 'unknown');
+        try {
+          (await current())();
+        } catch (error) {
+          // Only this exact dispatch token/revision can revert its still-unsent marker.
+          await this.preparations.transition(record, 'prepared');
+          throw error;
+        }
+        await this.shelf.request({
+          action: 'putBatch',
+          envelopes: native.heads,
+          expectedHeads: record.expectedHeads,
+        });
+        record = await this.preparations.transition(record, 'acknowledged');
+      } else if (record.phase === 'unknown') {
+        const snapshot = await this.shelf.request<LifeBatchPreparation>({
+          action: 'prepareBatch',
+          castIds: CAST.map((c) => c.castId),
+        });
+        const expected = { ...record.expectedHeads };
+        for (const claim of native.heads as PersonaEnvelope[]) expected[claim.castId] = claim.revision;
+        if (canonicalPersona(snapshot.expectedHeads) !== canonicalPersona(expected))
+          throw Error(
+            'The exact prepared claims are not confirmed. Keep both histories; this opening remains saved.',
+          );
+        (await current())();
+        record = await this.preparations.transition(record, 'acknowledged');
+      }
+      (await current())();
+      return await this.loadLocal(JSON.stringify({ ...native, preparation: record }), () =>
+        this.basisGuard(record.basis, readCurrent),
       );
+    } finally {
+      this.validation.cancel();
+    }
   }
-  async loadLocal(text: string) {
+  async loadLocal(text: string, recoveryTarget?: () => Promise<() => boolean>) {
     this.nativeOnly();
     this.invalidate();
     const generation = this.generation;
-    const saved = JSON.parse(text);
-    const state = importRun(saved.run);
-    await this.validateRunEnvelopes(state);
-    if (
-      typeof saved.runId !== 'string' ||
-      typeof saved.fileOrigin !== 'boolean' ||
-      !Array.isArray(saved.heads) ||
-      saved.heads.length > 8 ||
-      !Array.isArray(saved.sources) ||
-      JSON.stringify(saved.sources).length > maxArchive
-    )
-      throw new Error('The local ownership records or saved source data are invalid. Start a new game.');
-    const heads = await Promise.all(saved.heads.map((p: unknown) => validatePersona(p)));
-    if (
-      new Set(heads.map((p) => p.castId)).size !== heads.length ||
-      heads.some(
-        (p) =>
-          !CAST.some((c) => c.castId === p.castId) ||
-          p.source.game !== 'glance' ||
-          p.source.rules !== RULES ||
-          !(
-            state.chapter?.claims.some((c) => c.revision === p.revision) || p.transfer.hostRun === saved.runId
-          ),
-      )
-    )
-      throw new Error('This ownership record belongs to another game.');
-    if (generation !== this.generation) throw new Error('The game changed while it was loading.');
+    const state = await this.validation.native(text, (message) => {
+      this.status = message;
+      this.changed();
+    });
+    const canInstall = recoveryTarget ? await recoveryTarget() : undefined;
+    if (canInstall && !canInstall())
+      throw Error('The current watch changed before recovery could install. Keep the current watch.');
+    if (generation !== this.generation) throw Error('The game changed while it was loading.');
+    const saved = this.validation.nativeContext(state);
+    if (!saved) throw Error('Invalid native provenance.');
+    this.validation.keep(state);
     this.state = state;
     this.runId = saved.runId;
-    this.heads = heads;
+    this.heads = structuredClone(saved.heads);
     this.fileOrigin = saved.fileOrigin;
-    this.sources = saved.sources;
-    this.status =
-      'The local chapter was restored with its saved people and their last accepted ownership records. No newer browser histories were loaded.';
+    this.sources = structuredClone(saved.sources);
+    this.preparation = saved.preparation;
+    this.status = 'The complete local watch was restored. No newer browser histories were loaded.';
     return state;
   }
   async importFile(text: string) {
     if (this.fileSession) return this.importSession(text, this.beginFileSelection());
     this.invalidate();
     const generation = this.generation;
-    const raw = JSON.parse(text);
-    const state = importRun(raw);
-    await this.validateRunEnvelopes(state);
-    const sources = raw.castSources ?? [];
-    if (!Array.isArray(sources) || JSON.stringify(sources).length > maxArchive)
-      throw new Error('Source archive is too large.');
-    if (generation !== this.generation) throw new Error('The game changed while the file was loading.');
+    const state = await this.validation.load(JSON.parse(text), (message) => {
+      this.status = message;
+      this.changed();
+    });
+    if (generation !== this.generation) throw Error('The game changed while the file was loading.');
+    this.validation.keep(state);
     this.state = state;
-    this.heads = [];
+    this.heads = structuredClone(state.chapter?.claims ?? []);
+    this.sources = chapterSources(state.chapter);
+    this.preparation = undefined;
     this.runId = crypto.randomUUID();
-    this.sources = sources;
     this.fileOrigin = true;
-    this.status =
-      'The game was loaded from a file. It does not take ownership of the people saved in that file. Your menu choice controls recording and links between games.';
     return state;
   }
   private selection = 0;
-  /** Invalidate pending work synchronously, before chooser size checks or reads. */
   beginFileSelection() {
-    if (!this.fileSession) throw new Error('Use the file entry to choose a saved file.');
+    if (!this.fileSession) throw Error('Use the file entry to choose a saved file.');
+    this.validation.cancel();
     return ++this.selection;
   }
   isFileSelection(selection: number) {
     return this.fileSession && selection === this.selection;
   }
   private requireSelection(selection: number) {
-    if (!this.isFileSelection(selection)) throw new Error('A newer file selection replaced this one.');
+    if (!this.isFileSelection(selection)) throw Error('A newer file selection replaced this one.');
   }
   async importSelected(buffer: ArrayBuffer, selection: number) {
     this.requireSelection(selection);
-    const bytes = new Uint8Array(buffer.slice(0));
-    if (bytes.byteLength > fileBytes) throw new Error('File exceeds complete import capacity.');
-    // Hash selected bytes before decoding. Retain BOM as text, never replacement-decode.
-    const sha256 = await digestBytes(bytes);
-    this.requireSelection(selection);
+    const bytes = new Uint8Array(buffer);
+    if (bytes.byteLength > 16 * 1024 * 1024) throw Error('File exceeds complete import capacity.');
     const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
-    const roundtrip = encodeText(text);
-    if (roundtrip.length !== bytes.length || roundtrip.some((byte, i) => byte !== bytes[i]))
-      throw new Error('This file cannot be retained as exact UTF8.');
-    return this.importSession(text, selection, sha256);
+    encodeText(text);
+    await digestBytes(bytes);
+    this.requireSelection(selection);
+    return this.importSession(text, selection);
   }
-  private async importSession(text: string, selection: number, selectedSha256?: string) {
-    if (!this.fileSession) throw new Error('Use the file entry to load a file session.');
+  private async importSession(text: string, selection: number) {
     this.requireSelection(selection);
     const generation = this.generation;
-    let raw = safeFile(text);
-    let original = { text, sha256: selectedSha256 ?? (await digest(text)) };
+    const state = await this.validation.file(text, (message) => {
+      this.status = message;
+      this.changed();
+    });
     this.requireSelection(selection);
-    let provenance: unknown = null;
-    let sourceFile = raw;
-    if (raw.format === 'glance-file-session/1') {
-      if (typeof raw.original?.text !== 'string' || raw.original.sha256 !== (await digest(raw.original.text)))
-        throw new Error('Original file digest mismatch.');
-      original = raw.original;
-      const source = safeFile(original.text);
-      // Original must itself be a real native wrapper or public run, never a nested session.
-      if (source.format) throw new Error('Nested original file.');
-      await this.validateFile(source);
-      sourceFile = source;
-      provenance = source.run ? source : null;
-      if (JSON.stringify(raw.provenance) !== JSON.stringify(provenance))
-        throw new Error('Source provenance mismatch.');
-      if (!raw.current || raw.current.run) throw new Error('Invalid current run.');
-      raw = raw.current;
-    } else provenance = raw.run ? raw : null;
-    const { state, sources } = await this.validateFile(raw);
-    const sourceRun = sourceFile.run ?? sourceFile;
-    const originalSources = sourceFile.run ? sourceFile.sources : (sourceFile.castSources ?? []);
-    if (
-      JSON.stringify(sources) !== JSON.stringify(originalSources) ||
-      (raw.seed !== undefined &&
-        (raw.seed !== sourceRun.seed ||
-          state.minute < sourceRun.state.minute ||
-          state.applied < sourceRun.state.applied ||
-          JSON.stringify(raw.state?.chapter) !== JSON.stringify(sourceRun.state?.chapter) ||
-          JSON.stringify(raw.state?.rules) !== JSON.stringify(sourceRun.state?.rules) ||
-          JSON.stringify(raw.inputs.slice(0, sourceRun.inputs.length)) !== JSON.stringify(sourceRun.inputs)))
-    )
-      throw new Error('Current run does not continue the original file.');
-    // Verify complete serialization before installing anything. No truncation or compact snapshot.
-    safeFile(
-      JSON.stringify({
-        format: 'glance-file-session/1',
-        original,
-        provenance,
-        current: { ...exportRun(state), castSources: sources },
-      }),
-    );
-    this.requireSelection(selection);
-    if (generation !== this.generation) throw new Error('The game changed while the file was loading.');
+    if (generation !== this.generation) throw Error('The game changed while the file was loading.');
+    const context = this.validation.fileContext(state);
+    if (!context) throw Error('Invalid file provenance.');
+    this.validation.keep(state);
     this.invalidate();
     this.state = state;
-    this.original = original;
-    this.provenance = structuredClone(provenance);
-    this.sources = structuredClone(sources);
-    this.heads = [];
+    this.original = structuredClone(context.original);
+    this.provenance = structuredClone(context.provenance);
+    this.sources = structuredClone(context.castSources);
+    this.heads = structuredClone(state.chapter?.claims ?? []);
+    this.preparation = undefined;
     this.fileOrigin = true;
     this.runId = crypto.randomUUID();
     this.status = 'Progress stays in memory. Download this run before closing the page.';
     return state;
   }
-  private async validateFile(raw: any) {
-    if (raw.format !== undefined) throw new Error('Unsupported file format.');
-    const state = importRun(raw.run ?? raw);
-    await this.validateRunEnvelopes(state);
-    const sources = raw.run ? raw.sources : (raw.castSources ?? []);
-    if (!Array.isArray(sources)) throw new Error('Invalid source archive.');
-    for (const item of sources) {
-      if (
-        !item ||
-        typeof item.revision !== 'string' ||
-        !/^[a-f0-9]{64}$/.test(item.revision) ||
-        !item.source ||
-        Object.keys(item.source).sort().join(',') !== 'build,engine,game,rules' ||
-        typeof item.source.game !== 'string' ||
-        typeof item.source.build !== 'string' ||
-        typeof item.source.engine !== 'string' ||
-        typeof item.source.rules !== 'string' ||
-        !item.snapshot ||
-        typeof item.snapshot !== 'object'
-      )
-        throw new Error('Invalid source provenance.');
-      if (canonicalPersona(snapshot(restore(item.snapshot))) !== canonicalPersona(item.snapshot))
-        throw new Error('Invalid complete source snapshot.');
-    }
-    if (raw.run) {
-      if (
-        typeof raw.runId !== 'string' ||
-        !raw.runId ||
-        typeof raw.fileOrigin !== 'boolean' ||
-        !Array.isArray(raw.heads) ||
-        raw.heads.length > 8
-      )
-        throw new Error('Invalid native provenance.');
-      const heads = await Promise.all(raw.heads.map((p: unknown) => validatePersona(p)));
-      if (
-        new Set(heads.map((p) => p.castId)).size !== heads.length ||
-        heads.some(
-          (p) =>
-            !CAST.some((c) => c.castId === p.castId) ||
-            p.source.game !== 'glance' ||
-            p.source.rules !== RULES ||
-            !(
-              state.chapter?.claims.some((c) => c.revision === p.revision) || p.transfer.hostRun === raw.runId
-            ),
-        )
-      )
-        throw new Error('Invalid native ownership provenance.');
-    }
-    return { state, sources: sources as SourceArchive[] };
+  capacityContext() {
+    if (!this.fileSession || !this.original) throw Error('No accepted file.');
+    return {
+      format: 'glance-file-session/1',
+      original: structuredClone(this.original),
+      provenance: structuredClone(this.provenance),
+      castSources: structuredClone(this.sources),
+    };
   }
   exportSession(state: State) {
     if (!this.fileSession || !this.original) throw new Error('No accepted file.');
@@ -365,10 +506,11 @@ export class Continuity {
       fileOrigin: this.fileOrigin,
       heads: this.heads,
       sources: this.sources,
+      ...(this.preparation ? { preparation: this.preparation } : {}),
     });
   }
   export(state: State) {
-    return { ...(exportRun(state) as object), castSources: structuredClone(this.sources) };
+    return { ...exportRun(state), castSources: structuredClone(this.sources) };
   }
   pinnedHistories() {
     const group = new Map((this.state?.chapter?.claims ?? []).map((p) => [`${p.castId}/${p.branchId}`, p]));
@@ -394,155 +536,15 @@ export class Continuity {
     this.status =
       'Your choice about carrying people between games has changed. This loaded chapter keeps its saved people. Only a new chapter can load browser histories.';
   }
-  checkpoint(castId: string, fork = false) {
+  checkpoint(_castId: string, _fork = false): Promise<never> {
     this.nativeOnly();
-    const generation = this.generation,
-      state = this.state,
-      runId = this.runId;
-    const task = this.operation.then(async () => {
-      // Full native replay remains authority. Exact complete bytes bind that validation
-      // to the world and source records across asynchronous shelf/envelope operations.
-      // A changed run is never authorized by a stale validated object or editable marker.
-      let verifiedRun: string | undefined;
-      let verifiedSources: string | undefined;
-      const sourceRecords = () =>
-        JSON.stringify({ heads: this.heads, sources: this.sources, fileOrigin: this.fileOrigin });
-      const current = () =>
-        generation === this.generation &&
-        state === this.state &&
-        runId === this.runId &&
-        (verifiedRun === undefined || (!!state && JSON.stringify(exportRun(state)) === verifiedRun)) &&
-        (verifiedSources === undefined || sourceRecords() === verifiedSources);
-      if (
-        state &&
-        (state.outcomes?.rota || state.inputs.some((i) => i.kind === 'outcome' && i.task.startsWith('rota-')))
-      )
-        throw new Error(
-          'This rota history exceeds the published Glance person passport. Download the complete run; no person or source history was published.',
-        );
-      if (state && (state.viewing || state.inputs.some((i) => i.kind === 'viewing')))
-        throw new Error(
-          'This viewing history exceeds the published Glance person passport. Download the complete run; no person or source history was published.',
-        );
-      // Durable opt-in history exceeds the published passport, even after return, reload or death.
-      // Refuse before envelope creation, source archive, shelf or head writes. Never trust editable receipts alone.
-      if (
-        state &&
-        (state.inputs.some(
-          (i) => i.kind === 'outcome' && (i.task === 'callum-home-rest' || i.task === 'callum-home-return'),
-        ) ||
-          state.outcomes?.keeperScenes?.homeRequests)
-      )
-        throw new Error(
-          'This home-rest history exceeds the published Glance person passport. Download the complete run; no person or source history was published.',
-        );
-      // Known unsupported history can only refuse; do not replay it for each actor.
-      // Labels never authorize publication: stripped and potentially supported histories
-      // still bind the complete Person/world state to creation and recorded execution.
-      if (state) {
-        const complete = exportRun(state);
-        importRun(complete);
-        verifiedRun = JSON.stringify(complete);
-        verifiedSources = sourceRecords();
-      }
-      if (
-        !state ||
-        !current() ||
-        !state.inputs.some((input) => input.kind !== 'pause' && input.kind !== 'resume') ||
-        state.minute <= 1320 ||
-        (!state.chapterPaused &&
-          state.phase !== 'end' &&
-          state.people.find((p) => p.id === CAST.find((c) => c.castId === castId)?.id)?.body.alive !== false)
-      )
-        throw new Error(
-          'Play the game, then pause the chapter after the current work finishes before saving a person.',
-        );
-      // A finished chapter is not a pause: admit only its actual complete replay.
-      if (state.phase === 'end') importRun(exportRun(state));
-      await this.shelf.ready;
-      if (!current() || !this.shelf.enabled)
-        throw new Error('Carrying people between games is off, or the game has changed.');
-      const person = state.people.find((p) => p.id === CAST.find((c) => c.castId === castId)?.id);
-      const villager = person ? { person, name: person.name } : null;
-      if (!villager || !CAST.some((c) => c.castId === castId))
-        throw new Error('This person is not part of this game.');
-      const parent = this.heads.find((p) => p.castId === castId);
-      let envelope: PersonaEnvelope;
-      let raw: unknown;
-      if (!villager.person.body.alive) {
-        if (!parent)
-          throw new Error('This game does not own a living history for this person that it can close.');
-        if (parent.terminal) return false;
-        raw = snapshot(villager.person);
-        const closed = await closePersonaBranch(parent, this.source(), villager.person.now);
-        if (!current()) throw new Error('The game changed before this history could be saved.');
-        const { revision: _revision, ...body } = closed;
-        envelope = await createPersona({ ...body, transfer: { ...body.transfer, hostRun: runId } });
-      } else {
-        if (
-          state.phase !== 'end' &&
-          !(villager.person.id === 'nerys' && state.chapterPaused && state.nerys.ringing === null)
-        )
-          throw new Error(
-            'Work and family duties still keep this person here. Finish the storm week before they leave.',
-          );
-        const captured = await residentTransfer(villager.person);
-        if (!current()) throw new Error('The game changed before this history could be saved.');
-        raw = captured.raw;
-        const branchId = fork ? crypto.randomUUID() : (parent?.branchId ?? crypto.randomUUID());
-        const life =
-          !fork && parent?.transfer.life
-            ? anchorPersonaLife(parent.transfer.life as PersonaLife, castId, Date.now())
-            : initialPersonaLife(castId, branchId, Date.now());
-        envelope = await createPersona({
-          format: 'hf-persona/1',
-          castId,
-          castRevision: canonicalCast(castId).revision,
-          branchId,
-          parentRevision: fork ? null : (parent?.revision ?? null),
-          source: this.source(),
-          transfer: { ...captured.transfer, life, hostRun: runId },
-          limitations: captured.limitations,
-        });
-      }
-      if (!current()) throw new Error('The game changed before this history could be saved.');
-      // Preserve full actual source before publication, including failed CAS attempts, local only.
-      if (raw) {
-        const retained = [
-          ...this.sources,
-          { revision: envelope.revision, source: envelope.source, snapshot: raw },
-        ];
-        if (JSON.stringify(retained).length > maxArchive)
-          throw new Error(
-            'Complete source archive exceeds capacity. Download this run. This history was not published.',
-          );
-        this.sources = retained;
-        verifiedSources = sourceRecords();
-        this.changed();
-      }
-      if (!current()) throw new Error('The game changed before this history could be saved.');
-      await this.shelf.request({
-        action: 'put',
-        envelope,
-        fork,
-        authored: !fork && !parent && !this.fileOrigin && !state.chapter?.inputs.length,
-      });
-      if (!current()) return false;
-      this.heads = [...this.heads.filter((p) => p.castId !== castId), envelope].sort((a, b) =>
-        a.castId.localeCompare(b.castId),
-      );
-      this.key = crypto.randomUUID();
-      this.lab.setPersonaRecording(this.key);
-      this.status = `${villager.name}: ${envelope.terminal ? 'The end of this history was saved' : 'This point in the history was saved'}. Data that other games cannot use stays in the local export.`;
-      this.changed();
-      await this.recording();
-      return true;
-    });
-    this.operation = task.then(
-      () => {},
-      () => {},
+    // Roles exist; source suspension, reconciliation and producer retirement remain unsupported.
+    // Refuse before envelope, journal, source archive, shelf or head writes.
+    return Promise.reject(
+      new Error(
+        'These people cannot leave this watch yet. Download the complete run; no person or source history was published.',
+      ),
     );
-    return task;
   }
   async checkpointAll() {
     this.nativeOnly();
@@ -582,37 +584,4 @@ export function watchShelfPreference(invalidate: () => void, events: EventTarget
     events.removeEventListener('hf-persona-preference', invalidate);
     events.removeEventListener('storage', stored);
   };
-}
-
-// Bound bytes before parsing and bound finite JSON before replay or installation.
-// Exports remain complete even if a very long played session exceeds admission capacity.
-const fileBytes = 16 * 1024 * 1024;
-function safeFile(text: string): any {
-  if (encodeText(text).byteLength > fileBytes) throw new Error('File exceeds complete import capacity.');
-  // BOM is removed only from the JSON interpretation; original text/bytes stay exact.
-  const value = JSON.parse(text.startsWith('\uFEFF') ? text.slice(1) : text);
-  let nodes = 0;
-  function visit(v: unknown, depth: number) {
-    if (++nodes > 1_000_000 || depth > 128) throw new Error('File is too complex.');
-    if (typeof v === 'number' && !Number.isFinite(v)) throw new Error('Nonfinite file value.');
-    if (v && typeof v === 'object')
-      for (const [key, child] of Object.entries(v)) {
-        if (['__proto__', 'prototype', 'constructor'].includes(key)) throw new Error('Unsafe file key.');
-        visit(child, depth + 1);
-      }
-  }
-  visit(value, 0);
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid saved file.');
-  return value;
-}
-function encodeText(text: string) {
-  if (/[\uD800-\uDFFF]/u.test(text)) throw new Error('Original text contains a lone surrogate.');
-  return new TextEncoder().encode(text);
-}
-async function digest(text: string) {
-  return digestBytes(encodeText(text));
-}
-async function digestBytes(value: Uint8Array<ArrayBuffer>) {
-  const bytes = await crypto.subtle.digest('SHA-256', value);
-  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

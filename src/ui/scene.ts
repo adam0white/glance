@@ -3,8 +3,9 @@
  * truth), the hut, the gate wheel, the staff gauge, the path up to the weir, the river down to the inn, rain, and
  * the keepers walking between them. Lightning is the only moment the truth is drawn: a flash, then a pencil ghost.
  */
-import { readPerson } from '@adam0white/human-framework';
+
 import { clock, type GameState, keeperOf, type Place, personOf, planOf } from '../sim/dam.ts';
+import { readPerson } from '../sim/hf4.ts';
 import { keeperAway } from '../sim/keeper-scenes.ts';
 import { type KeeperId, NAMES, WATCH_FROM } from '../sim/keepers.ts';
 import { rainAt } from '../sim/water.ts';

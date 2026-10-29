@@ -37,28 +37,8 @@ it('keeps discoveries private until a willing, available conversation and pins t
   expect(rememberedConversation(s, 'wren')).toBeNull();
 });
 
-it('makes each allocated discovery reachable through ordinary inputs without granting operational skills', () => {
-  const s = newGame(7);
-  while (s.phase !== 'end') {
-    if (s.phase === 'dawn') {
-      queueInput(s, { kind: 'next' });
-      continue;
-    }
-    const m = (s.minute % 1440) - 1320;
-    if (m === 1 || m === -1260) queueInput(s, { kind: 'ask', keeper: 'dai', job: 'gate', target: 4 });
-    for (const person of discoveriesFor(s)) {
-      const first = s.conversations[person];
-      if (first === undefined || s.minute - first >= 20) queueInput(s, { kind: 'talk', person });
-    }
-    step(s);
-  }
-  expect(Object.keys(s.discoveries).sort()).toEqual(['bilal', 'callum', 'dai', 'nerys', 'wren']);
-  const replayed = replay(s.seed, s.inputs, s.minute);
-  expect(fingerprint(replayed)).toBe(fingerprint(s));
-  expect(s.people.find((p) => p.id === 'bilal')?.skills.gate).toBeUndefined();
-  expect(s.people.find((p) => p.id === 'wren')?.skills.gate).toBeUndefined();
-});
-
+// The complete five-person disclosure and no-skill-grant assertions run in
+// scripts/hf48-source-proof.ts with the one actual twelve-night source watch.
 it('does not reopen visitor conversations after midnight', () => {
   const s = newGame(7);
   s.night = 2;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { keeperOf, newGame, personOf, queueInput, step } from '../src/sim/dam.ts';
+import { cloneState, keeperOf, newGame, personOf, queueInput, step } from '../src/sim/dam.ts';
 import { concernLines, thresholdWords } from '../src/ui/concern.ts';
 
 function reading() {
@@ -43,7 +43,7 @@ describe('the desk concern', () => {
     job.skip = true;
     job.to = 'hut';
     job.walk = 0;
-    activity.endsAt = job.startedAt + 4;
+    expect(() => Reflect.set(activity, 'endsAt', job.startedAt + 4)).not.toBe(true);
     expect(concernLines(s)).toEqual(before);
     job.job = 'weir';
     expect(concernLines(s).join(' ')).toMatch(/weir.*about 22:15/);
@@ -58,11 +58,11 @@ describe('the desk concern', () => {
     job.target = 3;
     if (!s.board.gate) throw new Error('Missing opening gate report');
     s.board.gate.value = 1;
-    activity.endsAt = 1341;
+    expect(Object.isFrozen(activity)).toBe(true);
     const words = concernLines(s);
     expect(words.join(' ')).toMatch(/Dai.*gate.*about 22:15/);
     s.water.gate = 6;
-    activity.endsAt = 1387;
+
     expect(concernLines(s)).toEqual(words);
   });
 
@@ -99,9 +99,9 @@ describe('the desk concern', () => {
   ] as const)('names the requested work instead of the %s job key', (job, words) => {
     const s = newGame(7);
     queueInput(s, { kind: 'ask', keeper: 'dai', job });
-    const before = structuredClone(s);
+    const before = cloneState(s);
     expect(concernLines(s).join(' ')).toContain(`Your request to ${words} is waiting for an answer.`);
-    expect(s).toEqual(before);
+    expect(cloneState(s)).toEqual(before);
     s.inputs = [];
     keeperOf(s, 'dai').deferred = {
       s: { voiceId: 'engineer', strength: 0.6 },
@@ -117,19 +117,21 @@ describe('the desk concern', () => {
     const activity = personOf(s, 'dai').activity;
     if (!job || !activity) throw new Error('Missing activity fixture');
     job.job = 'stove';
-    activity.endsAt = 1340;
-    expect(concernLines(s)[0]).toBe('Dai: He is resting by the stove. He is expected to finish about 22:20.');
+
+    const line = concernLines(s)[0];
+    expect(line).toMatch(/^Dai: He is resting by the stove\. He is expected to finish about \d{2}:\d{2}\.$/);
+    expect(line).not.toContain(' .');
   });
 
-  it('shows sleep without promising a wake time or an active reading', () => {
+  // Real doze/wake is covered by the shared-Run control; an inspection cannot
+  // fabricate sleep by editing a copied activity as the HF3 fixture did.
+  it('keeps public actor inspections immutable', () => {
     const s = reading();
-    const activity = personOf(s, 'dai').activity;
-    if (!activity) throw new Error('Missing activity fixture');
-    activity.affordanceId = 'doze';
-    expect(concernLines(s).join(' ')).toMatch(/Dai.*not answering/);
-    expect(concernLines(s).join(' ')).not.toMatch(/about \d|reading|wake/);
-    activity.affordanceId = 'nap';
-    expect(concernLines(s).join(' ')).toContain('asleep, as you asked');
+    const p = personOf(s, 'dai');
+    const before = cloneState(s);
+    expect(Object.isFrozen(p)).toBe(true);
+    if (p.activity) expect(Reflect.set(p.activity, 'affordanceId', 'doze')).toBe(false);
+    expect(cloneState(s)).toEqual(before);
   });
 
   it('names idle availability, an inn report and radio trouble separately', () => {

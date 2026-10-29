@@ -1,8 +1,19 @@
 /** Chosen finite fiction, never an employer/family consent adapter. HF owns participation.
  * No new state or HF calls occur until a new action is recorded. Old watches continue exactly.
  */
-import { type Affordance, begin, decide, finish, type Person, readDoze } from '@adam0white/human-framework';
+
 import type { GameState } from './dam.ts';
+import {
+  type Affordance,
+  begin,
+  beginTogether,
+  type DecisionRecord,
+  decide,
+  decideTogether,
+  finish,
+  type Person,
+  readDoze,
+} from './hf4.ts';
 import { rotaAway, rotaBusy } from './rota.ts';
 
 export type KeeperSceneAction =
@@ -231,17 +242,23 @@ export function requestKeeperScene(s: GameState, action: KeeperSceneAction) {
         : action.replaceAll('-', ' '),
       duration,
     );
-    const rec = decide(
-      p,
-      [
+    return { p, proposed };
+  });
+  const records = decideTogether(
+    selections.map(({ p, proposed }) => ({
+      person: p,
+      affordances: [
         proposed,
         {
           ...offer('stove', 'keep the time for duty and rest', 20),
           advertises: { rest: 0.25, water: 0.15, food: 0.05 },
         },
       ],
-      { suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
-    );
+      options: { suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
+    })),
+  );
+  const choices = selections.map(({ p, proposed }, i) => {
+    const rec = records[i]!;
     return {
       p,
       proposed,
@@ -250,7 +267,7 @@ export function requestKeeperScene(s: GameState, action: KeeperSceneAction) {
     };
   });
   f.retryAfter = s.minute + 10;
-  if (selections.some((c) => !c.willing)) {
+  if (choices.some((c) => !c.willing)) {
     f.decisions.push({ at: s.minute, action, result: 'refused' });
     say(
       s,
@@ -258,11 +275,14 @@ export function requestKeeperScene(s: GameState, action: KeeperSceneAction) {
     );
     return;
   }
-  for (const c of selections) {
+  for (const c of choices) {
     stop(c.p, s.minute, 'interrupted');
     keeper(s, c.p.id).job = null;
-    if (!begin(c.p, c.proposed, c.rec)) {
-      for (const other of selections)
+  }
+  beginTogether(choices.map((c) => c.p));
+  for (const c of choices) {
+    if (c.p.activity?.affordanceId !== c.proposed.id) {
+      for (const other of choices)
         if (other.p.activity?.affordanceId.startsWith('family-')) stop(other.p, s.minute, 'interrupted');
       f.decisions.push({ at: s.minute, action, result: 'begin-failed' });
       return;
@@ -512,20 +532,23 @@ function chooseHome(
   id: 'dai' | 'callum',
   stage: 'out' | 'rest' | 'cover' | 'return',
   start = true,
+  supplied?: DecisionRecord,
 ) {
   const p = person(s, id),
     proposed = homeOffer(stage);
-  const rec = decide(
-    p,
-    [
-      proposed,
-      {
-        ...offer('stove', 'keep time for ordinary duty and rest', 20),
-        advertises: { rest: 0.25, water: 0.15, food: 0.05 },
-      },
-    ],
-    { now: s.minute, suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
-  );
+  const rec =
+    supplied ??
+    decide(
+      p,
+      [
+        proposed,
+        {
+          ...offer('stove', 'keep time for ordinary duty and rest', 20),
+          advertises: { rest: 0.25, water: 0.15, food: 0.05 },
+        },
+      ],
+      { now: s.minute, suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
+    );
   const willing = rec.chosenAffordanceId === proposed.id && rec.suggestion?.verdict === 'assented';
   if (!willing) {
     h.decisions.push({ at: s.minute, person: id, stage, result: 'refused' });
@@ -580,17 +603,44 @@ function requestHome(s: GameState, action: 'callum-home-rest' | 'callum-home-ret
   f.retryAfter = s.minute + 10;
   say(s, homeTerms);
   // Decide independently before beginning either activity. No forced assent or private state edits.
-  const choices = [chooseHome(s, h, 'dai', 'cover', false), chooseHome(s, h, 'callum', 'out', false)];
+  const records = decideTogether(
+    (
+      [
+        ['dai', 'cover'],
+        ['callum', 'out'],
+      ] as const
+    ).map(([id, stage]) => {
+      const proposed = homeOffer(stage);
+      return {
+        person: person(s, id),
+        affordances: [
+          proposed,
+          {
+            ...offer('stove', 'keep time for ordinary duty and rest', 20),
+            advertises: { rest: 0.25, water: 0.15, food: 0.05 },
+          },
+        ],
+        options: { suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
+      };
+    }),
+  );
+  const choices = [
+    chooseHome(s, h, 'dai', 'cover', false, records[0]),
+    chooseHome(s, h, 'callum', 'out', false, records[1]),
+  ];
   if (choices.some((c) => !c)) {
     event(h, 'refused', s.minute);
     say(s, 'The keepers did not both choose this home-rest arrangement. No departure or cover began.');
     return;
   }
-  for (const c of choices) {
-    if (!c || typeof c === 'boolean') continue;
+  const willing = choices.filter((c): c is Exclude<typeof c, boolean> => typeof c !== 'boolean');
+  for (const c of willing) {
     stop(c.p, s.minute, 'interrupted');
     keeper(s, c.p.id).job = null;
-    const began = begin(c.p, c.proposed, c.rec);
+  }
+  beginTogether(willing.map((c) => c.p));
+  for (const c of willing) {
+    const began = c.p.activity?.affordanceId === c.proposed.id;
     h.decisions.push({
       at: s.minute,
       person: c.p.id,

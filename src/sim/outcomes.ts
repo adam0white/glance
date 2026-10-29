@@ -2,9 +2,20 @@
  * the authored list, fictional correction and elapsed attendance. It supplies no sensor
  * measurement, institutional response, new competence or safety guarantee.
  */
-import { type Affordance, begin, decide, finish, type Person, readDoze } from '@adam0white/human-framework';
+
 import { rememberedConversation } from './cast.ts';
 import type { GameState, KeeperState } from './dam.ts';
+import {
+  type Affordance,
+  begin,
+  beginTogether,
+  type DecisionRecord,
+  decide,
+  decideTogether,
+  finish,
+  type Person,
+  readDoze,
+} from './hf4.ts';
 
 import {
   advanceKeeperScenes,
@@ -141,21 +152,41 @@ function aff(
 function stop(p: Person, at: number, status: 'completed' | 'interrupted') {
   if (p.activity) finish(p, { affordanceId: p.activity.affordanceId, action: p.activity.action, at, status });
 }
-function choose(s: GameState, id: 'dai' | 'callum', proposed: Affordance) {
+function choose(s: GameState, id: 'dai' | 'callum', proposed: Affordance, supplied?: DecisionRecord) {
   const p = person(s, id);
-  const rec = decide(
-    p,
-    [
-      proposed,
-      aff('stove', 'keep the time for ordinary duty and rest', 20, { rest: 0.25, water: 0.15, food: 0.05 }),
-    ],
-    { suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
-  );
+  const rec =
+    supplied ??
+    decide(
+      p,
+      [
+        proposed,
+        aff('stove', 'keep the time for ordinary duty and rest', 20, { rest: 0.25, water: 0.15, food: 0.05 }),
+      ],
+      { suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
+    );
   return {
     p,
     rec,
     willing: rec.chosenAffordanceId === proposed.id && rec.suggestion?.verdict === 'assented',
   };
+}
+function joint(s: GameState, first: Affordance, second: Affordance) {
+  const records = decideTogether(
+    (
+      [
+        ['dai', first],
+        ['callum', second],
+      ] as const
+    ).map(([id, proposed]) => ({
+      person: person(s, id),
+      affordances: [
+        proposed,
+        aff('stove', 'keep the time for ordinary duty and rest', 20, { rest: 0.25, water: 0.15, food: 0.05 }),
+      ],
+      options: { suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
+    })),
+  );
+  return [choose(s, 'dai', first, records[0]), choose(s, 'callum', second, records[1])] as const;
 }
 export function requestOutcome(s: GameState, task: OutcomeTask) {
   if (isRota(task)) {
@@ -206,8 +237,7 @@ export function requestOutcome(s: GameState, task: OutcomeTask) {
     20,
     { belonging: 0.25 },
   );
-  const dai = choose(s, 'dai', proposed),
-    callum = choose(s, 'callum', proposed);
+  const [dai, callum] = joint(s, proposed, proposed);
   o.retryAfter = s.minute + 20;
   if (!dai.willing || !callum.willing) {
     say(
@@ -220,7 +250,10 @@ export function requestOutcome(s: GameState, task: OutcomeTask) {
   for (const c of [dai, callum]) {
     stop(c.p, s.minute, 'interrupted');
     keeper(s, c.p.id).job = null;
-    if (!begin(c.p, proposed, c.rec)) {
+  }
+  beginTogether([dai.p, callum.p]);
+  for (const c of [dai, callum]) {
+    if (c.p.activity?.affordanceId !== proposed.id) {
       cancelOutcome(s, 'The joint activity could not begin.');
       for (const other of [dai, callum])
         if (other.p.activity?.affordanceId === proposed.id) stop(other.p, s.minute, 'interrupted');
@@ -382,9 +415,14 @@ export function advanceOutcomes(s: GameState) {
         action: 'sleep',
         effort: 0,
       };
-      const d = choose(s, 'dai', cover),
-        r = choose(s, 'callum', rest);
-      if (d.willing && r.willing && begin(d.p, cover, d.rec) && begin(r.p, rest, r.rec)) {
+      const [d, r] = joint(s, cover, rest);
+      if (d.willing && r.willing) beginTogether([d.p, r.p]);
+      if (
+        d.willing &&
+        r.willing &&
+        d.p.activity?.affordanceId === cover.id &&
+        r.p.activity?.affordanceId === rest.id
+      ) {
         c.cover = 'dai';
         c.restFrom = s.minute;
         say(

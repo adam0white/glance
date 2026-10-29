@@ -1,0 +1,38 @@
+{
+  "sourceTree": "ead60836dcb8ccac0d9cfaebe7d36f4a8c4ab24e",
+  "client": "0.5.5",
+  "hf": "4.8.0",
+  "qualification": "Exact full historical public HF/SDK/fake-IDB raw captures. Readonly fixtures only; no current claim authorization, live certification, browser disk or producer retirement.",
+  "files": [
+    {
+      "path": "focused-2.json",
+      "original": "/Users/abdul/code/.lab-scratch/games-deferred/gd-resume-glance-hf48-incoming-r2-proof-bound/focused-2.json",
+      "bytes": 2824020,
+      "sha256": "7176848d77626e3bae0562b935dfaa54914bb593531b042b542a1f68fd94d8a6"
+    },
+    {
+      "path": "focused-3.json",
+      "original": "/Users/abdul/code/.lab-scratch/games-deferred/gd-resume-glance-hf48-incoming-r2-proof-bound/focused-3.json",
+      "bytes": 1691764,
+      "sha256": "fd8ad7bd0a1477aa7a63cc343f3944364538b8f65e3f39b356758bfbe165f2d6"
+    },
+    {
+      "path": "focused-6.json",
+      "original": "/Users/abdul/code/.lab-scratch/games-deferred/gd-resume-glance-hf48-incoming-r2-proof-bound/focused-6.json",
+      "bytes": 1989676,
+      "sha256": "646fbac812fd12fae48690456d861cf0fb2320dc4a0b95f0f0fdc2f78dcbaf2a"
+    },
+    {
+      "path": "recovery-3.json",
+      "original": "/Users/abdul/code/.lab-scratch/games-deferred/gd-resume-glance-hf48-incoming-r2-proof-bound/recovery-3.json",
+      "bytes": 1384733,
+      "sha256": "68ee57cfc9b33aa60c5248053dc7232a1b0f70024f9117879ead0d343675ad5d"
+    },
+    {
+      "path": "recovery-5.json",
+      "original": "/Users/abdul/code/.lab-scratch/games-deferred/gd-resume-glance-hf48-incoming-r2-proof-bound/recovery-5.json",
+      "bytes": 1859932,
+      "sha256": "eb4fa1dcab3e34775c076303508920995a373c097d45be40bdbc73d9c4a3bbc8"
+    }
+  ]
+}
