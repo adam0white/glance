@@ -4,7 +4,7 @@
 import { admitFile, admitNative, admitPublic, type FileContext, safeFile } from './file-admission.ts';
 import { cloneState, type GameState, newGame, planOf, queueInput, restoreState, step } from './sim/dam.ts';
 import type { InspectionPacket } from './sim/display.ts';
-import { bodyForecast, predict, readPerson } from './sim/hf4.ts';
+import { bodyForecast, journalWatch, predict, readPerson } from './sim/hf4.ts';
 import { validateChapter } from './sim/passport.ts';
 import { practiceNight } from './sim/practice.ts';
 import { exportCurrent, importCurrent } from './sim/run.ts';
@@ -17,6 +17,7 @@ export function watchOwner(emit: (value: unknown) => void) {
     if (!state) throw Error('No watch is held.');
     return {
       full: exportCurrent(state),
+      journal: journalWatch(state.people[0]!),
       host: (({ people: _people, ...host }) => structuredClone(host))(state),
       people: state.people.map((p) => structuredClone(p)),
       bodies: state.people.map((p) => readPerson(p).body),

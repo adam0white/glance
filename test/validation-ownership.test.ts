@@ -5,6 +5,7 @@ import { Continuity } from '../src/continuity.ts';
 import { digest } from '../src/file-admission.ts';
 import { newGame } from '../src/sim/dam.ts';
 import { displayOwner } from '../src/sim/display.ts';
+import { exportCurrent } from '../src/sim/run.ts';
 import { BrowserWorker, disposeBrowserWorkers } from './browser-worker.ts';
 
 const workers: HoldingWorker[] = [];
@@ -83,7 +84,7 @@ it.each(['recovery', 'fresh'] as const)(
     // Supply a fresh candidate at the store boundary; validation remains real.
     const record = {
       id: 'race',
-      candidate: before,
+      candidate: JSON.stringify({ ...JSON.parse(before), run: exportCurrent(newGame(7)) }),
       basis: { runId: JSON.parse(before).runId, sha256: await digest(before) },
     };
     vi.spyOn(c.preparations, 'read').mockResolvedValue(record as never);

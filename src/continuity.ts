@@ -21,7 +21,14 @@ import { digestBytes, encodeText, safeFile } from './file-admission.ts';
 import { checkPreparation, PreparationStore, prepareRecord, type Reservation } from './preparation-store.ts';
 import { ALLOCATION as CAST } from './sim/cast.ts';
 import type { GameState as State, WatchRules } from './sim/dam.ts';
-import { FRAMEWORK_VERSION, restoreWatch, type WatchArchive, watchOpenings } from './sim/hf4.ts';
+import { displayJournal } from './sim/display.ts';
+import {
+  FRAMEWORK_VERSION,
+  journalWatch,
+  restoreWatch,
+  type WatchArchive,
+  watchOpenings,
+} from './sim/hf4.ts';
 import {
   admitResident,
   type Chapter,
@@ -532,8 +539,13 @@ export class Continuity {
   }
   localSave(state: State) {
     this.nativeOnly();
+    const run = exportRun(state);
+    const journal = displayJournal(state) ?? journalWatch(state.people[0]!);
+    const saved = structuredClone(run);
+    delete (saved.state as any).hf.run;
     return JSON.stringify({
-      run: exportRun(state),
+      run: saved,
+      journal,
       runId: this.runId,
       fileOrigin: this.fileOrigin,
       heads: this.heads,

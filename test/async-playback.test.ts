@@ -287,9 +287,10 @@ it('saves the accepted minute and schedules playback after an in-flight shelf pr
   expect(state.minute).toBe(1361);
   expect(JSON.parse(required(savedAfter)).run.state.minute).toBe(1361);
   const accepted = owner.responses.filter((r) => r.kind === 'accepted').at(-1)!;
-  expect(JSON.stringify(JSON.parse(required(savedAfter)).run) === JSON.stringify(accepted.packet!.full)).toBe(
-    true,
-  );
+  const { admitNative } = await import('../src/file-admission.ts');
+  const { exportCurrent } = await import('../src/sim/run.ts');
+  const recovered = await admitNative(required(savedAfter));
+  expect(exportCurrent(recovered.state)).toEqual(accepted.packet!.full);
   expect(frames).toBeGreaterThan(framesBefore);
   expect(next).toBeDefined();
 });

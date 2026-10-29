@@ -1,3 +1,4 @@
+import { readRunHistory } from '@adam0white/human-framework';
 import { expect, it } from 'vitest';
 import { archiveWatch, openWatch, verifyWatch } from '../src/sim/hf4.ts';
 
@@ -6,7 +7,7 @@ it('authors five canonical actors and preserves the complete shared run through 
   const watch = openWatch(7);
   expect(watch.people.map((p) => p.id)).toEqual(['dai', 'callum', 'nerys', 'bilal', 'wren']);
   const archive = archiveWatch(watch.people[0]!);
-  expect(archive.run.engine.package).toBe('@adam0white/human-framework@4.8.0');
+  expect(archive.run.engine.package).toBe('@adam0white/human-framework@4.14.0');
   expect(verifyWatch(watch.people[0]!).verified).toBe(true);
   expect(() => {
     (watch.people[0]!.body as { health: number }).health = 0;
@@ -73,8 +74,8 @@ it('starts a conditional pair only after both decisions and records each reached
   expect(first?.status).toBe('completed');
   expect(people[0]!.activity).toBeNull();
   expect(people[1]!.activity).not.toBeNull();
-  const resolved = archiveWatch(people[0]!)
-    .run.history.flatMap((x) => x.inputs)
+  const resolved = readRunHistory(archiveWatch(people[0]!).run)
+    .flatMap((x) => x.inputs)
     .filter((x) => x.kind === 'action.resolved' && x.payload.stage === 'finish');
   expect(resolved).toHaveLength(2);
   expect(finish(people[1]!, { action: 'read', at: people[1]!.now, status: 'completed' })?.status).toBe(

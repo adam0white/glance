@@ -6,15 +6,15 @@ import { required } from './required.ts';
 
 it('starts every original person with persisted published plain narration', () => {
   const state = newGame(42);
-  expect(FRAMEWORK_VERSION).toBe('4.8.0');
+  expect(FRAMEWORK_VERSION).toBe('4.14.0');
   expect(state.people).toHaveLength(5);
   for (const person of state.people) {
-    expect(person.engine).toBe('4.8.0');
+    expect(person.engine).toBe('4.14.0');
     expect(Object.isFrozen(person)).toBe(true);
     expect(person.body.bladder).toBeDefined();
   }
   const file = exportCurrent(state);
-  expect(file.framework).toBe('4.8.0');
+  expect(file.framework).toBe('4.14.0');
   expect(exportCurrent(importCurrent(structuredClone(file)))).toEqual(file);
 });
 
@@ -36,4 +36,28 @@ it('refuses an edited full retained actor without changing the candidate', () =>
   const before = structuredClone(bad);
   expect(() => importCurrent(bad)).toThrow();
   expect(bad).toEqual(before);
+});
+
+it('refuses a 4.8 watch before replacement and preserves its bytes', async () => {
+  const { archiveWatch, restoreWatch } = await import('../src/sim/hf4.ts');
+  const archive = structuredClone(archiveWatch(newGame(7).people[0]!));
+  archive.run = {
+    ...archive.run,
+    engine: { ...archive.run.engine, package: '@adam0white/human-framework@4.8.0' },
+  };
+  const before = structuredClone(archive);
+  expect(() => restoreWatch(archive)).toThrow(/Keep the file.*start a new/i);
+  expect(archive).toEqual(before);
+});
+
+it('pins current replay bytes for the HF 4.14 engine identity', async () => {
+  const { createHash } = await import('node:crypto');
+  const state = newGame(7);
+  queueInput(state, { kind: 'ask', keeper: 'dai', job: 'level' });
+  for (let minute = 0; minute < 20; minute++) step(state);
+  const file = exportCurrent(state);
+  expect(createHash('sha256').update(JSON.stringify(file)).digest('hex')).toBe(
+    'a1a5ef4b2e4910858be7b7dece1f7828be761aa9cd7ffbb981e635c2a8c649c7',
+  );
+  expect(exportCurrent(importCurrent(structuredClone(file)))).toEqual(file);
 });

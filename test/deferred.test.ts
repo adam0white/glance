@@ -1,3 +1,4 @@
+import { readRunHistory } from '@adam0white/human-framework';
 import { beforeAll, expect, it } from 'vitest';
 import { cloneState, newGame, queueInput, step, walkFor } from '../src/sim/dam.ts';
 import {
@@ -102,7 +103,7 @@ it('retains the actual daily review narration without a local guilt formula', ()
   const p = scheduledReview.people[0]!;
   expect(p.review.last).toBeDefined();
   expect(typeof reviewLine(p)).toBe('string');
-  expect(archiveWatch(p).run.history.length).toBeGreaterThan(0);
+  expect(readRunHistory(archiveWatch(p).run).length).toBeGreaterThan(0);
 });
 it('replays the complete current public frontier and refuses stripped inputs with retained people', () => {
   const s = newGame(7);

@@ -49,7 +49,7 @@ vi.mock('@adam0white/lab-client', async (importOriginal) => ({
   watchPersonaCheckpoint: () => () => {},
 }));
 function localFixture(s: GameState) {
-  return { run: exportRun(s, '4.8.0'), runId: 'test-run', heads: [], fileOrigin: false, sources: [] };
+  return { run: exportRun(s, '4.14.0'), runId: 'test-run', heads: [], fileOrigin: false, sources: [] };
 }
 async function click(id: string) {
   const button = document.getElementById(id);
@@ -540,7 +540,7 @@ describe('saved lightning comparison', () => {
     for (let n = 0; n < 50 && !run.flashes.length; n++) step(run);
     expect(run.flashes.length).toBeGreaterThan(0);
     for (let n = 0; n < 31; n++) step(run);
-    saved = exportRun(run, '4.8.0');
+    saved = exportRun(run, '4.14.0');
   });
   it('offers the saved image after the actual scene flash expires without changing the watch', async () => {
     const source = restoreState(structuredClone(saved.state));
@@ -569,7 +569,7 @@ describe('saved lightning comparison', () => {
       saved.state.rules,
       saved.state.applied,
     );
-    expect(exportRun(run, '4.8.0')).toEqual(saved);
+    expect(exportRun(run, '4.14.0')).toEqual(saved);
   });
 });
 
@@ -608,7 +608,7 @@ it('keeps quiet feedback choices local until Submit and uses the SDK literal lab
   await vi.waitFor(() => expect(lab.sendFeedback).toHaveBeenCalledOnce());
   expect(vi.mocked(lab.sendFeedback).mock.calls[0]?.[0]).toBe("I'm confused");
   expect(vi.mocked(lab.sendFeedback).mock.calls[0]?.[1]?.run).toEqual(
-    (await import('../src/sim/dam.ts')).exportRun(state(debug), '4.8.0'),
+    (await import('../src/sim/dam.ts')).exportRun(state(debug), '4.14.0'),
   );
 });
 

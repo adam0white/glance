@@ -55,7 +55,7 @@ async function input(id = 'callum') {
     castRevision: cast.revision,
     branchId: 'recovery-control',
     parentRevision: null,
-    source: { game: 'glance', build: 'actual-public-opening', engine: '4.8.0', rules: 'glance-hf48-1' },
+    source: { game: 'glance', build: 'actual-public-opening', engine: '4.14.0', rules: 'glance-hf414-1' },
     transfer: { castPassport: `hf-portable-person/${part.value.version}`, portable: part.value },
     limitations: [],
   });

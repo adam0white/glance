@@ -1,3 +1,15 @@
+# Glance HF 4.14 migration — delivery in progress
+
+Remaining: exact source CI, merge PR #12, exact merged-commit CI, normal deployment, clean matching release manifest and live Chromium/WebKit checks. Adam accepts feel and readiness separately. Report: `~/code/.lab-scratch/codex/glance-hf413.md`.
+
+Retargeted the prepared 4.13 migration to published HF 4.14.0, client 0.5.13 and kit 0.5.30. The client embeds exactly 4.14.0; the kit peer range accepts 0.5.13. No provisional pins remain. Read published CHANGELOG from 4.8.1 through 4.14.0. Glance does not branch live Runs, so the new `forkRun` API needs no adoption. Untrusted files still use restore and complete replay validation. No newborn or retelling inputs are used.
+
+The prepared public history/journal recovery, atomic matching autosave, word-only live readings, game-authored verdict/reason phrasebooks and removal of both host narration adapters remain. Complete native exports remain authoritative. The 4.14 game/host/passport edition refuses older saves with the plain keep-file/start-fresh message.
+
+Replay hash: historical HF3 fixtures/tests remain unchanged. The current seed7 twenty-minute action/export pin changes from `818813373f6a48a8ff1194b66f84c9fd9e78b13ac3bedf290a21a04c1c27cf54` (4.13) to `a1a5ef4b2e4910858be7b7dece1f7828be761aa9cd7ffbb981e635c2a8c649c7` for the exact 4.14 engine and game edition identities. No physics, difficulty, actor or RNG tuning is included. Full native recovery, independent HF replay and identical continuation remain required.
+
+Hosted-review waiver: coordinator ruling 2026-10-29T09:25Z. The owner requests no extra review for this task. No hosted request or extra reviewer is launched. Existing owner/playtest limits below remain.
+
 # Glance Nerys viewing — frozen source handoff
 
 Remaining: ONE independent default Codex review of the frozen source packet, same-author/same-reviewer fixes, then root’s normal precommit lane, signed source/exact CI, matched merge/main CI, clean live delivery and cleanup. No commit, push, deployment or owner acceptance is authorized in this author step. No whole Nerys/Glance closure.

@@ -19,7 +19,7 @@ export type Reservation = Preparation & {
   revision: number;
   dispatch: string | null;
 };
-export async function checkPreparation(p: Preparation) {
+export async function checkPreparation(p: Preparation, current = true) {
   if (
     !p ||
     typeof p.id !== 'string' ||
@@ -44,12 +44,14 @@ export async function checkPreparation(p: Preparation) {
     (!p.basis || typeof p.basis.runId !== 'string' || !/^[a-f0-9]{64}$/.test(p.basis.sha256))
   )
     throw Error('Invalid prior native basis.');
+  if (current && (p.source?.engine !== FRAMEWORK_VERSION || p.source?.rules !== RULES))
+    throw Error('This prepared watch uses an older or unsupported version. Keep the file. Start a new game.');
   const native = safeFile(p.candidate);
   const ids = ALLOCATION.map((c) => c.castId).sort();
   if (
     p.source?.game !== 'glance' ||
-    p.source.engine !== FRAMEWORK_VERSION ||
-    p.source.rules !== RULES ||
+    p.source.engine !== native.run?.framework ||
+    p.source.rules !== native.run?.state?.hf?.run?.host?.edition ||
     !p.source.build.endsWith(`.run-${native.runId}`) ||
     canonicalPersona(Object.keys(p.expectedHeads ?? {}).sort()) !== canonicalPersona(ids) ||
     Object.values(p.expectedHeads).some((head) => head !== null && !/^[a-f0-9]{64}$/.test(head)) ||
@@ -109,7 +111,7 @@ export class PreparationStore {
   async read(id: string) {
     const record = (await this.list()).find((r) => r.id === id);
     if (!record) throw Error('The prepared opening is missing.');
-    await checkPreparation(record);
+    await checkPreparation(record, false);
     return record;
   }
   /** New reservation only. Existing operations must use an exact conditional transition. */
