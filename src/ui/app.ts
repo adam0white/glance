@@ -550,7 +550,7 @@ function fileChooser() {
     } catch {
       if (continuity.isFileSelection(selection) && result?.isConnected)
         result.textContent =
-          'That saved file could not be loaded. Your current file is unchanged. Choose another file.';
+          'That saved file could not be loaded. Keep the file. Start a new game at the ordinary address, or choose another file. Your current file is unchanged.';
     }
     if (continuity.isFileSelection(selection)) {
       file.value = '';

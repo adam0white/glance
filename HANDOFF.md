@@ -10,6 +10,8 @@ Replay hash: historical HF3 fixtures/tests remain unchanged. The current seed7 t
 
 Hosted-review waiver: coordinator ruling 2026-10-29T09:25Z. The owner requests no extra review for this task. No hosted request or extra reviewer is launched. Existing owner/playtest limits below remain.
 
+Live refusal follow-up: the first deployed file picker hid the older-version error behind “Choose another file.” The picker now explicitly says to keep the file and start a new game at the ordinary address. Native validation and accepted-file preservation are unchanged. This wording fix follows merged PR #12 directly to keep the owner's one-PR limit; its exact signed commit, CI and new deployment are recorded in the external report. The actual live old-4.13 file probe is the regression control.
+
 # Glance Nerys viewing — frozen source handoff
 
 Remaining: ONE independent default Codex review of the frozen source packet, same-author/same-reviewer fixes, then root’s normal precommit lane, signed source/exact CI, matched merge/main CI, clean live delivery and cleanup. No commit, push, deployment or owner acceptance is authorized in this author step. No whole Nerys/Glance closure.
