@@ -1,3 +1,15 @@
+# Glance HF 4.13 migration — delivery blocked
+
+Remaining: replace provisional client0.5.12/kit0.5.29 with published companions embedding exactly HF4.13.0; rerun the normal lane; exact source CI; merge this one PR; exact merged-commit CI; `npm run deploy`; live Chromium/WebKit checks and `/release.json` with the merged commit and `dirty:false`. The requested report is `~/code/.lab-scratch/codex/glance-hf413.md`. Adam accepts feel/readiness separately. Existing owner/playtest limits below remain.
+
+Read published CHANGELOG v4.13.0 from4.8.1 through4.13.0. Source now uses HF4.13, decoded `readRunHistory`, public journal autosave recovery and word-only live person readings. Keeper replies come from game-authored verdict/reason phrasebooks, including complete `{verdict}{reason}` sentences and slot-free `verdict.deferred.later`. Both host reply and review adapters are removed; dawn retains the actual framework review, including absence of a review. No invented sleep confession or alternative action replaces a recorded meaning. No newborn or retelling inputs exist in Glance, so those optional4.11 contracts require no host changes.
+
+Local saves atomically write the matching host snapshot and complete public journal in the existing localStorage value. Cold recovery verifies the journal, reconstructs the native archive and replays the complete host simulation and provenance. This first adoption re-exports a standalone complete journal each save; it does not claim incremental byte savings or persist an opaque cursor. Downloads, recording captures and file exports remain complete native archives. Unsupported saves/prepared openings refuse with a plain keep-file/start-new message; read-only access to historical reservations still validates their original source and digest and cannot transition them under the new engine.
+
+Replay-hash boundary: the existing historical HF3 byte/hash tests and fixtures remain unchanged. A current seed7 twenty-minute action/export hash is pinned at `818813373f6a48a8ff1194b66f84c9fd9e78b13ac3bedf290a21a04c1c27cf54`. This is the new HF4.13 engine/game edition identity; no RNG, difficulty or physical rules were tuned to reproduce an old hash. Any later pin change needs an engine-identity explanation, not a looser comparator.
+
+Review: hosted review is waived by the coordinator ruling2026-10-29T09:25Z as requested. No `@codex review`, Opus review or second review is requested for this task. This is an explicitly blocked source candidate, not a deployment or owner-acceptance receipt.
+
 # Glance Nerys viewing — frozen source handoff
 
 Remaining: ONE independent default Codex review of the frozen source packet, same-author/same-reviewer fixes, then root’s normal precommit lane, signed source/exact CI, matched merge/main CI, clean live delivery and cleanup. No commit, push, deployment or owner acceptance is authorized in this author step. No whole Nerys/Glance closure.

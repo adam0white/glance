@@ -1,3 +1,4 @@
+import { readRunHistory } from '@adam0white/human-framework';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   cloneState,
@@ -78,7 +79,11 @@ describe('The Glance', () => {
     const s = newGame(7);
     const a = archiveWatch(s.people[0]!);
     expect(new Set(Object.values(a.run.current.people).map((p) => JSON.stringify(p.rng))).size).toBe(5);
-    expect(a.run.history.flatMap((h) => h.inputs).some((i) => i.kind === 'quantity.observed')).toBe(true);
+    expect(
+      readRunHistory(a.run)
+        .flatMap((h) => h.inputs)
+        .some((i) => i.kind === 'quantity.observed'),
+    ).toBe(true);
   });
   it('the telegraph is pure', () => {
     const s = newGame(2);

@@ -60,9 +60,12 @@ export type BodyReadout = Extract<
   Extract<PersonView, { kind: 'host' }>['parts'][number],
   { select: 'body' }
 >['value']['readout'];
+type HostPart = Extract<PersonView, { kind: 'host' }>['parts'][number];
+type ReadingParts = { [P in HostPart as P['select']]: P['value'] };
 export type Person = Readonly<{
   id: string;
   name: string;
+  readings: Readonly<Pick<ReadingParts, 'condition' | 'affect' | 'expectations' | 'needs'>>;
   engine: string;
   schema: string;
   now: number;

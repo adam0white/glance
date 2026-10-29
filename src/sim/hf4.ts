@@ -7,6 +7,7 @@ import {
   DEFAULT_NORMS,
   type DeepReadonly,
   exportRun,
+  exportRunJournal,
   type Input,
   inspect,
   type Offer,
@@ -153,7 +154,7 @@ export class Watch {
       id: `glance:${seed}`,
       seed,
       start,
-      host: { id: 'glance', edition: 'glance-hf48-1', schema: 'glance-run/1' },
+      host: { id: 'glance', edition: 'glance-hf413-1', schema: 'glance-run/1' },
       definitions: {
         actions: actions.map((id) => ({
           id,
@@ -180,6 +181,43 @@ export class Watch {
           names: Object.fromEntries(ids.map((id, i) => [id, canonicalCast(castIds[i]!).name])),
           roles: { engineer: 'the desk' },
           prefer: 'name',
+          wordings: {
+            'suggestion.resolved': ['{verdict}{reason}'],
+            'verdict.assented': ['Yes, I’ll do that.', 'I’ll do that.'],
+            'verdict.complied': ['I’ll do it if you say so.'],
+            'verdict.cannot': ['I can’t do that yet.'],
+            'verdict.refused': ['No, I won’t do that.'],
+            'verdict.deferred': ['I’ll do {alternative} first.'],
+            'verdict.deferred.later': ['I’ll leave that until later.'],
+            'verdict.modified': ['I’ll do {alternative} instead.'],
+            'verdict.commanded': ['I’ll follow the order.'],
+            'reason.capacity': ['I cannot manage it physically.'],
+            'reason.busy': ['I’m doing something else right now.'],
+            'reason.distrust': ['I don’t trust that advice.'],
+            'reason.commanded': ['That is an order.'],
+            'reason.command': ['That is an order.'],
+            'reason.need:sleep': ['I need sleep.'],
+            'reason.need:rest': ['I need rest.'],
+            'reason.need:food': ['I need food.'],
+            'reason.need:water': ['I need water.'],
+          },
+          voices: {
+            callum: {
+              'verdict.assented': ['I’ll do it, sir.', 'I’ll go now, sir.'],
+              'verdict.complied': ['I’ll do it if you say so, sir.'],
+              'verdict.cannot': ['I can’t do that yet, sir.'],
+              'verdict.refused': ['No, I won’t do that, sir.'],
+              'verdict.deferred': ['I’ll do {alternative} first, sir.'],
+              'verdict.deferred.later': ['I’ll leave that until later, sir.'],
+              'verdict.modified': ['I’ll do {alternative} instead, sir.'],
+              'verdict.commanded': ['I’ll follow the order, sir.'],
+            },
+            bilal: {
+              'verdict.assented': ['I can do that.'],
+              'verdict.complied': ['I’ll do as you ask.'],
+              'verdict.cannot': ['I cannot do that yet.'],
+            },
+          },
           actions: Object.fromEntries(
             Object.entries({
               level: ['read the level', 'read the level', 'reading the level'],
@@ -285,8 +323,16 @@ export class Watch {
       get name() {
         return c.part(id, 'summary').name;
       },
+      get readings() {
+        return immutable({
+          condition: c.part(id, 'condition'),
+          affect: c.part(id, 'affect'),
+          expectations: c.part(id, 'expectations'),
+          needs: c.part(id, 'needs'),
+        });
+      },
       engine: FRAMEWORK_VERSION,
-      schema: 'hf-run/5',
+      schema: 'hf-run/7',
       get now() {
         return c.at / MINUTE;
       },
@@ -381,6 +427,12 @@ export class Watch {
                 }
               : {}),
           } as DecisionRecord);
+      for (const e of result.events)
+        if (e.person && e.data.kind === 'suggestion-resolved') {
+          const decision = this.decisions.get(e.person);
+          if (decision?.suggestion && decision.id === e.data.decisionId)
+            decision.suggestion.says = e.narration.map((x) => x.text).join(' ');
+        }
       if (result.boundary.type === 'until') {
         this.pending = undefined;
         return { ...result, events };
@@ -622,8 +674,17 @@ export function archiveWatch(p: Person): WatchArchive {
     reviewLines: [...c.reviewLines],
   };
 }
+/** Export the complete accepted journal for an atomic local save. */
+export function journalWatch(p: Person) {
+  const { opening, chunk, head } = need(exportRunJournal(watch(p).run));
+  if (!opening) throw Error('Missing journal opening.');
+  return { opening, chunks: chunk ? [chunk] : [], head };
+}
 export function restoreWatch(a: WatchArchive) {
-  if (a.format !== 'glance-hf4/1')
+  if (
+    a.format !== 'glance-hf4/1' ||
+    a.run?.engine.package !== `@adam0white/human-framework@${FRAMEWORK_VERSION}`
+  )
     throw Error('This saved watch uses the older person engine. Keep the file; start a new watch.');
   const c = Object.create(Watch.prototype) as Watch;
   c.run = need(restoreRun(a.run));
@@ -1041,9 +1102,10 @@ export function predict(p: Person, affordances: readonly Affordance[], suggestio
   const d = r.possibilities.find((e) => e.data.kind === 'decision');
   if (d?.data.kind !== 'decision') throw Error('No hypothetical decision');
   const rec = d.data.decision as DecisionRecord;
+  const reply = r.possibilities.find((e) => e.data.kind === 'suggestion-resolved');
   return {
     ...rec.suggestion,
-    says: d.narration.map((n) => n.text).join(' '),
+    says: (reply ?? d).narration.map((n) => n.text).join(' '),
     verdict: rec.suggestion?.verdict ?? 'refused',
   } as NonNullable<DecisionRecord['suggestion']>;
 }

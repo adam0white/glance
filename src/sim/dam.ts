@@ -47,7 +47,6 @@ import {
   type WatchArchive,
 } from './hf4.ts';
 import { callumAway, recallCallum, recallDai } from './keeper-scenes.ts';
-import { keeperAnswer, keeperReview } from './keeper-voice.ts';
 import { ENGINEER, KEEPERS, type KeeperId, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
 import {
   advanceOutcomes,
@@ -100,7 +99,7 @@ import {
   weirOf,
 } from './water.ts';
 
-export const GAME_VERSION = 'glance@hf48-2';
+export const GAME_VERSION = 'glance@hf413-1';
 export const NIGHTS = 12;
 export interface WatchRules {
   edition: 'extended-2';
@@ -1770,7 +1769,7 @@ function keeperMinute(s: GameState, k: KeeperState, _rain: number) {
     if (r) {
       if (r.verdict === 'refused') k.night.refused += 1;
       if (r.verdict === 'complied') k.night.complied += 1;
-      if (!wasDeferred || r.verdict !== 'deferred') say(s, k.id, flavour(s, k.id, r), 'answer');
+      if (!wasDeferred || r.verdict !== 'deferred') say(s, k.id, r.says, 'answer');
       if (r.verdict === 'deferred' && !wasDeferred) {
         const d: KeeperState['deferred'] = { s: voice.s, job: voice.job, until: s.minute + 30 };
         if (voice.target !== undefined) d.target = voice.target;
@@ -1799,11 +1798,6 @@ function idleOffers(s: GameState, k: KeeperState): Affordance[] {
   const lastLevel = [...s.reports].reverse().find((r) => r.who === k.id && r.gauge === 'level');
   const stale = !lastLevel || s.minute - lastLevel.at > 50;
   return all.filter((o) => o.id === 'stove' || (o.id === 'level' && stale));
-}
-
-/** HF's answer, in his voice where HF's words are generic. The pick is keyed by seed and minute, so replay holds. */
-function flavour(s: GameState, id: KeeperId, r: SuggestionResolution): string {
-  return keeperAnswer(s.seed, s.night, s.minute, id, r);
 }
 
 function startJob(
@@ -2121,23 +2115,8 @@ function aboutYou(s: GameState, k: KeeperState, overtopped: boolean): string {
       ]);
 }
 
-/**
- * A recorded involuntary doze can be confessed at dawn. The later HF review remains
- * unchanged; this physical account does not create a missed-watch review record.
- */
-function ownWatchLine(s: GameState, id: KeeperId, line: string): string {
-  const k = keeperOf(s, id);
-  return keeperReview(
-    s.seed,
-    s.night,
-    id,
-    line,
-    k.dozes.some((d) => d.to > d.from),
-  );
-}
-
 /** Retain the actual HF review of this watch before a later morning review replaces it.
- * Cause changes narration only. The recorded missed/kept/resolved entries stay as HF wrote them.
+ * The event-time wording and missed/kept/resolved entries stay as HF wrote them.
  */
 function retainWatchReview(s: GameState, k: KeeperState, p: Person) {
   const review = p.review?.last;
@@ -2150,18 +2129,7 @@ function retainWatchReview(s: GameState, k: KeeperState, p: Person) {
   if (JSON.stringify(k.watchReview) === JSON.stringify(review)) return;
   if (k.watchReview?.missed.includes('my watch') && !review.missed.includes('my watch')) return;
   k.watchReview = structuredClone(review);
-  k.watchReviewLine = ownWatchLine(
-    s,
-    k.id,
-    (
-      reviewLine(p, {
-        variety: true,
-        ...(k.orderedNap && review.missed.length === 1 && review.missed[0] === 'my watch'
-          ? { cause: 'ordered' as const }
-          : {}),
-      }) ?? ''
-    ).replace(/^Today/, 'Tonight'),
-  );
+  k.watchReviewLine = reviewLine(p);
 }
 
 function houseFate(firstAt: number | null, warnedAt: number | null): 'dry' | 'saved' | 'flooded' {
@@ -2270,11 +2238,7 @@ function closeNight(s: GameState, overtopped: boolean) {
       .filter((k) => k.on && !physicallyAway(s, k.id))
       .map((k) => ({
         id: k.id,
-        line: ownWatchLine(
-          s,
-          k.id,
-          s.rules ? (k.watchReviewLine ?? '') : (reviewLine(personOf(s, k.id)) ?? ''),
-        ),
+        line: s.rules ? (k.watchReviewLine ?? '') : reviewLine(personOf(s, k.id)),
         aboutYou: aboutYou(s, k, overtopped),
       })),
   };

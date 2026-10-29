@@ -101,3 +101,23 @@ it('keeps recording changes separate from identity cancellation', () => {
   expect(invalidate).not.toHaveBeenCalled();
   close();
 });
+
+it('stores a journal with the host snapshot and refuses corrupted journal or host data', async () => {
+  const { c } = harness();
+  const state = await c.fresh(19, true);
+  queueInput(state, { kind: 'ring' });
+  step(state);
+  const text = c.localSave(state);
+  const save = JSON.parse(text);
+  expect(save.journal.opening.format).toBe('hf-run-journal');
+  expect(save.journal.chunks.length).toBeGreaterThan(0);
+  expect(save.run.state.hf.run).toBeUndefined();
+  const restored = await harness().c.loadLocal(text);
+  expect(exportCurrent(restored)).toEqual(exportCurrent(state));
+  const badJournal = structuredClone(save);
+  badJournal.journal.head.digest = '0'.repeat(64);
+  await expect(harness().c.loadLocal(JSON.stringify(badJournal))).rejects.toThrow();
+  const badHost = structuredClone(save);
+  badHost.run.state.minute++;
+  await expect(harness().c.loadLocal(JSON.stringify(badHost))).rejects.toThrow();
+});

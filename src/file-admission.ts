@@ -2,6 +2,7 @@
  * module runs in the owning worker; no editable marker or matching copy admits a
  * Person. Unsupported HF3, source families and ownership records are refused. */
 
+import { exportRun, restoreRunJournal } from '@adam0white/human-framework';
 import { canonicalPersona } from '@adam0white/lab-client';
 import { checkPreparation, type Reservation } from './preparation-store.ts';
 import type { GameState } from './sim/dam.ts';
@@ -65,6 +66,12 @@ export async function admitPublic(raw: any) {
 }
 export async function admitNative(text: string) {
   const raw = safeFile(text);
+  if (raw.journal !== undefined) {
+    if (!raw.run?.state?.hf || Object.hasOwn(raw.run.state.hf, 'run')) throw Error('Invalid journal save.');
+    const restored = restoreRunJournal(raw.journal);
+    if (!restored.ok) throw Error('The saved journal could not be verified.');
+    raw.run.state.hf.run = exportRun(restored.value.run);
+  }
   const { state } = await admitPublic(raw);
   let preparation: Reservation | undefined;
   if (raw.preparation !== undefined) {

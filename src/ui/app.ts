@@ -9,6 +9,7 @@ import { required } from '../required.ts';
 import { displayOwner } from '../sim/display.ts';
 import { callumAway, daiAway, type KeeperSceneAction, keeperSceneAvailable } from '../sim/keeper-scenes.ts';
 import { type RotaAction, rotaAvailable, rotaAway, rotaStatus, rotaTerms } from '../sim/rota.ts';
+import { liveWords } from './live-readings.ts';
 import { catchWords, durationWords } from './watch-copy.ts';
 
 /**
@@ -1393,7 +1394,14 @@ function drawSheet() {
     : activity === 'doze' || activity === 'nap'
       ? 'Wait for his answer. If he does not answer, call again.'
       : '';
-  if (sheet.kind === 'keeper') body += castConversations([who]);
+  if (sheet.kind === 'keeper') {
+    body += `<details class="current-readings"><summary>Current condition</summary><p class="soft">These are the game’s current readings of this person. Feelings are private; they are not radio reports or a measure of reading accuracy.</p>${liveWords(
+      personOf(s, who),
+    )
+      .map((line) => `<p>${esc(line)}</p>`)
+      .join('')}</details>`;
+    body += castConversations([who]);
+  }
   if (sheet.kind === 'gauge') body += readingNote(s, s.board[sheet.gauge]);
   body += `<p class="hint call-advice" ${callAdvice ? '' : 'hidden'}>${callAdvice}</p>`;
   const forecastOpen = el.querySelector<HTMLDetailsElement>('details.fore')?.open ?? false;

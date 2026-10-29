@@ -1,3 +1,4 @@
+import { readRunHistory } from '@adam0white/human-framework';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   cloneState,
@@ -119,8 +120,8 @@ describe('a physical skipped reading', () => {
   let s: ReturnType<typeof newGame>;
   let beforeSkip: number;
   const observations = () =>
-    archiveWatch(s.people[0]!)
-      .run.history.flatMap((h) => h.inputs)
+    readRunHistory(archiveWatch(s.people[0]!).run)
+      .flatMap((h) => h.inputs)
       .filter((i) => i.kind === 'quantity.observed').length;
   beforeAll(() => {
     s = newGame(1);

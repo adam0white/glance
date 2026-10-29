@@ -9,6 +9,7 @@ export type InspectionPacket = {
   host: Omit<GameState, 'people'>;
   people: Person[];
   bodies: BodyReadout[];
+  journal: ReturnType<typeof import('./hf4.ts').journalWatch>;
 };
 export type DisplayOwner = {
   preview: (person: string, kind: ForecastKind, payload: unknown) => unknown;
@@ -42,6 +43,7 @@ export function displayState(packet: InspectionPacket, owner: DisplayOwner, held
   return state;
 }
 export const displayArchive = (state: GameState) => states.get(state)?.packet.full.state;
+export const displayJournal = (state: GameState) => states.get(state)?.packet.journal;
 export const displayOwner = (state: GameState) => states.get(state)?.owner;
 export const displayBody = (person: Person) => {
   const d = actors.get(person);
