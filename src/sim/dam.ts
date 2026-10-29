@@ -47,6 +47,7 @@ import {
   type WatchArchive,
 } from './hf4.ts';
 import { callumAway, recallCallum, recallDai } from './keeper-scenes.ts';
+import { keeperAnswer, keeperReview } from './keeper-voice.ts';
 import { ENGINEER, KEEPERS, type KeeperId, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
 import {
   advanceOutcomes,
@@ -69,7 +70,7 @@ import {
   requestPrivate,
   returnForRiver,
 } from './private-scenes.ts';
-import { type Clarity, estimateRead, hedge, spoken, spokenFine } from './reading.ts';
+import { type Clarity, estimateRead, hedge, skipsWalk, spoken, spokenFine } from './reading.ts';
 import { DRAW, hashNormal, hashUnit } from './rng.ts';
 import { recallRota, rotaAway, rotaBusy, rotaStatus } from './rota.ts';
 import {
@@ -99,7 +100,7 @@ import {
   weirOf,
 } from './water.ts';
 
-export const GAME_VERSION = 'glance@hf48-1';
+export const GAME_VERSION = 'glance@hf48-2';
 export const NIGHTS = 12;
 export interface WatchRules {
   edition: 'extended-2';
@@ -1697,7 +1698,7 @@ function weatherAt(s: GameState): number {
   return Math.min(1, r / 14 + (planOf(s).radio ? 0.2 : 0));
 }
 
-function keeperMinute(s: GameState, k: KeeperState, rain: number) {
+function keeperMinute(s: GameState, k: KeeperState, _rain: number) {
   const p = personOf(s, k.id);
   if (s.rules) {
     const sitting =
@@ -1740,7 +1741,25 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
   if (s.pauseRequested && !a && !k.pending) return;
   const offers = idleOffers(s, k).filter((o) => !a || o.id !== a.affordanceId || k.pending);
   const voice = k.pending ?? (!a && k.deferred && s.minute <= k.deferred.until ? k.deferred : null);
-  const voiceOffers = voice ? offersFor(s, k.id, voice.target) : offers;
+  const available = voice ? offersFor(s, k.id, voice.target) : offers;
+  const shortcuts = new Set(
+    available
+      .filter((o) => {
+        const prior = o.id === 'level' || o.id === 'weir' ? s.board[o.id] : undefined;
+        return (
+          !!prior &&
+          skipsWalk(
+            p,
+            o.id,
+            s.minute - prior.at,
+            hashUnit(s.seed, DRAW.skip, s.night, s.minute, KEEPERS.indexOf(k.id)),
+          )
+        );
+      })
+      .map((o) => o.id),
+  );
+  // Register the actual short physical activity before HF chooses and starts it.
+  const voiceOffers = available.map((o) => (shortcuts.has(o.id) ? { ...o, duration: 4 } : o));
   const rec: DecisionRecord = decide(p, voiceOffers, voice ? { suggestion: voice.s } : {});
   let target: number | undefined;
   if (voice) {
@@ -1771,7 +1790,7 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
     return;
   }
   if (a) endActivity(p, 'interrupted', s.minute);
-  startJob(s, k, p, aff, rec, target, rain);
+  startJob(s, k, p, aff, rec, target, shortcuts.has(aff.id));
 }
 
 /** What he weighs when nobody is asking: the stove, and (Dai's habit) a look at the level now and then. */
@@ -1783,8 +1802,8 @@ function idleOffers(s: GameState, k: KeeperState): Affordance[] {
 }
 
 /** HF's answer, in his voice where HF's words are generic. The pick is keyed by seed and minute, so replay holds. */
-function flavour(_s: GameState, _id: KeeperId, r: SuggestionResolution): string {
-  return r.says;
+function flavour(s: GameState, id: KeeperId, r: SuggestionResolution): string {
+  return keeperAnswer(s.seed, s.night, s.minute, id, r);
 }
 
 function startJob(
@@ -1794,15 +1813,12 @@ function startJob(
   aff: Affordance,
   rec: DecisionRecord,
   target: number | undefined,
-  _rain: number,
+  skip: boolean,
 ) {
   const job = aff.id as Job;
-  // An actual read requires walking. HF chooses work/rest; the host invents no skipped cognition.
-  const skip = false;
   const to = skip ? k.place : DEST[job];
   const walk = walkFor(s, k.place, to);
-  const a2 = skip ? { ...aff, duration: 4 } : aff;
-  if (!begin(p, a2, rec)) {
+  if (!begin(p, aff, rec)) {
     k.idleUntil = s.minute + 4;
     return;
   }
@@ -1961,8 +1977,8 @@ function readGauge(s: GameState, who: KeeperId, gauge: Gauge, skipped: boolean):
     value,
     truth: round3(truth),
     conf: round3(conf),
-    clarity: round3(conf),
-    cause: skipped ? 'skipped' : 'unattributed',
+    clarity: round3(estimate?.clarity ?? prior!.clarity),
+    cause: skipped ? 'skipped' : estimate!.cause,
     skipped,
   };
   s.reports.push(r);
@@ -2106,11 +2122,18 @@ function aboutYou(s: GameState, k: KeeperState, overtopped: boolean): string {
 }
 
 /**
- * HF's review line in his own words. The review itself (did he keep his promise to stay awake) is HF's; the
- * wording of a broken watch varies by night, because the same sentence every dawn read as a template.
+ * A recorded involuntary doze can be confessed at dawn. The later HF review remains
+ * unchanged; this physical account does not create a missed-watch review record.
  */
-function ownWatchLine(_s: GameState, _id: KeeperId, line: string): string {
-  return line;
+function ownWatchLine(s: GameState, id: KeeperId, line: string): string {
+  const k = keeperOf(s, id);
+  return keeperReview(
+    s.seed,
+    s.night,
+    id,
+    line,
+    k.dozes.some((d) => d.to > d.from),
+  );
 }
 
 /** Retain the actual HF review of this watch before a later morning review replaces it.
@@ -2127,14 +2150,18 @@ function retainWatchReview(s: GameState, k: KeeperState, p: Person) {
   if (JSON.stringify(k.watchReview) === JSON.stringify(review)) return;
   if (k.watchReview?.missed.includes('my watch') && !review.missed.includes('my watch')) return;
   k.watchReview = structuredClone(review);
-  k.watchReviewLine = (
-    reviewLine(p, {
-      variety: true,
-      ...(k.orderedNap && review.missed.length === 1 && review.missed[0] === 'my watch'
-        ? { cause: 'ordered' as const }
-        : {}),
-    }) ?? ''
-  ).replace(/^Today/, 'Tonight');
+  k.watchReviewLine = ownWatchLine(
+    s,
+    k.id,
+    (
+      reviewLine(p, {
+        variety: true,
+        ...(k.orderedNap && review.missed.length === 1 && review.missed[0] === 'my watch'
+          ? { cause: 'ordered' as const }
+          : {}),
+      }) ?? ''
+    ).replace(/^Today/, 'Tonight'),
+  );
 }
 
 function houseFate(firstAt: number | null, warnedAt: number | null): 'dry' | 'saved' | 'flooded' {
@@ -2243,12 +2270,11 @@ function closeNight(s: GameState, overtopped: boolean) {
       .filter((k) => k.on && !physicallyAway(s, k.id))
       .map((k) => ({
         id: k.id,
-        line: s.rules
-          ? k.dozes.some((d) => d.to > d.from && d.from < watchTo(night) && d.to > watchFrom(night)) &&
-            k.watchReview?.kept.includes('my watch')
-            ? ''
-            : (k.watchReviewLine ?? '')
-          : ownWatchLine(s, k.id, reviewLine(personOf(s, k.id)) ?? ''),
+        line: ownWatchLine(
+          s,
+          k.id,
+          s.rules ? (k.watchReviewLine ?? '') : (reviewLine(personOf(s, k.id)) ?? ''),
+        ),
         aboutYou: aboutYou(s, k, overtopped),
       })),
   };

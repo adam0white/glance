@@ -174,3 +174,27 @@ it('reports a current recovery failure without replacing the saved watch', async
     'Controlled current recovery rejection',
   );
 });
+
+it('offers a new game for an incompatible browser save without a resume loop', async () => {
+  const saved = JSON.parse(native);
+  saved.run.framework = '3.0.0';
+  const old = JSON.stringify(saved);
+  localStorage.setItem(LOCAL_KEY, old);
+  const app = await import('../src/ui/app.ts');
+  app.start();
+  expect(document.body.textContent).toContain('This watch was saved by an older version. Start a new game.');
+  expect(document.getElementById('cont')).toBeNull();
+  expect(document.getElementById('retry-start')).toBeNull();
+  expect(localStorage.getItem(LOCAL_KEY)).toBe(old);
+});
+
+it('keeps preparation errors in Debug and gives the player a clear message', async () => {
+  const { Continuity } = await import('../src/continuity.ts');
+  vi.spyOn(Continuity.prototype, 'recoverPrepared').mockRejectedValue(Error('private diagnostic'));
+  const host = document.getElementById('prepared-openings')!;
+  expect(host.textContent).not.toContain('shelf claim');
+  host.querySelector('button')!.click();
+  await settle();
+  expect(host.textContent).toContain('Could not open the saved game. Your saved watch is unchanged.');
+  expect(host.querySelector('details pre')?.textContent).toContain('private diagnostic');
+});

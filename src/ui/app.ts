@@ -38,6 +38,7 @@ import {
   cloneState,
   EXTENDED_PLANS,
   exportRun,
+  GAME_VERSION,
   type GameState,
   type Gauge,
   type Hint,
@@ -399,13 +400,18 @@ function title() {
   skipUntil = 0;
   lab.screen('title');
   const save = readSave();
+  const incompatible =
+    !!save?.run &&
+    (save.run.framework !== FRAMEWORK_VERSION ||
+      save.run.game !== GAME_VERSION ||
+      save.run.state?.version !== GAME_VERSION);
   app.innerHTML = `<div class="page screen title-screen">${topbar('', true)}
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">You work at a night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
     <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(true)}</p>
-    <label for="dam-choice">Dam for a new game</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><details><summary>Life during the watch</summary><p>Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing.</p><p>The keepers may choose joint handover, record correction and covered rest. Dai’s visit and retirement and home-rest proposals take time; proposals await responses. A visit needs chosen cover, attendance and return. Nerys’s telescope trip, Bilal’s shadow play and post, and Wren’s appendix are available when their duties allow. Each person chooses; attended scenes take time. No sighting, reply or habitat finding is promised.</p></details>
-    <p id="continuity-status" role="status">${esc(continuity.status)}</p><div id="prepared-openings" role="status"></div>${debugFooter()}</div>
-    <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">Saved watch</p><p id="resume-status" role="status"></p><button id="cancel-resume" hidden>Cancel opening</button><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
+    <label for="dam-choice">Dam for a new game</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><details><summary>Life during the watch</summary><p>Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing.</p><p>The keepers may choose joint handover, record correction and covered rest. Dai’s visit and retirement and home-rest proposals take time; proposals await responses. A visit needs chosen cover, attendance and return. Nerys can take her telescope out, Bilal can perform a shadow play and write a post, and Wren can write an appendix to her field report when their duties allow. Each person chooses; attended scenes take time. No sighting, reply or habitat finding is promised.</p></details>
+    <div id="prepared-openings" role="status"></div>${debugFooter()}</div>
+    <div class="actionbar title-actions">${save ? `${incompatible ? '<p>This watch was saved by an older version. Start a new game.</p>' : '<button class="primary" id="cont">Resume</button><p class="save-time">Saved watch</p>'}<p id="resume-status" role="status"></p><button id="cancel-resume" hidden>Cancel opening</button><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new game? This replaces your saved watch after the new game is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
     </div></div>`;
   bindTopbar();
   drawDawn(document.getElementById('sample-chart') as HTMLCanvasElement, SAMPLE_DAWN);
@@ -421,8 +427,7 @@ function title() {
       const pending = records;
       const host = document.getElementById('prepared-openings');
       if (!host || !pending.length) return;
-      host.innerHTML =
-        '<p>A complete prepared opening is saved. Its shelf claim must be confirmed before it can open. Your current saved watch stays available.</p>';
+      host.innerHTML = '<p>A saved game is ready to check. Your saved watch stays available.</p>';
       for (const record of pending) {
         const button = document.createElement('button');
         button.textContent = 'Check prepared opening';
@@ -439,7 +444,14 @@ function title() {
           } catch (error) {
             if (attempt !== openingAttempt || !host.isConnected) return;
             const message = document.createElement('p');
-            message.textContent = String(error);
+            message.textContent = 'Could not open the saved game. Your saved watch is unchanged.';
+            const details = document.createElement('details');
+            const summary = document.createElement('summary');
+            summary.textContent = 'Debug';
+            const diagnostic = document.createElement('pre');
+            diagnostic.textContent = String(error);
+            details.append(summary, diagnostic);
+            message.append(details);
             host.append(message);
           } finally {
             if (button.isConnected) button.disabled = false;
@@ -591,11 +603,19 @@ async function beginWeek(localOnly = false, chosen?: WatchRules) {
 
 function startError(error: unknown, retry: () => void, action = 'start') {
   console.error('Glance chapter failed', error);
+  const permanent =
+    action === 'load' &&
+    /This (saved watch uses an older or unsupported version|file does not replay the same way)/.test(
+      String(error),
+    );
+  const message = permanent
+    ? 'This saved watch could not be replayed. Start a new game. Your saved watch is unchanged.'
+    : `We could not ${action === 'load' ? 'resume' : 'start'} the watch. Your saved watch is unchanged. You can try again or send Feedback.`;
   const d = dialog(
     'start-error',
     action === 'load' ? 'Could not resume' : 'Could not start',
-    `<p>We could not ${action === 'load' ? 'resume' : 'start'} the week. Your saved week is unchanged. You can try again or send Feedback.</p><details><summary>Debug</summary><pre>${esc(String(error))}</pre></details>`,
-    '<button id="retry-start">Try again</button><button id="error-feedback">Feedback</button><button id="dialog-back">Back</button>',
+    `<p>${message}</p><details><summary>Debug</summary><pre>${esc(String(error))}</pre></details>`,
+    `${permanent ? '' : '<button id="retry-start">Try again</button>'}<button id="error-feedback">Feedback</button><button id="dialog-back">Back</button>`,
   );
   d.querySelector('#retry-start')?.addEventListener('click', retry);
   d.querySelector('#error-feedback')?.addEventListener('click', sendWord);
@@ -711,9 +731,9 @@ function gameMenu() {
   const d = dialog(
     'game-menu',
     `Game menu${s ? ` · ${planOf(s).title} ${clock(s.minute)}` : ''}`,
-    `<p>Time stops while this menu is open.</p><p id="continuity-status" role="status">${esc(continuity.status)}</p>
+    `<p>Time stops while this menu is open.</p>
     ${paceSetting()}<button class="reading-row" id="to-title">To the title page</button>
-    <button class="reading-row" id="send-word">Feedback</button><button class="reading-row" id="fullscreen">Full screen</button><a class="reading-row" href="${GAMES}" target="_top">All games</a>${recordSwitch('record-menu')}<button id="menu-new">New game</button><div id="menu-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="menu-confirm-new">Yes, start again</button><button id="menu-cancel-new">Cancel</button></div>${debugFooter()}`,
+    <button class="reading-row" id="send-word">Feedback</button><button class="reading-row" id="fullscreen">Full screen</button><a class="reading-row" href="${GAMES}" target="_top">All games</a>${recordSwitch('record-menu')}<button id="menu-new">New game</button><div id="menu-confirm" hidden><p>Start a new game? This replaces your saved watch after the new game is ready.</p><button id="menu-confirm-new">Yes, start again</button><button id="menu-cancel-new">Cancel</button></div>${debugFooter()}`,
     '<button class="primary" id="dialog-back">Resume</button>',
   );
   d.querySelector('#debug-download')?.addEventListener('click', download);
@@ -1512,7 +1532,7 @@ function keeperFamilyRecord(ids: CastId[]): string {
   <p>Separate choices below supply authored fictional refusals to the proposals. No real agency or partner is contacted. Both keepers must choose five minutes to read each response. Actual duty, travel, cover, lost work and rest costs remain theirs.</p>
   ${f?.daiProposal ? (f.fictionalResponses?.dai ? `<p>${esc(f.fictionalResponses.dai.text)}</p><p>Read at ${clock(f.fictionalResponses.dai.at)} after five attended minutes. Original proposal retained.</p>` : button('dai-fictional-response', 'Choose the fictional agency refusal and read with Dai · five minutes')) : ''}
   ${f?.callumProposal ? (f.fictionalResponses?.callum ? `<p>${esc(f.fictionalResponses.callum.text)}</p><p>Read at ${clock(f.fictionalResponses.callum.at)} after five attended minutes. Original proposal retained.</p>` : button('callum-fictional-responses', 'Choose the fictional agency and partner refusals and read with Callum · five minutes')) : ''}
-  ${f?.callumProposal ? `<h4>Callum’s home-rest window</h4><p>Author assumption, authored-home-window-1: a different fictional care window is available tonight after the completed proposal. This supplies new game terms, not a real partner reply. The old proposal and refusal remain unchanged. Allow ten minutes home, 120 minutes resting there and a separately chosen ten-minute return before dawn. Dai must choose and maintain dam cover throughout, for up to150 minutes including ten minutes to choose the return. He gives up his own rest and work flexibility. Pay and any lost pay are unknown. Duty, sleep, radio loss, pause or lost participation can interrupt it. No clinical benefit or safety guarantee follows.</p>${button('callum-home-rest', 'Invite Callum’s home rest with Dai covering · two hours plus travel')}` : ''}
+  ${f?.callumProposal ? `<h4>Callum’s home-rest window</h4><p>A different care window is available tonight after the completed proposal. The earlier proposal and refusal remain unchanged. Allow ten minutes home, 120 minutes resting there and a separately chosen ten-minute return before dawn. Dai must choose and maintain dam cover throughout, for up to150 minutes including ten minutes to choose the return. He gives up his own rest and work flexibility. Pay and any lost pay are unknown. Duty, sleep, radio loss, pause or lost participation can interrupt it. No clinical benefit or safety guarantee follows.</p>${button('callum-home-rest', 'Invite Callum’s home rest with Dai covering · two hours plus travel')}` : ''}
   ${home ? `<p>Home-rest request ${clock(home.requestedAt)}: ${esc(home.events.at(-1)?.status ?? 'pending')}. ${home.departedAt !== undefined ? `Departed ${clock(home.departedAt)}.` : 'No departure recorded.'} ${home.arrivedAt !== undefined ? `Arrived home ${clock(home.arrivedAt)}.` : ''} Actual home rest: ${home.homeMinutes} minutes. Actual uninterrupted cover: ${home.coveredMinutes} minutes. ${home.restCompletedAt !== undefined ? 'The rest time is finished; the return is separate.' : ''} ${home.interruptedAt !== undefined ? `Interrupted ${clock(home.interruptedAt)}. ${esc(home.reason ?? '')}` : ''} ${home.returnFrom !== undefined && home.returnedAt === undefined ? `Returning since ${clock(home.returnFrom)}; Callum is still away.` : ''} ${home.returnedAt !== undefined ? `Returned ${clock(home.returnedAt)}.` : ''} ${home.completedAt !== undefined ? 'The home-rest interval is complete.' : 'No completed interval is recorded.'}</p>` : ''}
   ${callumAway(s) ? `<p>Callum is away and cannot do dam work. Return still costs ten actual minutes.</p>${button('callum-home-return', 'Invite Callum’s return · ten minutes')}${button('stop-family', 'Interrupt the home-rest arrangement')}` : ''}
   ${f?.voicemail ? `<p>${esc(f.voicemail.text)}</p>` : button('daughter-voicemail', 'Invite Dai to play his retained voicemail · about five minutes')}
@@ -1887,7 +1907,7 @@ function practiceDialog() {
       drawDawn(result.querySelector('canvas')!, outcome.dawn);
     } catch (error) {
       if (current === attempt && result.isConnected)
-        result.textContent = `${String(error)} Your saved watch is unchanged.`;
+        result.innerHTML = `<p>Practice could not be completed. Your saved watch is unchanged.</p><details><summary>Debug</summary><pre>${esc(String(error))}</pre></details>`;
     } finally {
       job.clear();
       if (current === attempt) button.disabled = false;
