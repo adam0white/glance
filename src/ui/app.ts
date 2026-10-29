@@ -50,7 +50,6 @@ import {
   PLANS,
   personOf,
   planOf,
-  queueInput,
   type Report,
   reportWords,
   restoreState,
@@ -1894,6 +1893,7 @@ function practiceDialog() {
 function watchArrangements() {
   if (!s?.rules) return;
   const current = s;
+  const generation = continuity.generation;
   const d = dialog(
     'watch-arrangements',
     'Watch arrangements',
@@ -1915,10 +1915,10 @@ function watchArrangements() {
         '',
       )}<p>Bilal may cover gauge rounds during his five-day visit, after his repairs, travel and a briefing. He has no gate authority. His body and other duties can prevent cover.</p>${current.night >= 2 && current.minute < VISIT_UNTIL && !current.keepers.some((k) => k.id === 'bilal' && k.on) ? '<button id="invite-relief">Invite Bilal for tonight’s gauge rounds</button>' : ''}<p id="arrangement-result" role="status"></p>`,
   );
-  const enqueue = (input: Parameters<typeof queueInput>[1]) => {
-    if (s !== current) return;
-    queueInput(current, input);
-    writeSave();
+  const enqueue = async (input: NewInput) => {
+    if (s !== current || continuity.generation !== generation || !d.isConnected) return;
+    if (!(await inputNow(current, input))) return;
+    if (s !== current || continuity.generation !== generation || !d.isConnected) return;
     (d.querySelector('#arrangement-result') as HTMLElement).textContent =
       'The request is ready to send. Close this page to let the watch continue and hear the answer.';
   };
