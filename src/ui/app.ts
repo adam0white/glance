@@ -161,16 +161,18 @@ let mutating = 0;
 async function mutateNow(state: GameState, request: { input?: NewInput; minutes?: number }) {
   const owner = displayOwner(state);
   if (!owner) throw Error('The watch could not be opened.');
-  const generation = continuity.generation;
+  // Admission preferences can change without replacing this owning Run.
+  const runId = continuity.runId;
+  const current = () => state === s && displayOwner(state) === owner && continuity.runId === runId;
   mutating++;
   try {
     await owner.mutate(request);
-    if (state !== s || generation !== continuity.generation) return;
+    if (!current()) return;
     drawAll();
     writeSave();
     return true;
   } catch (error) {
-    if (state !== s || generation !== continuity.generation) return;
+    if (!current()) return;
     cancelAnimationFrame(raf);
     const d = dialog(
       'watch-work',
@@ -955,14 +957,9 @@ async function frame(t: number) {
   const dt = Math.min(0.25, elapsed / 1000);
   const state = s;
   const owner = displayOwner(state);
-  const generation = continuity.generation;
   const runId = continuity.runId;
   const current = () =>
-    s === state &&
-    displayOwner(state) === owner &&
-    continuity.generation === generation &&
-    continuity.runId === runId &&
-    screen === 'watch';
+    s === state && displayOwner(state) === owner && continuity.runId === runId && screen === 'watch';
   const held = () => !!document.querySelector('dialog[open], .hflab-veil, #about:popover-open');
   const paused = held();
   if (paused) {
@@ -1820,9 +1817,10 @@ function dawn() {
   document.getElementById('next')?.addEventListener('click', async () => {
     if (!s) return;
     const current = s;
-    const generation = continuity.generation;
+    const owner = displayOwner(current);
+    const runId = continuity.runId;
     if (!(await inputNow(current, { kind: 'next' }))) return;
-    if (s !== current || continuity.generation !== generation) return;
+    if (s !== current || displayOwner(current) !== owner || continuity.runId !== runId) return;
     if (current.phase === 'watch') watch();
     else dawn();
   });
@@ -1893,7 +1891,8 @@ function practiceDialog() {
 function watchArrangements() {
   if (!s?.rules) return;
   const current = s;
-  const generation = continuity.generation;
+  const owner = displayOwner(current);
+  const runId = continuity.runId;
   const d = dialog(
     'watch-arrangements',
     'Watch arrangements',
@@ -1916,9 +1915,11 @@ function watchArrangements() {
       )}<p>Bilal may cover gauge rounds during his five-day visit, after his repairs, travel and a briefing. He has no gate authority. His body and other duties can prevent cover.</p>${current.night >= 2 && current.minute < VISIT_UNTIL && !current.keepers.some((k) => k.id === 'bilal' && k.on) ? '<button id="invite-relief">Invite Bilal for tonight’s gauge rounds</button>' : ''}<p id="arrangement-result" role="status"></p>`,
   );
   const enqueue = async (input: NewInput) => {
-    if (s !== current || continuity.generation !== generation || !d.isConnected) return;
+    if (s !== current || displayOwner(current) !== owner || continuity.runId !== runId || !d.isConnected)
+      return;
     if (!(await inputNow(current, input))) return;
-    if (s !== current || continuity.generation !== generation || !d.isConnected) return;
+    if (s !== current || displayOwner(current) !== owner || continuity.runId !== runId || !d.isConnected)
+      return;
     (d.querySelector('#arrangement-result') as HTMLElement).textContent =
       'The request is ready to send. Close this page to let the watch continue and hear the answer.';
   };

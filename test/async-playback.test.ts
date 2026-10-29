@@ -2,7 +2,8 @@
 /** Scope: real App RAF callbacks, DOM controls and production Node workers.
  * Delayed delivery exposes interleaving. This does not prove browser layout or disk persistence. */
 
-import { writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Worker as Thread } from 'node:worker_threads';
 import { Window } from 'happy-dom';
@@ -177,4 +178,113 @@ it.each([
   ).toBe(1361);
   if (action !== 'replacement') expect(heldState.minute).toBe(1361);
   if (action === 'replacement') expect(_debug.state?.minute).toBe(1320);
+});
+
+// Preference invalidation cancels admission work, not this still-held Run.
+it('saves the accepted minute and schedules playback after an in-flight shelf preference change', async () => {
+  browser = new Window({ url: 'http://localhost:3000/', width: 360, height: 690 });
+  for (const key of [
+    'window',
+    'document',
+    'location',
+    'history',
+    'navigator',
+    'localStorage',
+    'sessionStorage',
+  ] as const)
+    vi.stubGlobal(key, key === 'window' ? browser : browser[key]);
+  for (const key of ['addEventListener', 'removeEventListener', 'dispatchEvent'] as const)
+    vi.stubGlobal(key, browser[key].bind(browser));
+  vi.stubGlobal('Worker', DelayedWorker);
+  let next: FrameRequestCallback | undefined;
+  let frames = 0;
+  let scheduledAt = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    next = callback;
+    scheduledAt = performance.now();
+    frames++;
+    return frames;
+  });
+  vi.stubGlobal('cancelAnimationFrame', () => {
+    next = undefined;
+  });
+  vi.stubGlobal('fetch', async () => new Response('', { status: 503 }));
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  document.body.innerHTML = '<div id="app"></div>';
+  localStorage.setItem('hf-lab-player', 'a'.repeat(32));
+  localStorage.setItem('hf-lab:once:telemetry-notice-v1', 'existing notice');
+  const initial = newGame(7);
+  for (let i = 0; i < 40; i++) step(initial);
+  const { LOCAL_KEY, Continuity } = await import('../src/continuity.ts');
+  localStorage.setItem(
+    LOCAL_KEY,
+    JSON.stringify({
+      run: exportCurrent(initial),
+      runId: 'preference-control',
+      heads: [],
+      fileOrigin: false,
+      sources: [],
+    }),
+  );
+  const { start, _debug } = await import('../src/ui/app.ts');
+  dispose = (await import('../src/ui/lab.ts')).lab.dispose;
+  start();
+  const click = (selector: string) => required(document.querySelector<HTMLElement>(selector)).click();
+  await acceptedAction(() => {
+    click('#cont');
+  });
+  await vi.waitFor(() => expect(_debug.state?.minute).toBe(1360));
+  const state = required(_debug.state),
+    owner = required([...threads].at(-1));
+  click('#skip');
+  const t = scheduledAt + 90;
+  const first = required(next);
+  next = undefined;
+  await first(t);
+  expect(owner.requests.filter((q) => q.kind === 'mutate')).toHaveLength(0);
+  owner.hold = true;
+  const held = new Promise<void>((resolve) => {
+    onHeld = resolve;
+  });
+  const activeFrame = required<FrameRequestCallback>(next);
+  next = undefined;
+  const framesBefore = frames,
+    savedBefore = localStorage.getItem(LOCAL_KEY);
+  const pending = activeFrame(t + 250);
+  await held;
+  const invalidate = vi.spyOn(Continuity.prototype, 'invalidate');
+  window.dispatchEvent(new window.Event('hf-persona-preference'));
+  expect(invalidate).toHaveBeenCalled();
+  // Stop Skip through its public control so the first real minute remains the
+  // only in-flight work. Ordinary automatic playback must still be scheduled.
+  click('#skip');
+  owner.release();
+  await pending;
+  const savedAfter = localStorage.getItem(LOCAL_KEY);
+  if (process.env.GLANCE_PREFERENCE_PROOF)
+    writeFileSync(
+      process.env.GLANCE_PREFERENCE_PROOF,
+      JSON.stringify({
+        scope:
+          'Real production owner thread and App RAF; preference event retains same owner. No player or browser-disk claim.',
+        sourceSHA256: createHash('sha256').update(readFileSync('src/ui/app.ts')).digest('hex'),
+        testSHA256: createHash('sha256').update(readFileSync('test/async-playback.test.ts')).digest('hex'),
+        savedBefore,
+        savedAfter,
+        framesBefore,
+        framesAfter: frames,
+        stateMinute: _debug.state?.minute,
+        requests: owner.requests,
+        responses: owner.responses,
+      }),
+    );
+  expect(_debug.state).toBe(state);
+  expect(state.minute).toBe(1361);
+  expect(JSON.parse(required(savedAfter)).run.state.minute).toBe(1361);
+  const accepted = owner.responses.filter((r) => r.kind === 'accepted').at(-1)!;
+  expect(JSON.stringify(JSON.parse(required(savedAfter)).run) === JSON.stringify(accepted.packet!.full)).toBe(
+    true,
+  );
+  expect(frames).toBeGreaterThan(framesBefore);
+  expect(next).toBeDefined();
 });

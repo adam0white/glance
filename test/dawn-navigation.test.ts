@@ -81,18 +81,39 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
-it('opens the next watch and restarts playback only after the owning worker accepts next', async () => {
-  const raf = vi.mocked(requestAnimationFrame);
-  const before = raf.mock.calls.length;
-  document.getElementById('next')!.click();
-  expect(document.querySelector('.dawn')).not.toBeNull();
-  await settle();
-  expect(debug.state?.phase).toBe('watch');
-  expect(debug.state?.night).toBe(2);
-  expect(document.querySelector('.watch')).not.toBeNull();
-  expect(document.querySelector('.dawn')).toBeNull();
-  expect(raf.mock.calls.length).toBeGreaterThan(before);
-});
+it.each([false, true])(
+  'opens the accepted next watch with preference invalidation %s',
+  async (preference) => {
+    if (preference) {
+      const post = BrowserWorker.prototype.postMessage;
+      vi.spyOn(BrowserWorker.prototype, 'postMessage').mockImplementation(function (
+        this: BrowserWorker,
+        value: unknown,
+      ) {
+        const q = value as { id: number; kind: string; value?: { input?: { kind: string } } };
+        if (q.kind === 'mutate' && q.value?.input?.kind === 'next') {
+          const receive = this.onmessage;
+          this.onmessage = (event) => {
+            if (event.data.id === q.id && event.data.kind === 'accepted')
+              window.dispatchEvent(new Event('hf-persona-preference'));
+            receive?.(event);
+          };
+        }
+        post.call(this, value);
+      });
+    }
+    const raf = vi.mocked(requestAnimationFrame);
+    const before = raf.mock.calls.length;
+    document.getElementById('next')!.click();
+    expect(document.querySelector('.dawn')).not.toBeNull();
+    await settle();
+    expect(debug.state?.phase).toBe('watch');
+    expect(debug.state?.night).toBe(2);
+    expect(document.querySelector('.watch')).not.toBeNull();
+    expect(document.querySelector('.dawn')).toBeNull();
+    expect(raf.mock.calls.length).toBeGreaterThan(before);
+  },
+);
 it('keeps the same morning, save and source when the next input is refused', async () => {
   const { exportCurrent } = await import('../src/sim/run.ts');
   const before = JSON.stringify(exportCurrent(debug.state!)),
