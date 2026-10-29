@@ -490,7 +490,7 @@ it('preserves the saved run and receipts when shared admission fails', async () 
   await click('new');
   await click('confirm-new');
   expect(localStorage.getItem('glance-cast-local-v3')).toBe(saved);
-  expect(document.querySelector('#start-error')?.textContent).toContain('saved week is unchanged');
+  expect(document.querySelector('#start-error')?.textContent).toContain('saved watch is unchanged');
   expect(document.querySelector<HTMLDetailsElement>('#start-error details')?.open).toBe(false);
   expect(document.querySelector('#retry-start')).not.toBeNull();
   expect(document.querySelector('#error-feedback')).not.toBeNull();
@@ -633,10 +633,24 @@ it('refuses an unsupported saved edition before replacing browser state', async 
   const saved = JSON.stringify(old);
   localStorage.setItem('glance-cast-local-v3', saved);
   const debug = await boot();
-  await click('cont');
+  expect(document.getElementById('cont')).toBeNull();
+  expect(document.body.textContent).toContain('This watch was saved by an older version. Start a new game.');
   expect(debug.state).toBeNull();
   expect(localStorage.getItem('glance-cast-local-v3')).toBe(saved);
-  expect(document.getElementById('start-error')).not.toBeNull();
+});
+
+it('offers a new game when a current-version saved watch cannot replay', async () => {
+  const changed = localFixture(newGame(7));
+  changed.run.state.minute += 1;
+  const saved = JSON.stringify(changed);
+  localStorage.setItem('glance-cast-local-v3', saved);
+  await boot();
+  await click('cont');
+  expect(document.querySelector('#start-error')?.textContent).toContain(
+    'This saved watch could not be replayed. Start a new game.',
+  );
+  expect(document.getElementById('retry-start')).toBeNull();
+  expect(localStorage.getItem('glance-cast-local-v3')).toBe(saved);
 });
 
 it('accounts real frame minutes under the admitted inspector and holds menus and legacy inspections', async () => {

@@ -240,41 +240,20 @@ it('IN-R4 hides historical acknowledged openings and preserves a newer native re
   expect(h.c.localSave(b)).toBe(savedB);
   capture('historical-ACK', { record, savedA, savedB, after: h.c.localSave(b) });
 });
-it('IN-R5 checks a historical unknown multi-person claim in one snapshot without resending', async () => {
+it('refuses an older unknown multi-person opening without touching its claim or native bytes', async () => {
   vi.stubGlobal('indexedDB', new IDBFactory());
   const { record, before } = historicalEvent('recovery-5', 'changed-snapshot-refusal');
-  const store = historicalEvent('recovery-5', 'actual-reducer-state');
   await restoreHistoricalReservation(record);
-  let mixed = true;
   const requests: PersonaRequest[] = [];
-  const shelf = {
-    async request<T>(q: PersonaRequest): Promise<T> {
-      requests.push(structuredClone(q));
-      capture('actual-readonly-request', q);
-      if (q.action !== 'prepareBatch') throw Error('No get or write during unknown verification');
-      const heads = Object.fromEntries(ALLOCATION.map((c) => [c.castId, store.heads[c.castId] ?? null]));
-      // Inject an earlier genuine Wren head into a later snapshot: no fabricated Person or hash.
-      if (mixed) heads['hf.cast.wren.rope'] = record.expectedHeads['hf.cast.wren.rope'];
-      const snapshot = { expectedHeads: heads, inputs: [], blocked: [] };
-      capture('readonly-snapshot', snapshot);
-      return snapshot as T;
+  const c = new Continuity(lab, {
+    async request(q: PersonaRequest) {
+      requests.push(q);
     },
-  };
-  const c = new Continuity(lab, shelf as never),
-    old = await c.loadLocal(before);
-  await expect(c.recoverPrepared(record.id, () => before)).rejects.toThrow('not confirmed');
-  expect((await c.preparations.read(record.id)).phase).toBe('unknown');
-  expect(c.localSave(old)).toBe(before);
-  mixed = false;
-  const restored = await c.recoverPrepared(record.id, () => before);
-  expect(restored.chapter?.inputs).toHaveLength(2);
-  expect(requests.map((q) => q.action)).toEqual(['prepareBatch', 'prepareBatch']);
-  capture('historical-multi-head-recovered', {
-    record: await c.preparations.read(record.id),
-    native: c.localSave(restored),
-    sourceStore: store,
-    before,
-  });
+  } as never);
+  await expect(c.loadLocal(before)).rejects.toThrow(/older|unsupported/);
+  await expect(c.recoverPrepared(record.id, () => before)).rejects.toThrow(/older|unsupported/);
+  expect(await c.preparations.read(record.id)).toEqual(record);
+  expect(requests).toEqual([]);
 });
 it('IN-R1 refuses a stale prepared write over a possibly forwarded reservation', async () => {
   const h = harness([await input()]),

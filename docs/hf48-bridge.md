@@ -39,3 +39,11 @@ GDI553 remains the previously delivered HF3 baseline. GDI976's OR request remain
 Completion of this source unit requires one whole-candidate independent review, signed source, exact green CI and root's integration/delivery gates. The recovery worker owns integration and deployment. Cross-host dependencies and actual owner/player acceptance remain separate.
 
 Current engineering composition uses published client0.5.6 with kit0.5.24 and HF4.8.0. Kit0.5.24 explicitly includes client0.5.6 in its optional peer range. The prior kit0.5.23 mismatch is resolved without a peer override or a framework/runtime change. The downloaded release checksums and GitHub tag verification bind the artifact; no detached signature asset was published. This pin establishes no peer-host live adoption or cross-game custody.
+
+## Keeper restoration (2026-10-28)
+
+The HF4 port removed three parts of the gauge puzzle. This correction restores them without a second actor model. The spoken reading offset is continuous in the public HF emotionality trait and present body/weather impairment: Dai's low emotionality gives a low offset and Callum's high emotionality gives a high offset. HF still owns the observation draw and confidence. The host's keyed physical shortcut draw uses current HF sleepiness, conscientiousness and emotionality; only a recent retained figure can replace a walk. A skipped walk creates no quantity observation and preserves its original written time.
+
+Keeper phrasebooks restore the deleted response and confession lines. Actual HF verdicts select responses. A sleep confession requires a recorded HF involuntary doze. It describes that physical event and does not invent or modify an HF missed-watch review. Requested naps retain HF wording. The scheduled seven o’clock review remains a separate event; it is not brought forward to dawn. Public body evidence and weather label the dominant reading impediment on the morning page; this is not a diagnosis.
+
+The host edition is `glance@hf48-2`. Earlier saves are deliberately refused with one start-new explanation; old-save compatibility is not a requirement of this correction. HF remains pinned to 4.8.0. Owner acceptance of feel remains separate from technical delivery.

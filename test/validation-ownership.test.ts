@@ -2,9 +2,10 @@ import type { Lab } from '@adam0white/lab-client';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Continuity } from '../src/continuity.ts';
+import { digest } from '../src/file-admission.ts';
+import { newGame } from '../src/sim/dam.ts';
 import { displayOwner } from '../src/sim/display.ts';
 import { BrowserWorker, disposeBrowserWorkers } from './browser-worker.ts';
-import { historicalEvent, restoreHistoricalReservation } from './incoming-fixtures.ts';
 
 const workers: HoldingWorker[] = [];
 let nativeReady: (() => void) | undefined;
@@ -75,10 +76,17 @@ afterEach(() => {
 it.each(['recovery', 'fresh'] as const)(
   'obsolete %s validation cleanup cannot terminate newer Resume',
   async (kind) => {
-    const { record, before } = historicalEvent('recovery-5', 'changed-snapshot-refusal');
     const c = new Continuity(lab, shelf as never);
+    const before = c.localSave(newGame(7));
     await c.loadLocal(before);
-    await restoreHistoricalReservation(record);
+    // The recovery race stops during candidate validation, before any shelf operation.
+    // Supply a fresh candidate at the store boundary; validation remains real.
+    const record = {
+      id: 'race',
+      candidate: before,
+      basis: { runId: JSON.parse(before).runId, sha256: await digest(before) },
+    };
+    vi.spyOn(c.preparations, 'read').mockResolvedValue(record as never);
     initialKind = kind === 'recovery' ? 'load' : 'create';
     const ready = new Promise<void>((resolve) => {
       initialReady = resolve;
@@ -134,8 +142,8 @@ it.each(['recovery', 'fresh'] as const)(
   },
 );
 it('disposes a refused native candidate after validation and keeps the installed owner', async () => {
-  const { before } = historicalEvent('recovery-5', 'changed-snapshot-refusal');
   const c = new Continuity(lab, shelf as never);
+  const before = c.localSave(newGame(7));
   const held = await c.loadLocal(before),
     owner = displayOwner(held)!;
   const prior = workers.at(-1)!;

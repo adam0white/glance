@@ -35,7 +35,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
-it('reopens an exact historical native with closed arrival gates and no shelf read', async () => {
+it('refuses an exact historical native without a shelf read', async () => {
   vi.stubGlobal('indexedDB', new IDBFactory());
   const { saved, reopened } = historicalEvent('focused-2', 'installed-and-reopened-native');
   expect(saved).toBe(reopened);
@@ -44,9 +44,9 @@ it('reopens an exact historical native with closed arrival gates and no shelf re
       throw Error('No shelf reads');
     },
   } as never);
-  const state = await c.loadLocal(saved);
-  expect(c.localSave(state)).toBe(saved);
-  capture('exact-historical-native-reopened', { saved, reopened: c.localSave(state) });
+  await expect(c.loadLocal(saved)).rejects.toThrow('older or unsupported version');
+  expect(saved).toBe(reopened);
+  capture('exact-historical-native-refused', { saved, reopened });
 });
 it('refuses a historical gate-closed prepared CAS while preserving the exact old native and reservation', async () => {
   vi.stubGlobal('indexedDB', new IDBFactory());
@@ -59,15 +59,13 @@ it('refuses a historical gate-closed prepared CAS while preserving the exact old
       return undefined;
     },
   } as never);
-  const old = await c.loadLocal(before);
-  await expect(c.recoverPrepared(record.id, () => before)).rejects.toThrow('read-only');
+  await expect(c.recoverPrepared(record.id, () => before)).rejects.toThrow('older or unsupported version');
   expect(writes).toBe(0);
-  expect(c.localSave(old)).toBe(before);
   expect(await c.preparations.read(record.id)).toEqual(record);
   capture('gate-closed-prepared-refusal', {
     record,
     before,
-    after: c.localSave(old),
+    after: before,
     writes,
     retained: await c.preparations.read(record.id),
   });
