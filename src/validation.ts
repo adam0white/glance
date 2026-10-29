@@ -100,11 +100,15 @@ export class CandidateValidation {
   private directFiles = new WeakMap<GameState, FileContext>();
   private directNative = new WeakMap<GameState, Awaited<ReturnType<typeof admitNative>>>();
   private connections = new Set<Connection>();
+  private operations = new WeakMap<Connection, symbol>();
   private held: Connection | undefined;
   constructor(private changed: () => void = () => {}) {}
-  cancel() {
+  cancel(operation?: symbol) {
     for (const candidate of this.connections)
-      if (candidate !== this.held) {
+      if (
+        candidate !== this.held &&
+        (operation === undefined || this.operations.get(candidate) === operation)
+      ) {
         candidate.dispose();
         this.connections.delete(candidate);
       }
@@ -127,8 +131,9 @@ export class CandidateValidation {
     kind: 'load' | 'create' | 'file' | 'native',
     value: unknown,
     progress: (message: string) => void,
+    operation?: symbol,
   ): Promise<GameState> {
-    this.cancel();
+    this.cancel(operation);
     // CLI engineering uses the identical full replay/core, without a browser page.
     if (typeof Worker === 'undefined') {
       if (typeof window !== 'undefined')
@@ -149,6 +154,7 @@ export class CandidateValidation {
       return newGame((value as any).seed, (value as any).chapter, (value as any).rules);
     }
     const connection = new Connection(progress, this.changed);
+    if (operation !== undefined) this.operations.set(connection, operation);
     this.connections.add(connection);
     try {
       return await connection.open(kind, value);
@@ -166,16 +172,16 @@ export class CandidateValidation {
     const owner = displayOwner(state);
     return owner instanceof Connection ? owner.native : this.directNative.get(state);
   }
-  file(text: string, progress: (message: string) => void = () => {}) {
-    return this.prepare('file', text, progress);
+  file(text: string, progress: (message: string) => void = () => {}, operation?: symbol) {
+    return this.prepare('file', text, progress, operation);
   }
-  native(text: string, progress: (message: string) => void = () => {}) {
-    return this.prepare('native', text, progress);
+  native(text: string, progress: (message: string) => void = () => {}, operation?: symbol) {
+    return this.prepare('native', text, progress, operation);
   }
-  load(value: unknown, progress: (message: string) => void = () => {}) {
-    return this.prepare('load', value, progress);
+  load(value: unknown, progress: (message: string) => void = () => {}, operation?: symbol) {
+    return this.prepare('load', value, progress, operation);
   }
-  create(seed: number, chapter?: Chapter, rules?: WatchRules) {
-    return this.prepare('create', { seed, chapter, rules }, () => {});
+  create(seed: number, chapter?: Chapter, rules?: WatchRules, operation?: symbol) {
+    return this.prepare('create', { seed, chapter, rules }, () => {}, operation);
   }
 }

@@ -142,6 +142,7 @@ export class Continuity {
     this.busy = true;
     this.invalidate();
     const generation = this.generation;
+    const operation = Symbol('fresh-validation');
     try {
       await this.shelf.ready;
       if (!localOnly && generation === this.generation && !this.shelf.enabled) {
@@ -222,11 +223,14 @@ export class Continuity {
               opening.state.agenda.commitments = [];
               const initial = admitResident(input, opening);
               const claim = await plannedClaim(input);
+              if (!current()) throw Error('The game changed during actor admission.');
               await this.validation.create(
                 seed,
                 { version: DIALECT, inputs: [input], claims: [claim], initial: { [initial.id]: initial } },
                 rules,
+                operation,
               );
+              if (!current()) throw Error('The game changed during actor validation.');
               accepted.set(input.parent.castId, { initial, claim });
             },
           },
@@ -247,7 +251,7 @@ export class Continuity {
           )
             throw Error('SDK claim differs from planned public claim.');
         }
-        candidate = await this.validation.create(seed, chapter, rules);
+        candidate = await this.validation.create(seed, chapter, rules, operation);
         if (!current()) throw Error('The game changed during preparation.');
         if (chapter?.inputs.length) {
           const native = JSON.stringify({
@@ -294,7 +298,7 @@ export class Continuity {
       }
       if (!current())
         throw Error('The game changed. The prepared opening remains saved; the current watch is unchanged.');
-      const state = candidate ?? (await this.validation.create(seed, undefined, rules));
+      const state = candidate ?? (await this.validation.create(seed, undefined, rules, operation));
       const canInstall = await this.basisGuard(basis, () => this.currentNative());
       if (!current() || !canInstall()) throw Error('The current watch changed before the new watch started.');
       this.validation.keep(state);
@@ -313,13 +317,14 @@ export class Continuity {
           : 'A new chapter has started with the original people. No saved histories were carried over.';
       return state;
     } finally {
-      this.validation.cancel();
+      this.validation.cancel(operation);
       this.busy = false;
     }
   }
   async recoverPrepared(id: string, readCurrent = () => this.currentNative()) {
     this.nativeOnly();
     const generation = this.generation;
+    const operation = Symbol('recovery-validation');
     try {
       let record = await this.preparations.read(id);
       const current = async () => {
@@ -334,7 +339,7 @@ export class Continuity {
       };
       (await current())();
       const native = JSON.parse(record.candidate);
-      await this.validation.load(native);
+      await this.validation.load(native, undefined, operation);
       (await current())();
       if (record.phase === 'prepared') {
         // A historical prepared row is not current SDK permission to make an arrival write.
@@ -386,50 +391,68 @@ export class Continuity {
         this.basisGuard(record.basis, readCurrent),
       );
     } finally {
-      this.validation.cancel();
+      this.validation.cancel(operation);
     }
   }
   async loadLocal(text: string, recoveryTarget?: () => Promise<() => boolean>) {
     this.nativeOnly();
     this.invalidate();
     const generation = this.generation;
-    const state = await this.validation.native(text, (message) => {
-      this.status = message;
-      this.changed();
-    });
-    const canInstall = recoveryTarget ? await recoveryTarget() : undefined;
-    if (canInstall && !canInstall())
-      throw Error('The current watch changed before recovery could install. Keep the current watch.');
-    if (generation !== this.generation) throw Error('The game changed while it was loading.');
-    const saved = this.validation.nativeContext(state);
-    if (!saved) throw Error('Invalid native provenance.');
-    this.validation.keep(state);
-    this.state = state;
-    this.runId = saved.runId;
-    this.heads = structuredClone(saved.heads);
-    this.fileOrigin = saved.fileOrigin;
-    this.sources = structuredClone(saved.sources);
-    this.preparation = saved.preparation;
-    this.status = 'The complete local watch was restored. No newer browser histories were loaded.';
-    return state;
+    const operation = Symbol('native-validation');
+    try {
+      const state = await this.validation.native(
+        text,
+        (message) => {
+          this.status = message;
+          this.changed();
+        },
+        operation,
+      );
+      const canInstall = recoveryTarget ? await recoveryTarget() : undefined;
+      if (canInstall && !canInstall())
+        throw Error('The current watch changed before recovery could install. Keep the current watch.');
+      if (generation !== this.generation) throw Error('The game changed while it was loading.');
+      const saved = this.validation.nativeContext(state);
+      if (!saved) throw Error('Invalid native provenance.');
+      this.validation.keep(state);
+      this.state = state;
+      this.runId = saved.runId;
+      this.heads = structuredClone(saved.heads);
+      this.fileOrigin = saved.fileOrigin;
+      this.sources = structuredClone(saved.sources);
+      this.preparation = saved.preparation;
+      this.status = 'The complete local watch was restored. No newer browser histories were loaded.';
+      return state;
+    } finally {
+      this.validation.cancel(operation);
+    }
   }
   async importFile(text: string) {
     if (this.fileSession) return this.importSession(text, this.beginFileSelection());
     this.invalidate();
     const generation = this.generation;
-    const state = await this.validation.load(JSON.parse(text), (message) => {
-      this.status = message;
-      this.changed();
-    });
-    if (generation !== this.generation) throw Error('The game changed while the file was loading.');
-    this.validation.keep(state);
-    this.state = state;
-    this.heads = structuredClone(state.chapter?.claims ?? []);
-    this.sources = chapterSources(state.chapter);
-    this.preparation = undefined;
-    this.runId = crypto.randomUUID();
-    this.fileOrigin = true;
-    return state;
+    const operation = Symbol('native-file-validation');
+    try {
+      const state = await this.validation.load(
+        JSON.parse(text),
+        (message) => {
+          this.status = message;
+          this.changed();
+        },
+        operation,
+      );
+      if (generation !== this.generation) throw Error('The game changed while the file was loading.');
+      this.validation.keep(state);
+      this.state = state;
+      this.heads = structuredClone(state.chapter?.claims ?? []);
+      this.sources = chapterSources(state.chapter);
+      this.preparation = undefined;
+      this.runId = crypto.randomUUID();
+      this.fileOrigin = true;
+      return state;
+    } finally {
+      this.validation.cancel(operation);
+    }
   }
   private selection = 0;
   beginFileSelection() {
@@ -456,26 +479,35 @@ export class Continuity {
   private async importSession(text: string, selection: number) {
     this.requireSelection(selection);
     const generation = this.generation;
-    const state = await this.validation.file(text, (message) => {
-      this.status = message;
-      this.changed();
-    });
-    this.requireSelection(selection);
-    if (generation !== this.generation) throw Error('The game changed while the file was loading.');
-    const context = this.validation.fileContext(state);
-    if (!context) throw Error('Invalid file provenance.');
-    this.validation.keep(state);
-    this.invalidate();
-    this.state = state;
-    this.original = structuredClone(context.original);
-    this.provenance = structuredClone(context.provenance);
-    this.sources = structuredClone(context.castSources);
-    this.heads = structuredClone(state.chapter?.claims ?? []);
-    this.preparation = undefined;
-    this.fileOrigin = true;
-    this.runId = crypto.randomUUID();
-    this.status = 'Progress stays in memory. Download this run before closing the page.';
-    return state;
+    const operation = Symbol('file-session-validation');
+    try {
+      const state = await this.validation.file(
+        text,
+        (message) => {
+          this.status = message;
+          this.changed();
+        },
+        operation,
+      );
+      this.requireSelection(selection);
+      if (generation !== this.generation) throw Error('The game changed while the file was loading.');
+      const context = this.validation.fileContext(state);
+      if (!context) throw Error('Invalid file provenance.');
+      this.validation.keep(state);
+      this.invalidate();
+      this.state = state;
+      this.original = structuredClone(context.original);
+      this.provenance = structuredClone(context.provenance);
+      this.sources = structuredClone(context.castSources);
+      this.heads = structuredClone(state.chapter?.claims ?? []);
+      this.preparation = undefined;
+      this.fileOrigin = true;
+      this.runId = crypto.randomUUID();
+      this.status = 'Progress stays in memory. Download this run before closing the page.';
+      return state;
+    } finally {
+      this.validation.cancel(operation);
+    }
   }
   capacityContext() {
     if (!this.fileSession || !this.original) throw Error('No accepted file.');
