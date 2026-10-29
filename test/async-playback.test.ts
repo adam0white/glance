@@ -13,6 +13,15 @@ import type { InspectionPacket } from '../src/sim/display.ts';
 import { exportCurrent } from '../src/sim/run.ts';
 import { required } from './required.ts';
 
+// Reuse immutable public preparation; the timed race measures UI/worker interleaving.
+const playbackRun = (() => {
+  const initial = newGame(7);
+  for (let i = 0; i < 40; i++) step(initial);
+  return exportCurrent(initial);
+})();
+const playbackText = JSON.stringify(playbackRun);
+const replacementText = JSON.stringify(exportCurrent(newGame(9)));
+
 type Request = { id: number; kind: string; value?: unknown };
 type Reply = { id: number; kind: string; packet?: InspectionPacket };
 const threads = new Set<DelayedWorker>();
@@ -127,8 +136,6 @@ it.each([
   dispose = (await import('../src/ui/lab.ts')).lab.dispose;
   start();
   const click = (q: string) => required(document.querySelector<HTMLElement>(q)).click();
-  const initial = newGame(7);
-  for (let i = 0; i < 40; i++) step(initial);
   const load = (text: string) => {
     const file = required(document.querySelector<HTMLInputElement>('#file'));
     const bytes = new TextEncoder().encode(text);
@@ -138,7 +145,7 @@ it.each([
     });
     file.dispatchEvent(new window.Event('change'));
   };
-  await acceptedAction(() => load(JSON.stringify(exportCurrent(initial))));
+  await acceptedAction(() => load(playbackText));
   await vi.waitFor(() => expect(_debug.state?.minute).toBe(1360));
   const heldState = required(_debug.state);
   const owner = required([...threads].at(-1));
@@ -164,7 +171,7 @@ it.each([
     click('#menu');
     if (action === 'replacement') {
       click('#choose-another');
-      await acceptedAction(() => load(JSON.stringify(exportCurrent(newGame(9)))));
+      await acceptedAction(() => load(replacementText));
       await vi.waitFor(() => expect(_debug.state?.seed).toBe(9));
     }
   }
@@ -213,13 +220,11 @@ it('saves the accepted minute and schedules playback after an in-flight shelf pr
   document.body.innerHTML = '<div id="app"></div>';
   localStorage.setItem('hf-lab-player', 'a'.repeat(32));
   localStorage.setItem('hf-lab:once:telemetry-notice-v1', 'existing notice');
-  const initial = newGame(7);
-  for (let i = 0; i < 40; i++) step(initial);
   const { LOCAL_KEY, Continuity } = await import('../src/continuity.ts');
   localStorage.setItem(
     LOCAL_KEY,
     JSON.stringify({
-      run: exportCurrent(initial),
+      run: playbackRun,
       runId: 'preference-control',
       heads: [],
       fileOrigin: false,

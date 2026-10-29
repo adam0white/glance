@@ -1698,7 +1698,7 @@ function weatherAt(s: GameState): number {
   return Math.min(1, r / 14 + (planOf(s).radio ? 0.2 : 0));
 }
 
-function keeperMinute(s: GameState, k: KeeperState, rain: number) {
+function keeperMinute(s: GameState, k: KeeperState, _rain: number) {
   const p = personOf(s, k.id);
   if (s.rules) {
     const sitting =
@@ -1741,7 +1741,25 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
   if (s.pauseRequested && !a && !k.pending) return;
   const offers = idleOffers(s, k).filter((o) => !a || o.id !== a.affordanceId || k.pending);
   const voice = k.pending ?? (!a && k.deferred && s.minute <= k.deferred.until ? k.deferred : null);
-  const voiceOffers = voice ? offersFor(s, k.id, voice.target) : offers;
+  const available = voice ? offersFor(s, k.id, voice.target) : offers;
+  const shortcuts = new Set(
+    available
+      .filter((o) => {
+        const prior = o.id === 'level' || o.id === 'weir' ? s.board[o.id] : undefined;
+        return (
+          !!prior &&
+          skipsWalk(
+            p,
+            o.id,
+            s.minute - prior.at,
+            hashUnit(s.seed, DRAW.skip, s.night, s.minute, KEEPERS.indexOf(k.id)),
+          )
+        );
+      })
+      .map((o) => o.id),
+  );
+  // Register the actual short physical activity before HF chooses and starts it.
+  const voiceOffers = available.map((o) => (shortcuts.has(o.id) ? { ...o, duration: 4 } : o));
   const rec: DecisionRecord = decide(p, voiceOffers, voice ? { suggestion: voice.s } : {});
   let target: number | undefined;
   if (voice) {
@@ -1772,7 +1790,7 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
     return;
   }
   if (a) endActivity(p, 'interrupted', s.minute);
-  startJob(s, k, p, aff, rec, target, rain);
+  startJob(s, k, p, aff, rec, target, shortcuts.has(aff.id));
 }
 
 /** What he weighs when nobody is asking: the stove, and (Dai's habit) a look at the level now and then. */
@@ -1795,22 +1813,12 @@ function startJob(
   aff: Affordance,
   rec: DecisionRecord,
   target: number | undefined,
-  _rain: number,
+  skip: boolean,
 ) {
   const job = aff.id as Job;
-  const prior = job === 'level' || job === 'weir' ? s.board[job] : undefined;
-  const skip =
-    !!prior &&
-    skipsWalk(
-      p,
-      job,
-      s.minute - prior.at,
-      hashUnit(s.seed, DRAW.skip, s.night, s.minute, KEEPERS.indexOf(k.id)),
-    );
   const to = skip ? k.place : DEST[job];
   const walk = walkFor(s, k.place, to);
-  const a2 = skip ? { ...aff, duration: 4 } : aff;
-  if (!begin(p, a2, rec)) {
+  if (!begin(p, aff, rec)) {
     k.idleUntil = s.minute + 4;
     return;
   }
@@ -2119,7 +2127,13 @@ function aboutYou(s: GameState, k: KeeperState, overtopped: boolean): string {
  */
 function ownWatchLine(s: GameState, id: KeeperId, line: string): string {
   const k = keeperOf(s, id);
-  return keeperReview(s.seed, s.night, id, line, k.dozes.some((d) => d.to > d.from) && !k.orderedNap);
+  return keeperReview(
+    s.seed,
+    s.night,
+    id,
+    line,
+    k.dozes.some((d) => d.to > d.from),
+  );
 }
 
 /** Retain the actual HF review of this watch before a later morning review replaces it.

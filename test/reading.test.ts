@@ -8,6 +8,7 @@ import {
   restoreState,
   step,
 } from '../src/sim/dam.ts';
+import { archiveWatch } from '../src/sim/hf4.ts';
 import { spoken, spokenFine } from '../src/sim/reading.ts';
 import { exportCurrent, importCurrent } from '../src/sim/run.ts';
 import { required } from './required.ts';
@@ -113,8 +114,7 @@ it('allows a sleepy keeper to reuse a recent reading but a rested keeper walks',
   expect(skipsWalk(p, 'gate', 20, 0)).toBe(false);
 });
 
-it('a skipped walk repeats the retained figure and written time without observing a gauge', async () => {
-  const { archiveWatch } = await import('../src/sim/hf4.ts');
+it('a skipped walk repeats the retained figure and written time without observing a gauge', () => {
   const s = newGame(1);
   const observations = () =>
     archiveWatch(s.people[0]!)
@@ -125,7 +125,11 @@ it('a skipped walk repeats the retained figure and written time without observin
     if ((s.minute - 1320) % 15 === 0)
       queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level', insist: true });
     step(s);
-    if (s.keepers[0]!.job?.skip && beforeSkip === undefined) beforeSkip = observations();
+    if (s.keepers[0]!.job?.skip && beforeSkip === undefined) {
+      beforeSkip = observations();
+      const activity = s.people[0]!.activity!;
+      expect(activity.endsAt - activity.startedAt).toBe(4);
+    }
   }
   const stale = s.reports.at(-1)!;
   const prior = s.reports.at(-2)!;
