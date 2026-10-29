@@ -12,7 +12,7 @@ import {
   type PersonaRequest,
 } from '@adam0white/lab-client';
 import { IDBFactory } from 'fake-indexeddb';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Continuity } from '../src/continuity.ts';
 import { ALLOCATION } from '../src/sim/cast.ts';
 import { openWatch } from '../src/sim/hf4.ts';
@@ -121,64 +121,72 @@ async function prepared(h: ReturnType<typeof harness>) {
   expect(record!.phase).toBe('prepared');
   return { old, before, record: record! };
 }
-it('IN-R1 allows only one shared-IDB recovery dispatcher and rejects a stale downgrade', async () => {
-  const h = harness([await input()]),
+describe('IN-R1 shared-IDB dispatcher', () => {
+  let h: ReturnType<typeof harness>;
+  let p: Awaited<ReturnType<typeof prepared>>;
+  // Actual public SDK preparation is fixture work. Both racing dispatches and
+  // every original assertion remain inside the ordinary test deadline.
+  beforeEach(async () => {
+    h = harness([await input()]);
     p = await prepared(h);
-  const a = new Continuity(lab, h.shelf as never),
-    b = new Continuity(lab, h.shelf as never);
-  let reads = 0,
-    releaseReads!: () => void;
-  const bothRead = new Promise<void>((r) => (releaseReads = r));
-  for (const c of [a, b]) {
-    const read = c.preparations.read.bind(c.preparations);
-    let first = true;
-    vi.spyOn(c.preparations, 'read').mockImplementation(async (id) => {
-      const record = await read(id);
-      if (first) {
-        first = false;
-        if (++reads === 2) releaseReads();
-        await bothRead;
-      }
-      return record;
-    });
-  }
-  let sends = 0,
-    firstSend!: () => void,
-    secondSend!: () => void,
-    releaseSend!: () => void;
-  const sent = new Promise<void>((r) => (firstSend = r)),
-    second = new Promise<void>((r) => (secondSend = r)),
-    hold = new Promise<void>((r) => (releaseSend = r));
-  h.wire.onPut = async () => {
-    if (++sends === 1) firstSend();
-    else secondSend();
-    await hold;
-  };
-  const attempts = [
-    a.recoverPrepared(p.record.id, () => p.before),
-    b.recoverPrepared(p.record.id, () => p.before),
-  ];
-  const settled = Promise.race(
-    attempts.map((promise) =>
-      promise.then(
-        () => {},
-        () => {},
-      ),
-    ),
-  );
-  await sent;
-  await Promise.race([second, settled]);
-  releaseSend();
-  const outcomes = await Promise.allSettled(attempts);
-  capture('shared-IDB-race', {
-    sends,
-    outcomes: outcomes.map((o) => o.status),
-    records: await a.preparations.list(),
   });
-  expect(sends).toBe(1);
-  expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
-  await expect(a.preparations.commit(p.record)).rejects.toThrow();
-  expect((await a.preparations.read(p.record.id)).phase).toBe('acknowledged');
+  it('IN-R1 allows only one shared-IDB recovery dispatcher and rejects a stale downgrade', async () => {
+    const a = new Continuity(lab, h.shelf as never),
+      b = new Continuity(lab, h.shelf as never);
+    let reads = 0,
+      releaseReads!: () => void;
+    const bothRead = new Promise<void>((r) => (releaseReads = r));
+    for (const c of [a, b]) {
+      const read = c.preparations.read.bind(c.preparations);
+      let first = true;
+      vi.spyOn(c.preparations, 'read').mockImplementation(async (id) => {
+        const record = await read(id);
+        if (first) {
+          first = false;
+          if (++reads === 2) releaseReads();
+          await bothRead;
+        }
+        return record;
+      });
+    }
+    let sends = 0,
+      firstSend!: () => void,
+      secondSend!: () => void,
+      releaseSend!: () => void;
+    const sent = new Promise<void>((r) => (firstSend = r)),
+      second = new Promise<void>((r) => (secondSend = r)),
+      hold = new Promise<void>((r) => (releaseSend = r));
+    h.wire.onPut = async () => {
+      if (++sends === 1) firstSend();
+      else secondSend();
+      await hold;
+    };
+    const attempts = [
+      a.recoverPrepared(p.record.id, () => p.before),
+      b.recoverPrepared(p.record.id, () => p.before),
+    ];
+    const settled = Promise.race(
+      attempts.map((promise) =>
+        promise.then(
+          () => {},
+          () => {},
+        ),
+      ),
+    );
+    await sent;
+    await Promise.race([second, settled]);
+    releaseSend();
+    const outcomes = await Promise.allSettled(attempts);
+    capture('shared-IDB-race', {
+      sends,
+      outcomes: outcomes.map((o) => o.status),
+      records: await a.preparations.list(),
+    });
+    expect(sends).toBe(1);
+    expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
+    await expect(a.preparations.commit(p.record)).rejects.toThrow();
+    expect((await a.preparations.read(p.record.id)).phase).toBe('acknowledged');
+  });
 });
 it('IN-R2 blocks a new opening when unresolved reservation inventory cannot be read', async () => {
   const h = harness([await input()]),

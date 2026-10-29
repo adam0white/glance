@@ -1818,11 +1818,13 @@ function dawn() {
   bindTopbar();
   const chart = document.getElementById('chart') as HTMLCanvasElement;
   drawDawn(chart, d);
-  document.getElementById('next')?.addEventListener('click', () => {
+  document.getElementById('next')?.addEventListener('click', async () => {
     if (!s) return;
-    inputNow(s, { kind: 'next' });
-    writeSave();
-    if (s.phase === 'watch') watch();
+    const current = s;
+    const generation = continuity.generation;
+    if (!(await inputNow(current, { kind: 'next' }))) return;
+    if (s !== current || continuity.generation !== generation) return;
+    if (current.phase === 'watch') watch();
     else dawn();
   });
   document.getElementById('practice')?.addEventListener('click', practiceDialog);

@@ -64,11 +64,17 @@ it('refuses premature practice without replacing the source watch', () => {
 });
 // One fixed opening, real public time and ambient/alarm inputs. No body edits,
 // clock setter, seed search or manual wake can produce this control's result.
-it('uses actual doze and a reached radio alarm through the public Run', () => {
-  const w = openWatch(7),
-    p = w.people[0]!;
+// Prepare the complete physical wait under the ordinary hook deadline. The alarm
+// and full replay assertion keep the ordinary test deadline and all six hundred possible minutes.
+let dozingWatch: ReturnType<typeof openWatch>;
+beforeAll(() => {
+  dozingWatch = openWatch(7);
+  const p = dozingWatch.people[0]!;
   setDozeContext(p, { posture: 'seated', stimulation: 0.1 });
   for (let n = 0; n < 600 && !readDoze(p)?.asleep; n++) tick(p, p.now + 1);
+});
+it('uses actual doze and a reached radio alarm through the public Run', () => {
+  const p = dozingWatch.people[0]!;
   expect(readDoze(p)?.asleep).toBe(true);
   const asleepAt = p.now;
   perceive(p, [
