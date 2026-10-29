@@ -140,7 +140,7 @@ const fx: SceneFx = { flashAt: -1e9 };
 let wake: { release(): Promise<void> } | null = null;
 const seen = { hold: false };
 
-let resumeAttempt = 0;
+let openingAttempt = 0;
 let tracked = false;
 function trackRun() {
   if (tracked) return;
@@ -390,6 +390,7 @@ function title() {
     fileChooser();
     return;
   }
+  openingAttempt++;
   destroyStage();
   continuity.invalidate();
   cancelAnimationFrame(raf);
@@ -426,20 +427,22 @@ function title() {
         const button = document.createElement('button');
         button.textContent = 'Check prepared opening';
         button.addEventListener('click', async () => {
+          const attempt = ++openingAttempt;
           continuity.invalidate();
           cancelAnimationFrame(raf);
-          const previous = s;
           button.disabled = true;
           try {
             const state = await continuity.recoverPrepared(record.id, () => localStorage.getItem(SAVE));
+            if (attempt !== openingAttempt) return;
             s = state;
             enter();
           } catch (error) {
-            s = previous;
+            if (attempt !== openingAttempt || !host.isConnected) return;
             const message = document.createElement('p');
             message.textContent = String(error);
             host.append(message);
-            button.disabled = false;
+          } finally {
+            if (button.isConnected) button.disabled = false;
           }
         });
         host.append(button);
@@ -447,20 +450,20 @@ function title() {
     })
     .catch(() => {});
   document.getElementById('cancel-resume')?.addEventListener('click', () => {
-    resumeAttempt++;
+    openingAttempt++;
     continuity.invalidate();
     const status = document.getElementById('resume-status');
     if (status) status.textContent = 'Opening cancelled. Your saved watch is unchanged.';
     document.getElementById('cancel-resume')?.setAttribute('hidden', '');
   });
   document.getElementById('cont')?.addEventListener('click', async () => {
-    const attempt = ++resumeAttempt;
+    const attempt = ++openingAttempt;
     document.getElementById('cancel-resume')?.removeAttribute('hidden');
     const status = document.getElementById('resume-status');
     if (status) status.textContent = 'Opening your saved watch…';
     try {
       const loaded = await continuity.loadLocal(JSON.stringify(save));
-      if (attempt !== resumeAttempt) return;
+      if (attempt !== openingAttempt) return;
       s = loaded;
       const generation = continuity.generation;
       await continuity.recording();
@@ -468,7 +471,7 @@ function title() {
       readUntil = performance.now() + 6000;
       enter();
     } catch (error) {
-      if (attempt === resumeAttempt)
+      if (attempt === openingAttempt)
         startError(error, () => document.getElementById('cont')?.click(), 'load');
     }
   });
@@ -549,6 +552,7 @@ function debugFooter() {
 
 async function beginWeek(localOnly = false, chosen?: WatchRules) {
   if (fileMode) return;
+  const attempt = ++openingAttempt;
   const rules: WatchRules = chosen ?? {
     edition: 'extended-2',
     outcomes: 'private-scenes-1',
@@ -566,14 +570,16 @@ async function beginWeek(localOnly = false, chosen?: WatchRules) {
       pending.textContent =
         'Checking saved people and preparing the opening… Your current watch stays saved.';
     const prepared = await continuity.fresh(Date.now() >>> 0, localOnly === true, rules);
+    if (attempt !== openingAttempt) return;
     s = prepared;
     const generation = continuity.generation;
     clearSave();
     await continuity.recording();
-    if (generation !== continuity.generation || s !== prepared) return;
+    if (attempt !== openingAttempt || generation !== continuity.generation || s !== prepared) return;
     enter();
     window.scrollTo(0, 0);
   } catch (error) {
+    if (attempt !== openingAttempt) return;
     s = previous;
     if (s?.phase === 'watch') {
       last = performance.now();

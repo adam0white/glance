@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
+import { URL as NodeURL } from 'node:url';
 import type { Reservation } from '../src/preparation-store.ts';
 
 /** Exact full r2 .5.5 raw captures; readonly reconstruction is not current write eligibility. */
 export function historicalEvent(file: string, kind: string, index = 0): any {
   const raw = JSON.parse(
-    readFileSync(new URL(`./fixtures/incoming-pre-gate/${file}.json`, import.meta.url), 'utf8'),
+    readFileSync(new NodeURL(`./fixtures/incoming-pre-gate/${file}.json`, import.meta.url), 'utf8'),
   );
   const event = raw.events.filter((event: { kind: string }) => event.kind === kind)[index];
   if (!event) throw Error(`Missing full historical event ${file}/${kind}`);
