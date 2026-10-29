@@ -7,7 +7,7 @@ it('authors five canonical actors and preserves the complete shared run through 
   const watch = openWatch(7);
   expect(watch.people.map((p) => p.id)).toEqual(['dai', 'callum', 'nerys', 'bilal', 'wren']);
   const archive = archiveWatch(watch.people[0]!);
-  expect(archive.run.engine.package).toBe('@adam0white/human-framework@4.13.0');
+  expect(archive.run.engine.package).toBe('@adam0white/human-framework@4.14.0');
   expect(verifyWatch(watch.people[0]!).verified).toBe(true);
   expect(() => {
     (watch.people[0]!.body as { health: number }).health = 0;

@@ -99,7 +99,7 @@ import {
   weirOf,
 } from './water.ts';
 
-export const GAME_VERSION = 'glance@hf413-1';
+export const GAME_VERSION = 'glance@hf414-1';
 export const NIGHTS = 12;
 export interface WatchRules {
   edition: 'extended-2';

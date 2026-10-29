@@ -154,7 +154,7 @@ export class Watch {
       id: `glance:${seed}`,
       seed,
       start,
-      host: { id: 'glance', edition: 'glance-hf413-1', schema: 'glance-run/1' },
+      host: { id: 'glance', edition: 'glance-hf414-1', schema: 'glance-run/1' },
       definitions: {
         actions: actions.map((id) => ({
           id,

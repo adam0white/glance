@@ -14,7 +14,7 @@ import {
   validatePortablePerson,
 } from '@adam0white/lab-client';
 import { type Person, watchOpenings } from './hf4.ts';
-export const RULES = 'glance-hf413-1';
+export const RULES = 'glance-hf414-1';
 export const DIALECT = 'glance-retained/4';
 export const OPENING_AT = 900 * 60_000;
 export type Chapter = {

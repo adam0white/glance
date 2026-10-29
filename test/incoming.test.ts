@@ -49,7 +49,7 @@ async function incoming(id = 'callum'): Promise<LifePreparation> {
     castRevision: cast.revision,
     branchId: 'incoming-control',
     parentRevision: null,
-    source: { game: 'glance', build: 'actual-public-opening', engine: '4.13.0', rules: 'glance-hf413-1' },
+    source: { game: 'glance', build: 'actual-public-opening', engine: '4.14.0', rules: 'glance-hf414-1' },
     transfer: { castPassport: `hf-portable-person/${portable.version}`, portable },
     limitations: [],
   });
