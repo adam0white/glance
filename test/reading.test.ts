@@ -1,5 +1,13 @@
 import { expect, it } from 'vitest';
-import { newGame, queueInput, type Report, reportWords, step } from '../src/sim/dam.ts';
+import {
+  cloneState,
+  newGame,
+  queueInput,
+  type Report,
+  reportWords,
+  restoreState,
+  step,
+} from '../src/sim/dam.ts';
 import { spoken, spokenFine } from '../src/sim/reading.ts';
 import { exportCurrent, importCurrent } from '../src/sim/run.ts';
 import { required } from './required.ts';
@@ -27,7 +35,7 @@ it('writes gauge reports at source without losing digits, uncertainty or the yaw
         expect(words).toMatch(/This is the weir reading\.|I read the weir board\./);
         expect(words).toContain('zero point five two');
         expect(words).not.toMatch(/Weir’s|Weir board|bang on|Torch is going/);
-        if (who === 'dai' && at % 3 === 0) expect(words).toContain('(a long yawn)');
+        expect(words).not.toContain('(a long yawn)');
         if (who === 'callum' && conf === 0.2) expect(words).toMatch(/could be higher|maybe higher/);
       }
     }
@@ -46,7 +54,7 @@ it('pins a player doubt to a received reading without changing the physical run'
   const s = newGame(7);
   queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level' });
   while (!s.board.level) step(s);
-  const control = structuredClone(s);
+  const control = restoreState(cloneState(s));
   const report = s.reports.indexOf(s.board.level);
   queueInput(s, { kind: 'doubt', report, marked: true });
   step(s);
@@ -63,12 +71,13 @@ it('pins a player doubt to a received reading without changing the physical run'
   expect(s.board.level).toMatchObject({ doubted: false });
 });
 
-it('keeps the reading bias different for each keeper and their condition', async () => {
-  const { biasOf } = await import('../src/sim/reading.ts');
-  const rested = { true: 0.9, felt: 0.9, fear: 0, cause: 'fresh' as const };
-  const tired = { ...rested, true: 0.3, cause: 'sleepy' as const };
-  expect(biasOf('dai', tired)).toBeLessThan(biasOf('dai', rested));
-  expect(biasOf('dai', tired)).toBeLessThan(0);
-  expect(biasOf('callum', tired)).toBeGreaterThan(0);
-  expect(biasOf('callum', { ...tired, fear: 0.8 })).toBeGreaterThan(biasOf('callum', tired));
+// SCOPE: HF4 replaces the old private per-keeper bias calibration. Inspecting the
+// desk never creates another quantity draw or invents a physiological cause.
+it('records only actual HF quantity evidence and leaves repeated report rendering pure', async () => {
+  const { archiveWatch } = await import('../src/sim/hf4.ts');
+  const s = newGame(7);
+  const before = archiveWatch(s.people[0]!);
+  for (const r of s.reports) reportWords(s, r);
+  expect(archiveWatch(s.people[0]!)).toEqual(before);
+  expect(s.reports.filter((r) => r.gauge === 'level').every((r) => r.cause === 'unattributed')).toBe(true);
 });

@@ -1,23 +1,15 @@
 /** Finite fictional scenes, only for private-scenes-1. HF owns choice and bodily attendance. */
-import {
-  type Affordance,
-  begin,
-  decide,
-  finish,
-  type Person,
-  readDoze,
-  reviewed,
-  seedVoice,
-  tick,
-} from '@adam0white/human-framework';
+
 import { lifeReady, rememberedConversation } from './cast.ts';
 import type { GameState } from './dam.ts';
+import { type Affordance, begin, decide, finish, type Person, readDoze, reviewed, tick } from './hf4.ts';
 import { hashUnit } from './rng.ts';
 import { viewingAway } from './viewing.ts';
 
 export type Corner = 'riverbank' | 'yard' | 'back-wall';
 export type PrivateAction =
   | 'telescope'
+  | 'telescope-return'
   | 'lamp'
   | 'adjust-lamp'
   | 'post-shape'
@@ -255,21 +247,57 @@ export function cancelPrivate(s: GameState, reason: string) {
 export function returnForRiver(s: GameState, reason = 'The river call interrupted the telescope trip.') {
   const o = s.privateScenes;
   if (o?.active?.action !== 'telescope' || o.active.returningFrom !== undefined) return;
-  o.active.returningFrom = s.minute;
-  o.active.reason = reason;
-  o.active.until = Math.min(o.active.until, s.minute + 5);
   const p = person(s, 'nerys');
-  if (p.activity) p.activity.endsAt = o.active.until;
+  if (p.activity)
+    finish(p, { action: p.activity.action, at: s.minute, status: 'interrupted', summary: reason });
+  o.active.reason = reason;
+  if (readDoze(p)?.asleep) {
+    say(
+      s,
+      'narrator',
+      'Nerys remains away at the telescope. She is asleep and cannot choose the return yet.',
+    );
+    return;
+  }
+  const proposed: Affordance = {
+    id: 'private-telescope-return',
+    action: 'walk',
+    label: 'carry the telescope back to the inn',
+    duration: 5,
+    effort: 0.15,
+    advertises: { rest: 0.15 },
+  };
+  const rec = decide(p, [proposed, ordinary], {
+    suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 },
+  });
+  if (
+    rec.chosenAffordanceId !== proposed.id ||
+    rec.suggestion?.verdict !== 'assented' ||
+    !begin(p, proposed, rec)
+  ) {
+    say(
+      s,
+      'narrator',
+      'Nerys did not choose to begin the return. She remains away; ask for the return separately.',
+    );
+    return;
+  }
+  o.active.returningFrom = s.minute;
+  o.active.until = s.minute + 5;
   say(
     s,
-    'nerys',
-    `${reason} I am packing and returning. Allow five minutes. Any river call remains pending.`,
+    'narrator',
+    `${reason} Nerys chose the five-minute return. Any river call remains pending until she actually arrives.`,
   );
 }
 export function requestPrivate(s: GameState, input: PrivateInput) {
   const o = s.privateScenes;
   if (!o) return;
   const { action } = input;
+  if (action === 'telescope-return') {
+    returnForRiver(s, 'The player asks for the separate return.');
+    return;
+  }
   if (action === 'stop') {
     cancelPrivate(s, 'The player stopped attending.');
     return;
@@ -331,7 +359,7 @@ export function requestPrivate(s: GameState, input: PrivateInput) {
     p = person(s, id),
     proposed = offer(action);
   tick(p, s.minute);
-  seedVoice(p, 'engineer', 0.5);
+  // Existing held voice trust is never reseeded by an invitation.
   const rec = decide(p, [proposed, ordinary], {
     suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 },
   });
@@ -378,16 +406,23 @@ export function advancePrivate(s: GameState) {
   if (!a) return;
   const p = person(s, a.person);
   if (active.returningFrom !== undefined) {
+    if (!p.activity || readDoze(p)?.asleep) {
+      delete active.returningFrom;
+      active.reason = 'The return stopped. Nerys remains away.';
+      return;
+    }
     if (s.minute >= active.until) {
       if (a.stoppedAt === undefined) {
-        stopPerson(p, s.minute, 'interrupted');
+        stopPerson(p, s.minute, 'completed');
         a.stoppedAt = s.minute;
         a.reason = active.reason;
       }
+      stopPerson(p, s.minute, 'completed');
       delete o.active;
     }
     return;
   }
+  if (active.reason) return;
   if (
     s.phase !== 'watch' ||
     s.night !== a.night ||

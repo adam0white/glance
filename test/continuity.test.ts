@@ -1,529 +1,103 @@
-import { castForGame } from '@adam0white/lab-client';
-import { expect, it, vi } from 'vitest';
-import { exportRun, fingerprint, newGame, replay } from '../src/sim/dam.ts';
-import { admitResident } from '../src/sim/passport.ts';
-import { required } from './required.ts';
+/** SCOPE: unsupported historical inputs and current outbound custody still refuse. Historical
+ * HF3 passport success receipts stay immutable; these tests assert current refusal,
+ * per-person skipping, held-state safety and real complete native continuation. */
 
-it('uses released complete profiles and refuses a public profile in place of a passport', () => {
-  const s = newGame(7);
-  const dai = required(s.people[0]);
-  expect(dai.traits).toEqual(required(castForGame('glance').find((c) => c.name === 'Dai')).traits);
-  expect(() =>
-    admitResident({ parent: { castId: 'hf.cast.dai.glance', transfer: {} }, clockMs: 0 } as never, dai),
-  ).toThrow();
-  const ex = exportRun(s, '2.23.0');
-  expect(fingerprint(replay(ex.seed, ex.inputs, ex.state.minute, ex.state.chapter ?? undefined))).toBe(
-    fingerprint(s),
-  );
-});
+import type { Lab } from '@adam0white/lab-client';
+import { IDBFactory } from 'fake-indexeddb';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-// Synthetic protocol/semantic controls. These are not browser journey evidence.
-import { createPerson, snapshot } from '@adam0white/human-framework';
-import {
-  acceptPersona,
-  acceptPersonaBatch,
-  canonicalCast,
-  createPersona,
-  initialPersonaLife,
-  type Lab,
-  type PersonaEnvelope,
-  type PersonaRequest,
-  type PersonaShelfState,
-  preparePersonaLife,
-} from '@adam0white/lab-client';
+beforeEach(() => vi.stubGlobal('indexedDB', new IDBFactory()));
+afterEach(() => vi.unstubAllGlobals());
+
 import { Continuity, watchShelfPreference } from '../src/continuity.ts';
-import { queueInput, step } from '../src/sim/dam.ts';
-import { residentTransfer } from '../src/sim/passport.ts';
-import { exportCurrent, importCurrent } from '../src/sim/run.ts';
+import { ALLOCATION } from '../src/sim/cast.ts';
+import { cloneState, newGame, queueInput, step } from '../src/sim/dam.ts';
+import { exportCurrent } from '../src/sim/run.ts';
 
-const clock = 1_790_000_000_000;
-async function source(id = 'nerys', peer = false) {
-  const castId = `hf.cast.${id}.glance`;
-  const c = canonicalCast(castId);
-  const p = createPerson({
-    id: peer ? castId : id,
-    name: c.name,
-    seed: 71,
-    now: 555,
-    bornAt: 555 - c.age * 525600,
-    sex: id === 'nerys' ? 'female' : 'male',
-    traits: c.traits,
-    values: c.values,
-    body: { fitness: 0.61 },
-  });
-  const captured = await residentTransfer(p);
-  if (peer) {
-    captured.transfer.castPassport = 'commonstead-cast/1';
-    captured.transfer.person.person.mappingVersion = 'commonstead-calendar/1';
-  }
-  return createPersona({
-    format: 'hf-persona/1',
-    castId,
-    castRevision: c.revision,
-    branchId: `control-${castId}`,
-    parentRevision: null,
-    source: {
-      game: peer ? 'commonstead' : 'glance',
-      build: 'synthetic-control',
-      engine: '2.23.0',
-      rules: peer ? 'commonstead-3' : 'glance-4',
-    },
-    transfer: { ...captured.transfer, life: initialPersonaLife(castId, `control-${castId}`, clock) },
-    limitations: captured.limitations,
-  });
-}
-function harness(initial: PersonaEnvelope[] = [], now = clock) {
-  let data: PersonaShelfState = { heads: {}, revisions: [] };
-  for (const p of initial) data = acceptPersona(data, p);
-  let allowed = false;
-  let epoch = 'opaque-control-epoch';
-  let rotate = false;
-  let key: string | null = null;
-  let delay: ((value: unknown) => void) | null = null;
-  const requests: PersonaRequest[] = [];
-  const lab = {
-    setPersonaRecording: (value: string | null) => {
-      if (key !== value) {
-        allowed = value === null;
-        key = value;
-      }
-    },
-    allowPersonaRecording: (value: boolean) => {
-      allowed = value;
-    },
-    build: () => ({ c: 'synthetic-control' }),
-  } as unknown as Lab;
+function harness(blocked: unknown[] = []) {
+  const requests: any[] = [];
   const shelf = {
     enabled: true,
-    ready: Promise.resolve(true),
-    setEnabled(value: boolean) {
-      this.enabled = value;
-    },
-    async request<T>(request: PersonaRequest): Promise<T> {
-      requests.push(request);
-      if (request.action === 'prepareBatch')
+    ready: Promise.resolve(),
+    request: async (r: any) => {
+      requests.push(structuredClone(r));
+      if (r.action === 'prepareBatch')
         return {
-          expectedHeads: Object.fromEntries(
-            (request.castIds ?? []).map((id) => [id, data.heads[id] ?? null]),
-          ),
-          inputs: (request.castIds ?? []).flatMap((id) => {
-            const p = data.revisions.find((p) => p.revision === data.heads[id]);
-            return p ? [preparePersonaLife(p, now)] : [];
-          }),
-          blocked: [],
-        } as T;
-      if (request.action === 'putBatch') {
-        data = acceptPersonaBatch(data, request.envelopes ?? [], request.expectedHeads);
-        return null as T;
-      }
-      if (request.action === 'put') {
-        data = acceptPersona(data, required(request.envelope), request.fork);
-        return null as T;
-      }
-      if (request.action === 'recordingBatch') {
-        if (new Set(request.envelopes?.map((p) => p.castId)).size !== request.envelopes?.length)
-          throw new Error('Batch requires distinct cast IDs');
-        const response = {
-          sameEpoch: request.allowRecording === true,
-          revisions: request.envelopes?.map((p) => p.revision) ?? [],
-          recordingEpoch: epoch,
+          expectedHeads: Object.fromEntries(ALLOCATION.map((a) => [a.castId, null])),
+          inputs: [],
+          blocked,
         };
-        if (request.allowRecording && rotate) {
-          rotate = false;
-          epoch = 'different-control-epoch';
-          response.recordingEpoch = epoch;
-        }
-        if (delay) {
-          const release = delay;
-          delay = null;
-          return await new Promise<T>((resolve) => release(() => resolve(response as T)));
-        }
-        return response as T;
-      }
-      return { recordingEpoch: 'opaque-control-epoch' } as T;
+      return null;
     },
   };
-  return {
-    lab,
-    shelf,
-    requests,
-    get data() {
-      return data;
-    },
-    get allowed() {
-      return allowed;
-    },
-    rotateAfterApproval() {
-      rotate = true;
-    },
-    defer(callback: (resume: unknown) => void) {
-      delay = callback;
-    },
-  };
+  const lab = {
+    build: () => ({ c: 'test' }),
+    setPersonaRecording() {},
+    allowPersonaRecording: async () => false,
+  } as unknown as Lab;
+  return { c: new Continuity(lab, shelf as never), shelf, requests };
 }
-
-it('preflights all five heads then atomically claims two, preserving actual state and deterministic replay', async () => {
-  const n = await source('nerys', true),
-    c = await source('callum');
-  const h = harness([n, c]);
-  const runtime = new Continuity(h.lab, h.shelf);
-  const s = await runtime.fresh(7);
-  expect(s.chapter?.inputs).toHaveLength(2);
-  for (const person of s.people) expect(person.lexicon?.plainEnglish).toBe(true);
-  for (const person of Object.values(required(s.chapter).initial))
-    expect(person.lexicon?.plainEnglish).toBe(true);
-  expect(h.requests.filter((r) => r.action === 'putBatch')).toHaveLength(1);
-  expect(
-    Object.keys(required(required(h.requests.find((r) => r.action === 'putBatch')).expectedHeads)),
-  ).toHaveLength(5);
-  expect(required(s.people.find((p) => p.id === 'nerys')).body.fitness).toBe(0.61);
-  expect(required(s.people.find((p) => p.id === 'callum')).traits).toEqual(
-    (c.transfer.person as Awaited<ReturnType<typeof residentTransfer>>['transfer']['person']).person.traits,
-  );
-  queueInput(s, { kind: 'ring' });
-  step(s);
-  expect(exportCurrent(importCurrent(exportCurrent(s)))).toEqual(exportCurrent(s));
-  const loaded = await runtime.loadLocal(runtime.localSave(s));
-  expect(runtime.heads.map((p) => p.revision)).toEqual(required(s.chapter).claims.map((p) => p.revision));
-  await runtime.importFile(JSON.stringify(exportCurrent(loaded)));
-  expect(runtime.heads).toHaveLength(0);
-  expect(runtime.fileOrigin).toBe(true);
-  await runtime.recording();
-  expect(h.allowed).toBe(false);
-  await runtime.recording(true);
+it('names unsupported people and starts the other local people without claiming histories', async () => {
+  const { c, requests } = harness([{ castId: 'hf.cast.dai.glance', reason: 'Unsupported source family' }]);
+  const s = await c.fresh(7);
+  expect(s.people.map((p) => p.id)).toEqual(['dai', 'callum', 'nerys', 'bilal', 'wren']);
+  expect(c.status).toContain('Dai');
+  expect(c.status).toContain('Unsupported source family');
+  expect(c.heads).toEqual([]);
+  expect(requests.filter((r) => r.action === 'putBatch').flatMap((r) => r.envelopes)).toEqual([]);
 });
-it('fails the whole admission before CAS on one unsupported person or dam qualification', async () => {
-  const n = await source('nerys', true),
-    d = await source('dai', true);
-  const h = harness([n, d]);
-  const runtime = new Continuity(h.lab, h.shelf);
-  await expect(runtime.fresh(7)).rejects.toThrow(/dam operating/);
-  expect(h.requests.some((r) => r.action === 'putBatch')).toBe(false);
-  expect(h.data.heads[n.castId]).toBe(n.revision);
+it('refuses every actor before any publication operation even when the source is idle', async () => {
+  const { c, requests } = harness();
+  await c.fresh(7, true);
+  for (const actor of ALLOCATION)
+    await expect(c.checkpoint(actor.castId)).rejects.toThrow('no person or source history was published');
+  expect(requests).toEqual([]);
 });
-
-it('consumes seeded away-life through actual extra-work availability and preserves pinned clock', async () => {
-  const n = await source('nerys', true);
-  let found = false;
-  for (let days = 1; days < 12; days++) {
-    const h = harness([n], clock + days * 86400000);
-    const runtime = new Continuity(h.lab, h.shelf);
-    const s = await runtime.fresh(7);
-    const life = required(s.life.nerys);
-    expect(life).toBeDefined();
-    if (!life.availableForExtraWork) {
-      found = true;
-      expect(required(required(s.chapter).inputs[0]).clockMs).toBeGreaterThan(clock);
-      expect((await runtime.loadLocal(runtime.localSave(s))).life.nerys).toEqual(life);
-      break;
-    }
-  }
-  expect(found).toBe(true);
+it('preserves the native held source and original text on older or forged file refusal', async () => {
+  const { c } = harness();
+  const s = await c.fresh(7, true);
+  const before = c.localSave(s);
+  const old = exportCurrent(newGame(7));
+  old.framework = '3.0.0';
+  await expect(c.importFile(JSON.stringify(old))).rejects.toThrow('unsupported');
+  expect(c.localSave(s)).toBe(before);
+  const forged = exportCurrent(s);
+  forged.state.minute++;
+  await expect(c.importFile(JSON.stringify(forged))).rejects.toThrow();
+  expect(c.localSave(s)).toBe(before);
 });
-
-it('continues its exact accepted head after local reload, and refuses a competing chapter without retry', async () => {
-  const n = await source('nerys', true);
-  const h = harness([n]);
-  const runtime = new Continuity(h.lab, h.shelf);
-  const s = await runtime.fresh(7);
+it('continues both native source histories after a real local reload', async () => {
+  const { c } = harness();
+  const s = await c.fresh(7, true);
   queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level' });
   step(s);
-  queueInput(s, { kind: 'pause' });
-  for (let i = 0; i < 100 && !s.chapterPaused; i++) step(s);
-  expect(s.chapterPaused).toBe(true);
-  await runtime.checkpoint(n.castId);
-  const saved = runtime.localSave(s),
-    own = required(runtime.heads[0]).revision;
-  await runtime.loadLocal(saved);
-  await runtime.checkpoint(n.castId);
-  expect(required(runtime.heads[0]).parentRevision).toBe(own);
-  const rival = new Continuity(h.lab, h.shelf);
-  await rival.fresh(8);
-  await expect(runtime.checkpoint(n.castId)).rejects.toThrow();
-  expect(required(runtime.heads[0]).revision).not.toBe(h.data.heads[n.castId]);
-});
-
-it('refuses an unrecorded death before terminal publication or ownership changes', async () => {
-  const n = await source('nerys', true);
-  const h = harness([n]);
-  const runtime = new Continuity(h.lab, h.shelf);
-  const s = await runtime.fresh(7);
+  const saved = c.localSave(s);
+  const other = harness();
+  const loaded = await other.c.loadLocal(saved);
   queueInput(s, { kind: 'ring' });
+  queueInput(loaded, { kind: 'ring' });
   step(s);
-  required(s.people.find((p) => p.id === 'nerys')).body.alive = false; // synthetic actual-owned-death protocol control
-  // No authored lethal input exists. A mutable Person flag is not actual source authority.
-  const heads = structuredClone(runtime.heads);
-  await expect(runtime.checkpoint(n.castId)).rejects.toThrow(/replay/);
-  expect(runtime.heads).toEqual(heads);
-  expect(runtime.sources).toEqual([]);
-  expect(h.requests.some((r) => r.action === 'put')).toBe(false);
+  step(loaded);
+  expect(cloneState(loaded)).toEqual(cloneState(s));
 });
-it('resumes a paused watch through the same logged control in live play and replay', () => {
-  const s = newGame(7);
-  queueInput(s, { kind: 'pause' });
-  step(s);
-  for (let i = 0; i < 100 && !s.chapterPaused; i++) step(s);
-  expect(s.chapterPaused).toBe(true);
-  queueInput(s, { kind: 'resume' });
-  expect(s.chapterPaused).toBe(false);
-  step(s);
-  expect(fingerprint(importCurrent(exportCurrent(s)))).toBe(fingerprint(s));
-});
-it('carried Nerys availability changes an ordinary night-two river call', async () => {
-  const n = await source('nerys', true);
-  let s: ReturnType<typeof newGame> | undefined;
-  for (let day = 1; day < 12; day++) {
-    const h = harness([n], clock + day * 86400000);
-    const runtime = new Continuity(h.lab, h.shelf);
-    const candidate = await runtime.fresh(7);
-    if (!candidate.life.nerys?.availableForExtraWork) {
-      s = candidate;
-      break;
-    }
-  }
-  expect(s).toBeDefined();
-  if (!s) throw new Error('control not found');
-  queueInput(s, { kind: 'ask', keeper: 'dai', job: 'gate', target: 4 });
-  while (s.phase === 'watch') step(s);
-  expect(s.phase).toBe('dawn');
-  queueInput(s, { kind: 'next' });
-  queueInput(s, { kind: 'ring' });
-  step(s);
-  expect(s.nerys.ringing).toBeNull();
-  expect(s.said.at(-1)?.text).toContain('half past');
-  for (let i = 0; i < 30; i++) step(s);
-  queueInput(s, { kind: 'ring' });
-  step(s);
-  expect(s.nerys.ringing).not.toBeNull();
-});
-
-it('recording preference changes do not cancel a chapter waiting for the shelf', async () => {
-  const h = harness();
-  let finish: (value: boolean) => void = () => {};
-  h.shelf.ready = new Promise<boolean>((resolve) => {
-    finish = resolve;
-  });
-  const continuity = new Continuity(h.lab, h.shelf);
-  const events = new EventTarget();
-  const stop = watchShelfPreference(() => continuity.invalidate(), events);
-  const pending = continuity.fresh(42);
-  events.dispatchEvent(new Event('hf-lab-preference'));
-  events.dispatchEvent(Object.assign(new Event('storage'), { key: 'hf-persona-recording:old-history' }));
-  finish(true);
-  await expect(pending).resolves.toBeDefined();
-  stop();
-});
-
-it('browser-person continuity changes still cancel a chapter waiting for the shelf', async () => {
-  const h = harness();
-  let finish: (value: boolean) => void = () => {};
-  h.shelf.ready = new Promise<boolean>((resolve) => {
-    finish = resolve;
-  });
-  const continuity = new Continuity(h.lab, h.shelf);
-  const events = new EventTarget();
-  const stop = watchShelfPreference(() => continuity.invalidate(), events);
-  const pending = continuity.fresh(42);
-  events.dispatchEvent(new Event('hf-persona-preference'));
-  finish(true);
-  await expect(pending).rejects.toThrow(/changed/i);
-  stop();
-});
-
-it('recording metadata and checkpoint publication do not query historical recording permission', async () => {
-  const h = harness();
-  const request = h.shelf.request.bind(h.shelf);
-  h.shelf.request = async (r) => {
-    if (r.action === 'recording' || r.action === 'recordingBatch') throw new Error('obsolete recording RPC');
-    return request(r);
-  };
-  const c = new Continuity(h.lab, h.shelf);
-  const state = await c.fresh(42);
-  queueInput(state, { kind: 'ask', keeper: 'dai', job: 'level' });
-  step(state);
-  queueInput(state, { kind: 'pause' });
-  for (let i = 0; i < 100 && !state.chapterPaused; i++) step(state);
-  await c.recording(true);
-  await c.deny();
-  await c.checkpoint('hf.cast.nerys.glance');
-});
-
-it.each(['prepareBatch', 'putBatch'])(
-  'preserves old receipts when real admission fails at %s',
-  async (stage) => {
-    const h = harness([await source('nerys', true)]);
-    const runtime = new Continuity(h.lab, h.shelf);
-    const previous = await runtime.fresh(7);
-    const saved = runtime.localSave(previous);
-    const heads = structuredClone(runtime.heads);
-    const request = h.shelf.request.bind(h.shelf);
-    let attempts = 0;
-    h.shelf.request = async (r) => {
-      if (r.action === stage) {
-        attempts++;
-        // Model an accepted batch whose reply was lost, as well as a failed preflight.
-        if (stage === 'putBatch') await request(r);
-        throw new Error('Shelf unavailable. Use a local file.');
-      }
-      return request(r);
-    };
-    await expect(runtime.fresh(8)).rejects.toThrow('Shelf unavailable');
-    expect(attempts).toBe(1);
-    expect(runtime.heads).toEqual(heads);
-    expect(runtime.localSave(previous)).toBe(saved);
-    expect(runtime.busy).toBe(false);
-  },
-);
-
-it('receives actual paused Commonstead Nerys and replays the complete current notebook', async () => {
-  const { readFileSync } = await import('node:fs');
-  const { createHash } = await import('node:crypto');
-  const { canonicalPersona } = await import('@adam0white/lab-client');
-  const fixture = JSON.parse(
-    readFileSync(new URL('./fixtures/commonstead-nerys-hf3.json', import.meta.url), 'utf8'),
-  );
-  const parent = fixture.envelope as PersonaEnvelope;
-  expect(parent.source).toMatchObject({ game: 'commonstead', rules: 'commonstead-3', engine: '2.23.0' });
-  expect(createHash('sha256').update(canonicalPersona(fixture.raw)).digest('hex')).toBe(
-    (parent.transfer.checkpoint as { sha256: string }).sha256,
-  );
-  expect(fixture.raw.activity).toBeNull();
-  const h = harness(
-    [parent],
-    (parent.transfer.life as import('@adam0white/lab-client').PersonaLife).clock.watermark * 3_600_000,
-  );
-  const runtime = new Continuity(h.lab, h.shelf);
-  const s = await runtime.fresh(42);
-  expect(s.chapter?.inputs).toHaveLength(1);
-  expect(s.chapter?.inputs[0]?.parent.revision).toBe(parent.revision);
-  queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level' });
-  for (let i = 0; i < 60; i++) step(s);
-  expect(exportCurrent(importCurrent(exportCurrent(s)))).toEqual(exportCurrent(s));
-  const input = preparePersonaLife(
-    parent,
-    (parent.transfer.life as import('@adam0white/lab-client').PersonaLife).clock.watermark * 3_600_000,
-  );
-  const opening = newGame(42).people.find((p) => p.id === 'nerys');
-  if (!opening) throw new Error('Missing Nerys');
-  for (const field of ['rules', 'engine'] as const) {
-    const wrong = structuredClone(input);
-    wrong.parent.source[field] = 'unsupported';
-    expect(() => admitResident(wrong, opening)).toThrow();
-  }
-});
-
-it('automatically enables the supported shelf channel before admitting matching people', async () => {
-  const parent = await source('nerys', true);
-  const h = harness([parent]);
-  h.shelf.enabled = false;
-  const setEnabled = vi.spyOn(h.shelf, 'setEnabled');
-  const runtime = new Continuity(h.lab, h.shelf);
-  const s = await runtime.fresh(71);
-  expect(setEnabled).toHaveBeenCalledWith(true);
-  expect(s.chapter?.inputs.some((input) => input.parent.castId === parent.castId)).toBe(true);
-  expect(h.requests.some((request) => request.action === 'prepareBatch')).toBe(true);
-});
-
-it('publishes a naturally finished native chapter without requiring an unreachable pause input', async () => {
-  const h = harness();
-  const runtime = new Continuity(h.lab, h.shelf);
-  const state = await runtime.fresh(7);
-  while (state.phase !== 'end') {
-    if (state.phase === 'dawn') queueInput(state, { kind: 'next' });
-    else step(state);
-  }
-  expect(state.chapterPaused).toBe(false);
-  const result = await runtime.checkpointAll();
-  const puts = h.requests.filter((r) => r.action === 'put');
-  expect(result.published).toBe(puts.length);
-  expect(result.refused).toBe(5 - puts.length);
-  expect(h.requests.some((r) => r.action === 'put' && r.envelope?.castId === 'hf.cast.nerys.glance')).toBe(
-    true,
-  );
-  expect(runtime.sources).toHaveLength(result.published);
-  for (const put of puts) {
-    const retained = required(runtime.sources.find((entry) => entry.revision === put.envelope?.revision));
-    const id = String(put.envelope?.transfer.sourceRole);
-    expect(retained.snapshot).toEqual(snapshot(required(state.people.find((p) => p.id === id))));
-  }
-  expect(exportCurrent(importCurrent(exportCurrent(state)))).toEqual(exportCurrent(state));
-});
-
-it('refuses a native checkpoint at archive capacity without dropping any retained source or publishing', async () => {
-  const h = harness();
-  const runtime = new Continuity(h.lab, h.shelf);
-  const state = await runtime.fresh(7);
-  while (state.phase !== 'end') {
-    if (state.phase === 'dawn') queueInput(state, { kind: 'next' });
-    else step(state);
-  }
-  const retained = {
-    revision: 'a'.repeat(64),
-    source: runtime.source(),
-    snapshot: snapshot(required(state.people.find((p) => p.id === 'nerys'))),
-    raw: '',
-  };
-  runtime.sources = [retained];
-  retained.raw = 'é'.repeat(999900 - JSON.stringify(runtime.sources).length);
-  expect(JSON.stringify(runtime.sources).length).toBe(999900);
-  expect(new TextEncoder().encode(JSON.stringify(runtime.sources)).byteLength).toBeGreaterThan(1_000_000);
-  const world = exportCurrent(state);
-  const claims = structuredClone(runtime.heads);
-  const before = JSON.stringify(runtime.sources);
-  await expect(runtime.checkpoint('hf.cast.nerys.glance')).rejects.toThrow(/archive.*capacity/i);
-  expect(JSON.stringify(runtime.sources)).toBe(before);
-  expect(h.requests.some((r) => r.action === 'put')).toBe(false);
-  expect(runtime.heads).toEqual(claims);
-  expect(exportCurrent(state)).toEqual(world);
-});
-
-it('refuses a fabricated ending through the complete current source verifier', async () => {
-  const h = harness();
-  const runtime = new Continuity(h.lab, h.shelf);
-  const state = await runtime.fresh(7);
-  queueInput(state, { kind: 'ring' });
-  step(state);
-  state.phase = 'end';
-  await expect(runtime.checkpoint('hf.cast.nerys.glance')).rejects.toThrow(/replay/i);
-  expect(runtime.sources).toEqual([]);
-  expect(h.requests.some((r) => r.action === 'put')).toBe(false);
-});
-
-// Independent reviewer control: queued ending publication must not write a successor run.
-it('review: cancellation during ending publication leaves successor status untouched', async () => {
-  const h = harness();
-  const changed = vi.fn();
-  const runtime = new Continuity(h.lab, h.shelf, changed);
-  const state = await runtime.fresh(7);
-  while (state.phase !== 'end') {
-    if (state.phase === 'dawn') queueInput(state, { kind: 'next' });
-    else step(state);
-  }
+it('cancels stale shelf preparation without installing or claiming its result', async () => {
   let release!: () => void;
-  let entered!: () => void;
-  const enteredPut = new Promise<void>((resolve) => {
-    entered = resolve;
-  });
-  const original = h.shelf.request.bind(h.shelf);
-  h.shelf.request = async <T>(r: PersonaRequest): Promise<T> => {
-    if (r.action === 'put') {
-      entered();
-      await new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      throw new Error('old ending refused');
-    }
-    return original<T>(r);
-  };
-  const pending = runtime.checkpointAll();
-  await enteredPut;
-  runtime.clear();
-  runtime.status = 'successor status';
-  changed.mockClear();
+  const h = harness();
+  h.shelf.ready = new Promise<void>((r) => {
+    release = r;
+  }) as never;
+  const pending = h.c.fresh(7);
+  h.c.invalidate();
   release();
-  await pending;
-  expect(runtime.status).toBe('successor status');
-  expect(changed).not.toHaveBeenCalled();
-  expect(runtime.heads).toEqual([]);
-  expect(runtime.sources).toEqual([]);
+  await expect(pending).rejects.toThrow();
+  expect(h.requests).toEqual([]);
+  expect(h.c.heads).toEqual([]);
+});
+it('keeps recording changes separate from identity cancellation', () => {
+  const target = new EventTarget();
+  const invalidate = vi.fn();
+  const close = watchShelfPreference(invalidate, target);
+  target.dispatchEvent(new Event('storage'));
+  expect(invalidate).not.toHaveBeenCalled();
+  close();
 });

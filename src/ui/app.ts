@@ -6,16 +6,17 @@ import {
   telemetryOn,
 } from '@adam0white/lab-kit';
 import { required } from '../required.ts';
+import { displayOwner } from '../sim/display.ts';
 import { callumAway, daiAway, type KeeperSceneAction, keeperSceneAvailable } from '../sim/keeper-scenes.ts';
 import { type RotaAction, rotaAvailable, rotaAway, rotaStatus, rotaTerms } from '../sim/rota.ts';
 import { catchWords, durationWords } from './watch-copy.ts';
+
 /**
  * The Glance UI: DOM for the board, the radio log and the sheets; one canvas for the dam. The UI reads state and
  * queues inputs; it never changes the sim directly. Real time drives sim minutes, continuously, slowing while a
  * sheet is open. Game menus and notebook dialogs hold time.
  */
 
-import { FRAMEWORK_VERSION } from '@adam0white/human-framework';
 import {
   FEEDBACK_LABELS,
   type FeedbackLabel,
@@ -49,7 +50,6 @@ import {
   PLANS,
   personOf,
   planOf,
-  queueInput,
   type Report,
   reportWords,
   restoreState,
@@ -60,11 +60,10 @@ import {
   watchFrom,
   weatherOutlook,
 } from '../sim/dam.ts';
+import { FRAMEWORK_VERSION } from '../sim/hf4.ts';
 import { KEEPERS, type KeeperId, NAMES } from '../sim/keepers.ts';
 import { type OutcomeTask, outcomeAvailable } from '../sim/outcomes.ts';
-import { practiceNight } from '../sim/practice.ts';
 import { type Corner, cornerSky, type PrivateAction, privateAvailable } from '../sim/private-scenes.ts';
-import { importCurrent } from '../sim/run.ts';
 import {
   type ViewingAction,
   viewingAvailable,
@@ -72,6 +71,7 @@ import {
   viewingStatus,
 } from '../sim/viewing.ts';
 import { CREST, LIP, TURNS } from '../sim/water.ts';
+import { CandidateValidation } from '../validation.ts';
 import { concernLines, thresholdWords } from './concern.ts';
 import { drawDawn } from './dawn.ts';
 import { lab } from './lab.ts';
@@ -97,6 +97,9 @@ const continuity = new Continuity(
   },
   fileMode,
 );
+continuity.inspectionChanged = () => {
+  if (s) drawSheet();
+};
 let selectedRate = 1.4;
 let paceChoice = 'Automatic';
 let skipUntil = 0;
@@ -137,6 +140,7 @@ const fx: SceneFx = { flashAt: -1e9 };
 let wake: { release(): Promise<void> } | null = null;
 const seen = { hold: false };
 
+let openingAttempt = 0;
 let tracked = false;
 function trackRun() {
   if (tracked) return;
@@ -151,35 +155,41 @@ function trackRun() {
 }
 if (!fileMode) trackRun();
 
-// File play checks the complete next export before installing a simulation change.
-// Snapshot/restore preserves every Person and raw RNG; admission still uses replay.
-function fileMutation(state: GameState, change: (candidate: GameState) => void) {
-  if (!fileMode) {
-    change(state);
-    return;
-  }
-  const candidate = restoreState(cloneState(state));
-  change(candidate);
+// The worker owns every current actor and physical source step. The held page
+// remains the last accepted inspection while a candidate operation is pending.
+let mutating = 0;
+async function mutateNow(state: GameState, request: { input?: NewInput; minutes?: number }) {
+  const owner = displayOwner(state);
+  if (!owner) throw Error('The watch could not be opened.');
+  // Admission preferences can change without replacing this owning Run.
+  const runId = continuity.runId;
+  const current = () => state === s && displayOwner(state) === owner && continuity.runId === runId;
+  mutating++;
   try {
-    continuity.exportSession(candidate);
-  } catch {
+    await owner.mutate(request);
+    if (!current()) return;
+    drawAll();
+    writeSave();
+    return true;
+  } catch (error) {
+    if (!current()) return;
     cancelAnimationFrame(raf);
     const d = dialog(
-      'file-capacity',
-      'Download this run',
-      '<p>This file has reached the size this page can reopen. Download the complete current run before closing.</p><button id="capacity-download">Download this run</button>',
+      'watch-work',
+      'Keep this watch',
+      `<p>The watch could not advance. The last accepted watch is unchanged. Download the complete current run before closing.</p><details><summary>Debug</summary><pre>${esc(String(error))}</pre></details><button id="capacity-download">Download this run</button>`,
     );
     d.querySelector('#capacity-download')?.addEventListener('click', download);
-    return;
+    return false;
+  } finally {
+    mutating--;
   }
-  for (const key of Object.keys(state)) if (!(key in candidate)) Reflect.deleteProperty(state, key);
-  Object.assign(state, candidate);
 }
 function inputNow(state: GameState, input: NewInput) {
-  fileMutation(state, (candidate) => queueInput(candidate, input));
+  return mutateNow(state, { input });
 }
 function stepNow(state: GameState) {
-  fileMutation(state, (candidate) => step(candidate));
+  return mutateNow(state, { minutes: 1 });
 }
 
 // ---------- save ----------
@@ -380,6 +390,7 @@ function title() {
     fileChooser();
     return;
   }
+  openingAttempt++;
   destroyStage();
   continuity.invalidate();
   cancelAnimationFrame(raf);
@@ -388,19 +399,13 @@ function title() {
   skipUntil = 0;
   lab.screen('title');
   const save = readSave();
-  let restored: GameState | null = null;
-  try {
-    if (save) restored = importCurrent(save.run);
-  } catch {
-    /* Explicit fresh play remains available. */
-  }
   app.innerHTML = `<div class="page screen title-screen">${topbar('', true)}
     <div class="page-body"><h1>The Glance</h1><p class="subtitle">You work at a night desk above a valley town.</p>
     <button class="sample-morning" id="sample" aria-label="Read a sample morning"><canvas id="sample-chart" aria-label="A good morning: the water fell and the town stayed dry"></canvas><span>A good morning: the gate opened early, the level fell, the river rose later, and the town stayed dry.</span></button>
     <p id="goal">Keep the water below the top of the dam. Keep the town dry, or warn people before it floods. ${durationWords(true)}</p>
     <label for="dam-choice">Dam for a new game</label><select id="dam-choice"><option value="valley">Valley dam</option><option value="upper">Upper dam — harder: longer paths, slower river response</option></select><details><summary>Life during the watch</summary><p>Water keeps flowing between nights. Keepers can consider standing requests. Bilal may cover gauge rounds after his own work and a briefing.</p><p>The keepers may choose joint handover, record correction and covered rest. Dai’s visit and retirement and home-rest proposals take time; proposals await responses. A visit needs chosen cover, attendance and return. Nerys’s telescope trip, Bilal’s shadow play and post, and Wren’s appendix are available when their duties allow. Each person chooses; attended scenes take time. No sighting, reply or habitat finding is promised.</p></details>
-    ${debugFooter()}</div>
-    <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">${restored ? `${planOf(restored).title} night · ${clock(restored.minute)}` : ''}</p><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
+    <p id="continuity-status" role="status">${esc(continuity.status)}</p><div id="prepared-openings" role="status"></div>${debugFooter()}</div>
+    <div class="actionbar title-actions">${save ? `<button class="primary" id="cont">Resume</button><p class="save-time">Saved watch</p><p id="resume-status" role="status"></p><button id="cancel-resume" hidden>Cancel opening</button><button id="new">New game</button><div id="restart-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="confirm-new">Yes, start again</button><button id="cancel-new">No</button></div>` : '<button class="primary" id="new">Start game</button>'}
     </div></div>`;
   bindTopbar();
   drawDawn(document.getElementById('sample-chart') as HTMLCanvasElement, SAMPLE_DAWN);
@@ -408,17 +413,57 @@ function title() {
     const d = dialog('sample-page', 'A sample morning', reportBody(SAMPLE_DAWN, false, true));
     drawDawn(d.querySelector('#chart') as HTMLCanvasElement, SAMPLE_DAWN);
   });
+  const titleGeneration = continuity.generation;
+  void continuity
+    .pendingPreparations(() => localStorage.getItem(SAVE))
+    .then((records) => {
+      if (screen !== 'title' || continuity.generation !== titleGeneration) return;
+      const pending = records;
+      const host = document.getElementById('prepared-openings');
+      if (!host || !pending.length) return;
+      host.innerHTML =
+        '<p>A complete prepared opening is saved. Its shelf claim must be confirmed before it can open. Your current saved watch stays available.</p>';
+      for (const record of pending) {
+        const button = document.createElement('button');
+        button.textContent = 'Check prepared opening';
+        button.addEventListener('click', async () => {
+          const attempt = ++openingAttempt;
+          continuity.invalidate();
+          cancelAnimationFrame(raf);
+          button.disabled = true;
+          try {
+            const state = await continuity.recoverPrepared(record.id, () => localStorage.getItem(SAVE));
+            if (attempt !== openingAttempt) return;
+            s = state;
+            enter();
+          } catch (error) {
+            if (attempt !== openingAttempt || !host.isConnected) return;
+            const message = document.createElement('p');
+            message.textContent = String(error);
+            host.append(message);
+          } finally {
+            if (button.isConnected) button.disabled = false;
+          }
+        });
+        host.append(button);
+      }
+    })
+    .catch(() => {});
+  document.getElementById('cancel-resume')?.addEventListener('click', () => {
+    openingAttempt++;
+    continuity.invalidate();
+    const status = document.getElementById('resume-status');
+    if (status) status.textContent = 'Opening cancelled. Your saved watch is unchanged.';
+    document.getElementById('cancel-resume')?.setAttribute('hidden', '');
+  });
   document.getElementById('cont')?.addEventListener('click', async () => {
-    if (!restored) {
-      startError(
-        new Error('The saved run could not be read.'),
-        () => document.getElementById('cont')?.click(),
-        'load',
-      );
-      return;
-    }
+    const attempt = ++openingAttempt;
+    document.getElementById('cancel-resume')?.removeAttribute('hidden');
+    const status = document.getElementById('resume-status');
+    if (status) status.textContent = 'Opening your saved watch…';
     try {
       const loaded = await continuity.loadLocal(JSON.stringify(save));
+      if (attempt !== openingAttempt) return;
       s = loaded;
       const generation = continuity.generation;
       await continuity.recording();
@@ -426,7 +471,8 @@ function title() {
       readUntil = performance.now() + 6000;
       enter();
     } catch (error) {
-      startError(error, () => document.getElementById('cont')?.click(), 'load');
+      if (attempt === openingAttempt)
+        startError(error, () => document.getElementById('cont')?.click(), 'load');
     }
   });
   document.getElementById('new')?.addEventListener('click', () => {
@@ -456,7 +502,7 @@ function fileChooser() {
     <p>Progress stays in memory. Download this run before closing the page. Reload this page to choose a file again.</p>
     <button id="choose-file">${s ? 'Choose another file' : 'Choose a saved file'}</button>
     <input type="file" id="file" accept="application/json" hidden>
-    <p id="file-result" role="status"></p>
+    <p id="file-result" role="status"></p><button id="file-cancel" hidden>Cancel checking</button>
     ${s ? '<button id="file-download">Download this run</button><button id="file-resume">Resume current file</button>' : ''}${recordSwitch('record-file')}<p>Recording links new play across games on this device. Your browser’s privacy signal keeps recording off unless you choose to turn it on.</p></div></div>`;
   bindRecord(app, 'record-file');
   const file = required(document.querySelector<HTMLInputElement>('#file'));
@@ -466,11 +512,19 @@ function fileChooser() {
     continuity.beginFileSelection();
     enter();
   });
+  document.getElementById('file-cancel')?.addEventListener('click', () => {
+    continuity.beginFileSelection();
+    const status = document.getElementById('file-result');
+    if (status) status.textContent = 'Checking cancelled. The current watch is unchanged.';
+    document.getElementById('file-cancel')?.setAttribute('hidden', '');
+  });
   file.addEventListener('change', async () => {
     const selection = continuity.beginFileSelection();
     const selected = file.files?.[0];
     if (!selected) return;
     const result = document.getElementById('file-result');
+    if (result) result.textContent = 'Checking the complete saved watch…';
+    document.getElementById('file-cancel')?.removeAttribute('hidden');
     try {
       if (selected.size > 16 * 1024 * 1024) throw new Error('File exceeds complete import capacity.');
       const loaded = await continuity.importSelected(await selected.arrayBuffer(), selection);
@@ -485,7 +539,10 @@ function fileChooser() {
         result.textContent =
           'That saved file could not be loaded. Your current file is unchanged. Choose another file.';
     }
-    if (continuity.isFileSelection(selection)) file.value = '';
+    if (continuity.isFileSelection(selection)) {
+      file.value = '';
+      document.getElementById('file-cancel')?.setAttribute('hidden', '');
+    }
   });
 }
 
@@ -495,6 +552,7 @@ function debugFooter() {
 
 async function beginWeek(localOnly = false, chosen?: WatchRules) {
   if (fileMode) return;
+  const attempt = ++openingAttempt;
   const rules: WatchRules = chosen ?? {
     edition: 'extended-2',
     outcomes: 'private-scenes-1',
@@ -507,15 +565,21 @@ async function beginWeek(localOnly = false, chosen?: WatchRules) {
   cancelAnimationFrame(raf);
   const previous = s;
   try {
+    const pending = document.getElementById('resume-status');
+    if (pending)
+      pending.textContent =
+        'Checking saved people and preparing the opening… Your current watch stays saved.';
     const prepared = await continuity.fresh(Date.now() >>> 0, localOnly === true, rules);
+    if (attempt !== openingAttempt) return;
     s = prepared;
     const generation = continuity.generation;
     clearSave();
     await continuity.recording();
-    if (generation !== continuity.generation || s !== prepared) return;
+    if (attempt !== openingAttempt || generation !== continuity.generation || s !== prepared) return;
     enter();
     window.scrollTo(0, 0);
   } catch (error) {
+    if (attempt !== openingAttempt) return;
     s = previous;
     if (s?.phase === 'watch') {
       last = performance.now();
@@ -535,6 +599,13 @@ function startError(error: unknown, retry: () => void, action = 'start') {
   );
   d.querySelector('#retry-start')?.addEventListener('click', retry);
   d.querySelector('#error-feedback')?.addEventListener('click', sendWord);
+  const recover = document.createElement('button');
+  recover.textContent = 'Review saved preparations';
+  recover.addEventListener('click', () => {
+    closeDialogs();
+    title();
+  });
+  d.querySelector('.dialog-actions')?.append(recover);
 }
 
 function showAbout() {
@@ -640,7 +711,7 @@ function gameMenu() {
   const d = dialog(
     'game-menu',
     `Game menu${s ? ` · ${planOf(s).title} ${clock(s.minute)}` : ''}`,
-    `<p>Time stops while this menu is open.</p>
+    `<p>Time stops while this menu is open.</p><p id="continuity-status" role="status">${esc(continuity.status)}</p>
     ${paceSetting()}<button class="reading-row" id="to-title">To the title page</button>
     <button class="reading-row" id="send-word">Feedback</button><button class="reading-row" id="fullscreen">Full screen</button><a class="reading-row" href="${GAMES}" target="_top">All games</a>${recordSwitch('record-menu')}<button id="menu-new">New game</button><div id="menu-confirm" hidden><p>Start a new week? This replaces your saved week after the new week is ready.</p><button id="menu-confirm-new">Yes, start again</button><button id="menu-cancel-new">Cancel</button></div>${debugFooter()}`,
     '<button class="primary" id="dialog-back">Resume</button>',
@@ -886,24 +957,52 @@ function freeKeeper(st: GameState): KeeperId {
   );
 }
 
-function frame(t: number) {
+async function frame(t: number) {
   if (!s) return;
   const elapsed = Math.max(0, t - last);
   const dt = Math.min(0.25, elapsed / 1000);
-  const paused = !!document.querySelector('dialog[open], .hflab-veil, #about:popover-open');
-  if (paused) skipUntil = 0;
+  const state = s;
+  const owner = displayOwner(state);
+  const runId = continuity.runId;
+  const current = () =>
+    s === state && displayOwner(state) === owner && continuity.runId === runId && screen === 'watch';
+  const held = () => !!document.querySelector('dialog[open], .hflab-veil, #about:popover-open');
+  const paused = held();
+  if (paused) {
+    skipUntil = 0;
+    carry = 0;
+  }
   if (paused && readUntil > last) readUntil += elapsed;
   last = t;
-  if (s.phase === 'watch' && !paused) {
+  if (s.phase === 'watch' && !paused && !mutating) {
     const { rate } = playback(sheet !== null, t < readUntil, selectedRate, skipUntil > 0, !!s.outcomes);
     if (rate === 0) carry = 0;
     carry += dt * rate;
+    const permitted = () =>
+      current() &&
+      !document.hidden &&
+      !held() &&
+      !mutating &&
+      state.phase === 'watch' &&
+      playback(sheet !== null, t < readUntil, selectedRate, skipUntil > 0, !!state.outcomes).rate === rate;
     let stepped = false;
-    while (carry >= 1 && s.phase === 'watch') {
+    while (carry >= 1 && state.phase === 'watch') {
+      if (!permitted()) {
+        carry = 0;
+        break;
+      }
       carry -= 1;
       const before = eventStamp(s);
       const concernBefore = concernLines(s).join('|');
-      stepNow(s);
+      const advanced = await stepNow(state);
+      if (!current()) {
+        carry = 0;
+        return;
+      }
+      if (!advanced || !permitted()) {
+        carry = 0;
+        break;
+      }
       stepped = true;
       if (
         eventStamp(s) !== before ||
@@ -1472,7 +1571,7 @@ function privateRecord(ids: CastId[]): string {
     ids.includes('wren') && s.discoveries.wren
       ? `<h3>Wren’s appendix</h3><p>The omitted observation was ambiguous. The retained source page has no supplied identifier or observation detail here. Drafting takes twenty attended minutes. Filing takes a separate chosen five minutes. Filing does not establish approval or a habitat finding.</p>${button('appendix', 'Ask Wren to prepare the appendix · twenty minutes')}<p>${esc(o.appendix.text ?? 'No signed draft yet.')}</p>${o.appendix.filedAt !== undefined ? `<p>Filed in the in-game survey register at ${clock(o.appendix.filedAt)}. Awaiting review.</p><p>The desk may close tonight’s optional dam-owned riverbank corner pending review. This costs Nerys that corner until next night. Her two other corners, emergency access and Wren’s licensed survey duties remain available. This is a precaution, not a habitat finding.</p>${o.access.some((a) => a.night === s?.night) ? `<p>${o.access.find((a) => a.night === s?.night)?.closed ? 'Riverbank corner closed tonight.' : 'Existing optional access left unchanged tonight.'}</p>` : '<button data-private="close-access">Close optional riverbank access tonight pending review</button><button data-private="keep-access">Leave optional access unchanged tonight</button>'}` : button('file-appendix', 'Ask Wren to file the signed draft · five minutes')}`
       : '';
-  return `<section aria-label="Private scenes"><p>${esc(o.premise)}</p>${viewingRecord(ids)}${telescope}${lamp}${appendix}${o.active ? `${returning ? `<p>Nerys is returning from the telescope. She cannot witness the river steps until she returns. Viewing has stopped. ${attempt?.attended ?? 0} minutes attended. ${attempt?.observations?.length ?? 0} observations retained in the partial record. This attempt is not complete.</p>` : `<p>Attending ${esc(o.active.action)}. ${attempt?.attended ?? 0} minutes attended. No completed result yet.</p>`}${attempt?.stoppedAt === undefined ? '<button data-private="stop">Stop attending</button>' : ''}` : ''}${o.attempts
+  return `<section aria-label="Private scenes"><p>${esc(o.premise)}</p>${viewingRecord(ids)}${telescope}${lamp}${appendix}${o.active ? `${o.active.action === 'telescope' && !returning && o.active.reason ? '<p>Nerys remains away at the telescope. River reports are unavailable until she chooses and completes a return.</p><button data-private="telescope-return">Ask for the separate return · five minutes</button>' : ''}${returning ? `<p>Nerys is returning from the telescope. She cannot witness the river steps until she returns. Viewing has stopped. ${attempt?.attended ?? 0} minutes attended. ${attempt?.observations?.length ?? 0} observations retained in the partial record. This attempt is not complete.</p>` : `<p>Attending ${esc(o.active.action)}. ${attempt?.attended ?? 0} minutes attended. No completed result yet.</p>`}${attempt?.stoppedAt === undefined ? '<button data-private="stop">Stop attending</button>' : ''}` : ''}${o.attempts
     .filter((a) => a.stoppedAt !== undefined)
     .map(
       (a) =>
@@ -1721,11 +1820,14 @@ function dawn() {
   bindTopbar();
   const chart = document.getElementById('chart') as HTMLCanvasElement;
   drawDawn(chart, d);
-  document.getElementById('next')?.addEventListener('click', () => {
+  document.getElementById('next')?.addEventListener('click', async () => {
     if (!s) return;
-    inputNow(s, { kind: 'next' });
-    writeSave();
-    if (s.phase === 'watch') watch();
+    const current = s;
+    const owner = displayOwner(current);
+    const runId = continuity.runId;
+    if (!(await inputNow(current, { kind: 'next' }))) return;
+    if (s !== current || displayOwner(current) !== owner || continuity.runId !== runId) return;
+    if (current.phase === 'watch') watch();
     else dawn();
   });
   document.getElementById('practice')?.addEventListener('click', practiceDialog);
@@ -1747,23 +1849,56 @@ function practiceDialog() {
       Array.from({ length: 7 }, (_, n) => `<option value="${n}">${n} turns</option>`).join('') +
       '</select><button id="run-practice">Try this request</button><div id="practice-result"></div>',
   );
-  d.querySelector('#run-practice')?.addEventListener('click', () => {
-    const branch = practiceNight(
-      actual,
-      Number((d.querySelector('#practice-turns') as HTMLSelectElement).value),
-    );
-    const dawn = branch.dawns.at(-1);
-    if (!dawn) return;
-    const result = d.querySelector('#practice-result') as HTMLElement;
+  const job = new CandidateValidation();
+  let attempt = 0;
+  const cancel = () => {
+    attempt++;
+    job.clear();
+  };
+  d.addEventListener('close', cancel);
+  for (const button of d.querySelectorAll('.x,#dialog-back')) button.addEventListener('click', cancel);
+  d.addEventListener('click', (event) => {
+    if (event.target === d) cancel();
+  });
+  d.querySelector('#run-practice')?.addEventListener('click', async () => {
+    const current = ++attempt;
+    const button = d.querySelector<HTMLButtonElement>('#run-practice')!;
+    const result = d.querySelector<HTMLElement>('#practice-result')!;
+    button.disabled = true;
     result.innerHTML =
-      '<p><b>Practice result. Your saved watch has not changed.</b></p>' +
-      reportBody(dawn, planOf(branch).keepers.length > 1);
-    drawDawn(result.querySelector('canvas') as HTMLCanvasElement, dawn);
+      '<p>Trying this request in a separate practice watch…</p><button id="practice-cancel">Cancel</button>';
+    result.querySelector('#practice-cancel')?.addEventListener('click', () => {
+      cancel();
+      result.textContent = 'Practice cancelled. Your saved watch is unchanged.';
+      button.disabled = false;
+    });
+    try {
+      const branch = await job.load(exportRun(actual, FRAMEWORK_VERSION));
+      const owner = displayOwner(branch);
+      if (!owner) throw Error('Practice could not be opened.');
+      const outcome = await owner.practice(
+        Number(d.querySelector<HTMLSelectElement>('#practice-turns')!.value),
+      );
+      if (current !== attempt || !result.isConnected) return;
+      if (!outcome.dawn) throw Error('No practice morning was reached.');
+      result.innerHTML =
+        '<p><b>Practice result. Your saved watch has not changed.</b></p>' +
+        reportBody(outcome.dawn, outcome.crew);
+      drawDawn(result.querySelector('canvas')!, outcome.dawn);
+    } catch (error) {
+      if (current === attempt && result.isConnected)
+        result.textContent = `${String(error)} Your saved watch is unchanged.`;
+    } finally {
+      job.clear();
+      if (current === attempt) button.disabled = false;
+    }
   });
 }
 function watchArrangements() {
   if (!s?.rules) return;
   const current = s;
+  const owner = displayOwner(current);
+  const runId = continuity.runId;
   const d = dialog(
     'watch-arrangements',
     'Watch arrangements',
@@ -1785,10 +1920,12 @@ function watchArrangements() {
         '',
       )}<p>Bilal may cover gauge rounds during his five-day visit, after his repairs, travel and a briefing. He has no gate authority. His body and other duties can prevent cover.</p>${current.night >= 2 && current.minute < VISIT_UNTIL && !current.keepers.some((k) => k.id === 'bilal' && k.on) ? '<button id="invite-relief">Invite Bilal for tonight’s gauge rounds</button>' : ''}<p id="arrangement-result" role="status"></p>`,
   );
-  const enqueue = (input: Parameters<typeof queueInput>[1]) => {
-    if (s !== current) return;
-    queueInput(current, input);
-    writeSave();
+  const enqueue = async (input: NewInput) => {
+    if (s !== current || displayOwner(current) !== owner || continuity.runId !== runId || !d.isConnected)
+      return;
+    if (!(await inputNow(current, input))) return;
+    if (s !== current || displayOwner(current) !== owner || continuity.runId !== runId || !d.isConnected)
+      return;
     (d.querySelector('#arrangement-result') as HTMLElement).textContent =
       'The request is ready to send. Close this page to let the watch continue and hear the answer.';
   };
@@ -1953,8 +2090,8 @@ document.addEventListener('visibilitychange', () => {
 });
 
 export const _debug = {
-  step: (n: number) => {
-    for (let i = 0; i < n && s && s.phase === 'watch'; i++) stepNow(s);
+  step: async (n: number) => {
+    for (let i = 0; i < n && s && s.phase === 'watch'; i++) await stepNow(s);
     if (s) s.phase === 'watch' ? drawAll() : dawn();
   },
   get state() {

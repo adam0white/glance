@@ -2,16 +2,20 @@
  * refusals and correction stay exact. The new offer/route/care terms are design assumptions;
  * only HF chooses people, updates bodies and records their participation. No input: no state.
  */
+
+import type { GameState } from './dam.ts';
 import {
   type Affordance,
   begin,
+  beginTogether,
+  type DecisionRecord,
   decide,
+  decideTogether,
   finish,
   type Person,
   perceive,
   readDoze,
-} from '@adam0white/human-framework';
-import type { GameState } from './dam.ts';
+} from './hf4.ts';
 import { bridgeOf, MILL_LANE } from './water.ts';
 
 type Operator = 'dai' | 'callum';
@@ -218,29 +222,72 @@ function offer(stage: 'read' | 'out' | 'interval' | 'cover' | 'return', id: Oper
         : { belonging: 0.25 },
   };
 }
-function choice(s: GameState, id: Operator, stage: Parameters<typeof offer>[0]) {
+function choice(s: GameState, id: Operator, stage: Parameters<typeof offer>[0], supplied?: DecisionRecord) {
   const p = person(s, id),
     proposed = offer(stage, id);
-  const rec = decide(
-    p,
-    [
-      proposed,
-      {
-        id: 'stove',
-        action: 'stove',
-        label: 'keep time for ordinary duty and rest',
-        duration: 20,
-        effort: 0.03,
-        advertises: { rest: 0.25, water: 0.15, food: 0.05 },
-      },
-    ],
-    { now: s.minute, suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
-  );
+  const rec =
+    supplied ??
+    decide(
+      p,
+      [
+        proposed,
+        {
+          id: 'stove',
+          action: 'stove',
+          label: 'keep time for ordinary duty and rest',
+          duration: 20,
+          effort: 0.03,
+          advertises: { rest: 0.25, water: 0.15, food: 0.05 },
+        },
+      ],
+      { now: s.minute, suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
+    );
   if (rec.chosenAffordanceId !== proposed.id || rec.suggestion?.verdict !== 'assented') {
     record(s)!.decisions.push({ at: s.minute, person: id, stage, result: 'refused' });
     return null;
   }
   return { p, proposed, rec, id, stage };
+}
+/** Both real decisions precede either conditional physical start. */
+function joint(s: GameState, pairs: readonly [Operator, Parameters<typeof offer>[0]][]) {
+  const records = decideTogether(
+    pairs.map(([id, stage]) => {
+      const proposed = offer(stage, id);
+      return {
+        person: person(s, id),
+        affordances: [
+          proposed,
+          {
+            id: 'stove',
+            action: 'stove',
+            label: 'keep time for ordinary duty and rest',
+            duration: 20,
+            effort: 0.03,
+            advertises: { rest: 0.25, water: 0.15, food: 0.05 },
+          },
+        ],
+        options: { suggestion: { voiceId: 'engineer', affordanceId: proposed.id, strength: 0.6 } },
+      };
+    }),
+  );
+  return pairs.map(([id, stage], i) => choice(s, id, stage, records[i]));
+}
+function startJoint(s: GameState, choices: NonNullable<ReturnType<typeof choice>>[]) {
+  for (const c of choices) {
+    if (c.p.activity) finishOwn(c.p, s.minute, 'interrupted');
+    keeper(s, c.id).job = null;
+  }
+  beginTogether(choices.map((c) => c.p));
+  return choices.every((c) => {
+    const began = c.p.activity?.affordanceId === c.proposed.id;
+    record(s)!.decisions.push({
+      at: s.minute,
+      person: c.id,
+      stage: c.stage,
+      result: began ? 'began' : 'begin-failed',
+    });
+    return began;
+  });
 }
 function finishOwn(p: Person, at: number, status: 'interrupted' | 'completed') {
   if (p.activity) finish(p, { affordanceId: p.activity.affordanceId, action: p.activity.action, at, status });
@@ -332,35 +379,49 @@ export function requestRota(s: GameState, action: RotaAction) {
     };
     r.offers.push(o);
     say(s, o.terms);
-    const choices = [choice(s, 'dai', 'read'), choice(s, 'callum', 'read')];
+    const choices = joint(s, [
+      ['dai', 'read'],
+      ['callum', 'read'],
+    ]);
     if (choices.some((c) => !c)) {
       o.stoppedAt = s.minute;
       o.reason = 'The keepers did not both choose the reading.';
       say(s, o.reason);
       return;
     }
-    for (const c of choices)
-      if (c && !start(s, c)) {
-        o.stoppedAt = s.minute;
-        o.reason = 'The reading could not begin.';
-        stopOwn(s, 'interrupted');
-        return;
-      }
+    if (
+      !startJoint(
+        s,
+        choices.filter((c) => c !== null),
+      )
+    ) {
+      o.stoppedAt = s.minute;
+      o.reason = 'The reading could not begin.';
+      stopOwn(s, 'interrupted');
+      return;
+    }
     o.readFrom = s.minute;
     r.reading = r.offers.length - 1;
     return;
   }
   const o = lastOffer(s, id)!;
-  const choices = [choice(s, id, 'out'), choice(s, other(id), 'cover')];
+  const choices = joint(s, [
+    [id, 'out'],
+    [other(id), 'cover'],
+  ]);
   if (choices.some((c) => !c)) {
     say(s, 'The keepers did not both accept this conditional rota. No departure or cover began.');
     return;
   }
-  for (const c of choices)
-    if (c && !start(s, c)) {
-      stopOwn(s, 'interrupted');
-      return;
-    }
+  if (
+    !startJoint(
+      s,
+      choices.filter((c) => c !== null),
+    )
+  ) {
+    stopOwn(s, 'interrupted');
+    return;
+  }
   r.trips.push({
     person: id,
     cover: other(id),

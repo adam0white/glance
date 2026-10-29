@@ -1,6 +1,9 @@
 // @vitest-environment happy-dom
+
+import { IDBFactory } from 'fake-indexeddb';
 import { Window } from 'happy-dom';
 import { afterEach, expect, it, vi } from 'vitest';
+import { BrowserWorker, disposeBrowserWorkers } from './browser-worker.ts';
 import { required } from './required.ts';
 
 // Only browser/network boundaries are synthetic. App, Continuity, HF and replay are real.
@@ -31,6 +34,7 @@ let browser: Window;
 let dispose: (() => void) | undefined;
 afterEach(async () => {
   dispose?.();
+  disposeBrowserWorkers();
   await browser?.happyDOM.close();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -39,6 +43,8 @@ afterEach(async () => {
 // Removing the public default, dropping the chosen dam on retry, or clearing before
 // preparation would fail this actual App control; no fake HF acceptance is supplied.
 it('starts public rules directly and retains the physical dam and old save through failed preparation', async () => {
+  vi.stubGlobal('Worker', BrowserWorker);
+  vi.stubGlobal('indexedDB', new IDBFactory());
   browser = new Window({ url: 'http://localhost:3000/' });
   for (const key of [
     'window',
@@ -115,9 +121,10 @@ it('starts public rules directly and retains the physical dam and old save throu
   wire.fail = false;
   click('retry-start');
   await vi.waitFor(() => expect(_debug.state?.rules?.dam).toBe('upper'));
-  const run = exportCurrent(required(_debug.state));
+  const current = await import('../src/sim/run.ts');
+  const run = current.exportCurrent(required(_debug.state));
   expect(run.state.rules).toEqual({ edition: 'extended-2', dam: 'upper', outcomes: 'private-scenes-1' });
-  expect(exportCurrent(importCurrent(run))).toEqual(run);
+  expect(current.exportCurrent(current.importCurrent(run))).toEqual(run);
   expect(
     exportCurrent(
       replay(

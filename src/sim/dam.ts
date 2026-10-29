@@ -1,3 +1,7 @@
+import { canonicalPersona } from '@adam0white/lab-client';
+import { required } from '../required.ts';
+import { ALLOCATION, type CastId, lifeReady, talk, VISIT_FROM, VISIT_UNTIL } from './cast.ts';
+import { displayArchive, displayOwner } from './display.ts';
 /**
  * The Glance: the dam host. Pure and deterministic: state is plain JSON, world draws come from `rng.ts` keyed by
  * night and minute, and every player input is stamped with the sim minute it applies at. Replaying the same seed
@@ -6,7 +10,7 @@
  * Covers: the storm and the water (`water.ts`), the keepers' jobs (walk, read, turn the gate, rest, sleep) decided
  * through HF (decide/begin/finish; predict and bodyForecast for the telegraph), readings whose error comes from
  * the keeper's true state and whose words come from his felt state (`reading.ts`), noticing through HF `perceive`,
- * edition-pinned dozing (HF in the extended watch) and skipped walks from true sleepiness, the inn by the bridge, the town warning, lightning,
+ * public HF dozing and actual reached-instrument quantity observations, the inn by the bridge, the town warning, lightning,
  * radio drop-outs, the tree on the screen, and the hours between nights lived through HF (home, review, sleep).
  * The extended watch adds conditional requests, an authored second basin, relief gauge cover and a second week.
  * Does not cover: the town as people, automatic engineering authority or certain weather forecasts.
@@ -14,36 +18,36 @@
 import {
   type Activity,
   type Affordance,
+  archiveWatch,
   begin,
+  beginTogether,
   bodyForecast,
   type DecisionRecord,
   decide,
-  enableDoze,
+  decideTogether,
+  estimateQuantity,
   finish,
   forecastThresholds,
   injure,
   interrupt,
   type Outcome,
+  openWatch,
   type Person,
   perceive,
   predict,
   readDoze,
   readPerson,
-  restore,
+  restoreWatch,
   reviewed,
   reviewLine,
   type Suggestion,
   type SuggestionResolution,
-  seedVoice,
   setDozeContext,
-  snapshot,
   tick,
-} from '@adam0white/human-framework';
-import { canonicalPersona } from '@adam0white/lab-client';
-import { required } from '../required.ts';
-import { ALLOCATION, type CastId, lifeReady, makeVisitor, talk, VISIT_FROM, VISIT_UNTIL } from './cast.ts';
+  type WatchArchive,
+} from './hf4.ts';
 import { callumAway, recallCallum, recallDai } from './keeper-scenes.ts';
-import { ENGINEER, KEEPERS, type KeeperId, makeKeeper, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
+import { ENGINEER, KEEPERS, type KeeperId, NAMES, WATCH_FROM, WATCH_MINUTES } from './keepers.ts';
 import {
   advanceOutcomes,
   cancelOutcome,
@@ -54,6 +58,7 @@ import {
   type ShiftOutcomes,
 } from './outcomes.ts';
 import { admitResident, type Chapter, checkChapter, lifeAdmission } from './passport.ts';
+import { innUnavailable, physicallyAway } from './presence.ts';
 import {
   advancePrivate,
   cancelPrivate,
@@ -64,17 +69,7 @@ import {
   requestPrivate,
   returnForRiver,
 } from './private-scenes.ts';
-import {
-  biasOf,
-  type Clarity,
-  clarityOf,
-  confidenceOf,
-  errorSd,
-  estimateRead,
-  hedge,
-  spoken,
-  spokenFine,
-} from './reading.ts';
+import { type Clarity, estimateRead, hedge, spoken, spokenFine } from './reading.ts';
 import { DRAW, hashNormal, hashUnit } from './rng.ts';
 import { recallRota, rotaAway, rotaBusy, rotaStatus } from './rota.ts';
 import {
@@ -104,24 +99,22 @@ import {
   weirOf,
 } from './water.ts';
 
-export const GAME_VERSION = 'glance@4-deterministic-water';
-export const NIGHTS = 5;
+export const GAME_VERSION = 'glance@hf48-1';
+export const NIGHTS = 12;
 export interface WatchRules {
-  edition: 'extended-1' | 'extended-2';
+  edition: 'extended-2';
   dam: 'valley' | 'upper';
-  outcomes?: 'handover-1' | 'private-scenes-1';
+  outcomes: 'private-scenes-1';
 }
 export function checkRules(rules: WatchRules | undefined): void {
   if (
-    rules !== undefined &&
-    (!['extended-1', 'extended-2'].includes(rules.edition) ||
-      !['valley', 'upper'].includes(rules.dam) ||
-      (rules.outcomes !== undefined &&
-        (!['handover-1', 'private-scenes-1'].includes(rules.outcomes) || rules.edition !== 'extended-2')) ||
-      Object.keys(rules).sort().join(',') !==
-        (rules.outcomes !== undefined ? 'dam,edition,outcomes' : 'dam,edition'))
+    !rules ||
+    rules.edition !== 'extended-2' ||
+    rules.outcomes !== 'private-scenes-1' ||
+    !['valley', 'upper'].includes(rules.dam) ||
+    Object.keys(rules).sort().join(',') !== 'dam,edition,outcomes'
   )
-    throw new Error('These watch rules are unknown. Start a new game.');
+    throw Error('This saved watch uses different rules. Keep the file; start a new watch.');
 }
 export const nightsOf = (s: GameState) => (s.rules ? 12 : NIGHTS);
 
@@ -588,8 +581,7 @@ export const FOLLOWUP_PLANS: NightPlan[] = EXTENDED_PLANS.map((plan, index) => (
   intro: index === 7 ? ['A second week begins. The same keepers return after the day at home.'] : plan.intro,
   beats: index >= 5 ? (SECOND_WEEK_BEATS[index - 5] as NightPlan['beats']) : plan.beats,
 }));
-const plansOf = (s: GameState) =>
-  s.rules?.edition === 'extended-2' ? FOLLOWUP_PLANS : s.rules ? EXTENDED_PLANS : PLANS;
+const plansOf = (s: GameState) => FOLLOWUP_PLANS;
 
 const nightStart = (night: number) => (night - 1) * 1440;
 export const watchFrom = (night: number) => nightStart(night) + WATCH_FROM;
@@ -618,7 +610,9 @@ function beatHeard(s: GameState, beat: NightPlan['beats'][number]): boolean {
     )
       return false;
   }
-  if (beat.who === 'nerys' && viewingInnUnavailable(s)) return false;
+  if (beat.who === 'nerys' && innUnavailable(s)) return false;
+  if (['dai', 'callum'].includes(beat.who) && physicallyAway(s, beat.who)) return false;
+  if (beat.if && physicallyAway(s, beat.if)) return false;
   if (beat.if && (!keeperOf(s, beat.if).on || (beat.if === 'callum' && callumAway(s)))) return false;
   if (callumAway(s) && s.night === 3 && beat.who === 'dai' && beat.at === 90) return false;
   if (beat.who !== 'dai' && beat.who !== 'callum') return true;
@@ -662,7 +656,7 @@ function recruitRelief(s: GameState) {
   const p = s.people.find((p) => p.id === 'bilal') as Person;
   if (p.activity) return;
   tick(p, s.minute);
-  seedVoice(p, ENGINEER, 0.5);
+  // Recruitment does not reset the actual held trust.
   const cover = offer('relief-briefing', {
     action: 'work',
     label: 'travel to the hut and take the gauge-round briefing',
@@ -702,7 +696,7 @@ function reliefMinute(s: GameState) {
   if (!p.activity || p.activity.affordanceId !== 'relief-briefing' || p.activity.dozedAt !== undefined)
     return;
   endActivity(p, 'completed', p.activity.endsAt);
-  enableDoze(p, { posture: 'upright', stimulation: 1 });
+  setDozeContext(p, { posture: 'upright', stimulation: 1 });
   s.keepers = s.keepers.filter((k) => k.id !== 'bilal');
   s.keepers.push({
     id: 'bilal',
@@ -737,7 +731,10 @@ const DEST: Record<Job, Place> = {
 // ---------- setup ----------
 
 export function newGame(seed: number, chapter?: Chapter, rules?: WatchRules): GameState {
+  rules ??= { edition: 'extended-2', dam: 'valley', outcomes: 'private-scenes-1' };
   checkRules(rules);
+  if (chapter) checkChapter(chapter);
+  const actors = openWatch(seed, chapter?.initial);
   const now = VISIT_FROM;
   const s: GameState = {
     version: GAME_VERSION,
@@ -749,10 +746,7 @@ export function newGame(seed: number, chapter?: Chapter, rules?: WatchRules): Ga
     night: 1,
     phase: 'watch',
     minute: now,
-    people: [
-      ...KEEPERS.map((id) => makeKeeper(id, seed, now)),
-      ...(['nerys', 'bilal', 'wren'] as const).map((id) => makeVisitor(id, seed, now)),
-    ],
+    people: actors.people,
     discoveries: {},
     conversations: {},
     keepers: KEEPERS.map((id) => ({
@@ -788,8 +782,8 @@ export function newGame(seed: number, chapter?: Chapter, rules?: WatchRules): Ga
     inputs: [],
     applied: 0,
   };
-  if (rules?.outcomes) s.outcomes = newOutcomes();
-  if (rules?.outcomes === 'private-scenes-1') s.privateScenes = newPrivateScenes();
+  s.outcomes = newOutcomes();
+  s.privateScenes = newPrivateScenes();
   if (rules) {
     s.rules = structuredClone(rules);
     s.arrangements = {};
@@ -798,28 +792,15 @@ export function newGame(seed: number, chapter?: Chapter, rules?: WatchRules): Ga
   dayHours(s, 1);
   startNight(s, 1);
   if (s.privateScenes) say(s, 'narrator', PRIVATE_PREMISE, 'journal');
-  if (rules) for (const k of s.keepers) enableDoze(personOf(s, k.id), { posture: 'upright', stimulation: 1 });
+
   if (chapter) {
     checkChapter(chapter);
-    s.people = s.people.map((p) => {
-      const c = required(ALLOCATION.find((c) => c.id === p.id));
-      const input = chapter.inputs.find((i) => i.parent.castId === c.castId);
-      const expected = input ? admitResident(input, p) : p;
-      if (canonicalPersona(chapter.initial[c.castId]) !== canonicalPersona(expected))
-        throw new Error('The saved character differs from the character admitted from the source.');
-      if (input) {
-        const facts = lifeAdmission(input, 'glance');
-        s.life[c.id] = facts;
-        say(s, 'narrator', `${c.name}: ${facts.line}`, 'journal');
-        const keeper = s.keepers.find((k) => k.id === c.id);
-        if (keeper) {
-          keeper.place = facts.startsAtHome ? 'hut' : facts.life.place === 'public-garden' ? 'staff' : 'gate';
-          keeper.idleUntil = s.minute + (facts.availableForExtraWork ? 0 : 30);
-        }
-      }
-      return restore(structuredClone(expected));
-    });
+    for (const input of chapter.inputs) {
+      const cast = ALLOCATION.find((c) => c.castId === input.parent.castId);
+      if (cast) s.life[cast.id] = lifeAdmission(input, 'glance');
+    }
   }
+
   return s;
 }
 
@@ -845,57 +826,114 @@ function offer(id: string, over: Partial<Affordance> = {}): Affordance {
   return { id, action: id, label: id, duration: 20, effort: 0.05, advertises: {}, ...over };
 }
 
-/** The day before a watch: afternoon, meals, arriving at 21:50. */
-function dayHours(s: GameState, night: number) {
-  const d = nightStart(night);
-  for (const p of s.people) {
-    if (rotaAway(s, p.id)) {
-      tick(p, Math.max(p.now, d + 21 * 60 + 50));
-      continue;
-    }
-    if (p.id === 'nerys' && viewingAway(s)) {
-      tick(p, Math.max(p.now, d + 21 * 60 + 50));
-      continue;
-    }
-    if (p.activity) endActivity(p, 'interrupted', Math.max(p.now, p.activity.startedAt));
-    hostAct(p, offer('meal', { duration: 30, advertises: { food: 0.6, water: 0.6 } }), d + 16 * 60);
-    hostAct(p, offer('meal', { duration: 30, advertises: { food: 0.6, water: 0.6 } }), d + 20 * 60);
-    hostAct(p, offer('wait', { duration: 20 }), d + 21 * 60 + 30);
+/** Shared source time: every actor advances together; scheduled meals are offers, not grants. */
+function routineGroup(
+  s: GameState,
+  at: number,
+  affordance: (p: Person) => Affordance | undefined,
+  wait = true,
+) {
+  tick(s.people[0]!, at);
+  const candidates = s.people
+    .filter((p) => !physicallyAway(s, p.id) && !p.activity && !readDoze(p)?.asleep)
+    .flatMap((p) => {
+      const aff = affordance(p);
+      return aff ? [{ person: p, affordances: [aff], aff }] : [];
+    });
+  if (!candidates.length) return;
+  const records = decideTogether(candidates);
+  const chosen = candidates.filter((c, i) => records[i]?.chosenAffordanceId === c.aff.id);
+  beginTogether(chosen.map((c) => c.person));
+  if (!wait) return;
+  for (const c of chosen.sort(
+    (a, b) => (a.person.activity?.endsAt ?? Infinity) - (b.person.activity?.endsAt ?? Infinity),
+  )) {
+    const a = c.person.activity;
+    if (!a) continue;
+    tick(c.person, a.endsAt);
+    finish(c.person, {
+      affordanceId: c.aff.id,
+      action: c.aff.action,
+      at: a.endsAt,
+      status: 'completed',
+      ...(c.aff.id === 'meal' ? { needs: { food: 0.6, water: 0.6 } } : {}),
+    });
   }
 }
-
-/** After a watch: home, breakfast, the morning review, day sleep (Callum's broken by the baby). */
-function morningHours(s: GameState, night: number) {
-  const d = nightStart(night) + 1440;
-  for (const p of s.people) {
-    if (rotaAway(s, p.id)) {
-      tick(p, Math.max(p.now, d + 15 * 60));
-      continue;
-    }
-    if (p.id === 'nerys' && viewingAway(s)) {
-      tick(p, Math.max(p.now, d + 15 * 60));
-      continue;
-    }
-    if (p.activity) endActivity(p, 'interrupted', Math.max(p.now, p.activity.startedAt));
-    hostAct(
-      p,
+function dayHours(s: GameState, night: number) {
+  const d = nightStart(night);
+  for (const hour of [16, 20])
+    routineGroup(s, d + hour * 60, () =>
       offer('meal', { duration: 30, advertises: { food: 0.6, water: 0.6 } }),
-      Math.max(p.now, d + 6 * 60 + 30),
     );
-    tick(p, Math.max(p.now, d + 7 * 60 + 15));
-    const hours = p.id === 'callum' ? 4.5 : 6;
-    hostAct(
-      p,
-      offer('sleep', { mode: 'sleep', duration: hours * 60, effort: 0, advertises: { sleep: 1, rest: 0.5 } }),
-      Math.max(p.now, d + 8 * 60),
-    );
-    if (p.id === 'callum')
-      hostAct(
-        p,
-        offer('sleep', { mode: 'sleep', duration: 90, effort: 0, advertises: { sleep: 1, rest: 0.5 } }),
-        Math.max(p.now, d + 14 * 60),
+  tick(s.people[0]!, d + 21 * 60 + 50);
+}
+/** SCOPE: the source water and all five bodies consume the same day interval.
+ * Routines are voluntary physical offers. A flood never earns later sleep. */
+function advanceDay(s: GameState): boolean {
+  const day = nightStart(s.night) + 1440;
+  s.water.gate = 1;
+  s.water.blocked = false;
+  const boundaries = new Set([390, 420, 480, 840, 930, 960, 990, 1200, 1230, 1320]);
+  const consume = () => {
+    tick(s.people[0]!, s.minute);
+    for (const p of s.people) {
+      const a = p.activity;
+      if (a && ['meal', 'sleep'].includes(a.affordanceId) && a.endsAt <= p.now)
+        finish(p, { action: a.action, at: p.now, status: 'completed' });
+    }
+  };
+  for (let at = watchTo(s.night); at < watchFrom(s.night + 1); at++) {
+    s.minute = at;
+    const m = at - day;
+    if (boundaries.has(m)) {
+      consume();
+      if (m === 390 || m === 960 || m === 1200)
+        routineGroup(
+          s,
+          at,
+          () => offer('meal', { duration: 30, advertises: { food: 0.6, water: 0.6 } }),
+          false,
+        );
+      if (m === 480 || m === 840)
+        routineGroup(
+          s,
+          at,
+          (p) =>
+            m === 480 || p.id === 'callum'
+              ? offer('sleep', {
+                  mode: 'sleep',
+                  duration: m === 840 ? 90 : p.id === 'callum' ? 270 : 360,
+                  effort: 0,
+                  advertises: { sleep: 1, rest: 0.5 },
+                })
+              : undefined,
+          false,
+        );
+      if (m === 420) {
+        // This review is received at seven, after the first-light account.
+        for (const k of s.keepers) if (k.on) retainWatchReview(s, k, personOf(s, k.id));
+      }
+    }
+    stepWater(s.water, 0.35);
+    if (s.water.overtopped) {
+      s.minute = at + 1;
+      consume();
+      const dawn = s.dawns.at(-1);
+      if (dawn) dawn.daytimeLoss = { at: s.minute };
+      s.phase = 'end';
+      say(
+        s,
+        'narrator',
+        `The day keeper reports water over the top of the dam at ${clock(s.minute)}. There will be no next watch.`,
+        'journal',
       );
+      return false;
+    }
   }
+  s.minute = watchFrom(s.night + 1);
+  consume();
+  return true;
 }
 
 function startNight(s: GameState, night: number) {
@@ -922,7 +960,7 @@ function startNight(s: GameState, night: number) {
   for (const k of s.keepers) {
     const p = personOf(s, k.id);
     k.on = plan.keepers.includes(k.id);
-    if (!rotaAway(s, k.id) && !(k.id === 'callum' && callumAway(s))) k.place = 'hut';
+    if (!physicallyAway(s, k.id)) k.place = 'hut';
     k.job = null;
     k.pending = null;
     k.deferred = null;
@@ -958,9 +996,11 @@ function startNight(s: GameState, night: number) {
           ? 'The day keeper covered the dam. A keeper remains physically away under the retained rota; no arrival is inferred.'
           : callumAway(s)
             ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. Callum remains away; his return has not been recorded.'
-            : s.rules.edition === 'extended-2'
-              ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers have come back from their time at home.'
-              : 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers return after their actual rest.',
+            : physicallyAway(s, 'dai')
+              ? 'The day keeper covered the dam. Dai remains away; no return has been recorded.'
+              : s.rules.edition === 'extended-2'
+                ? 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers have come back from their time at home.'
+                : 'The day keeper covered the dam with the gate on one turn. Water kept flowing through the day. The night keepers return after their actual rest.',
         'journal',
       );
   }
@@ -978,16 +1018,13 @@ function startNight(s: GameState, night: number) {
       'Callum remains away from the dam. His exact location is not recorded; a separate return is needed.',
       'journal',
     );
+  else if (physicallyAway(s, 'dai'))
+    say(s, 'narrator', 'Dai remains away. No on-site arrival or handover is inferred.', 'journal');
   else for (const line of plan.intro) say(s, 'narrator', line, 'journal');
   // The handover: the day man's figures, written at ten, read fresh.
   const w = s.water;
-  const lead =
-    rotaAway(s, 'dai') || rotaAway(s, 'callum')
-      ? plan.keepers.find((id) => !rotaAway(s, id) && !(id === 'callum' && callumAway(s)))
-      : callumAway(s)
-        ? plan.keepers.find((id) => id !== 'callum')
-        : plan.keepers[0];
-  if (!lead) {
+  const lead = plan.keepers.find((id) => !physicallyAway(s, id));
+  if (!lead || keeperAsleep(s, lead)) {
     say(
       s,
       'narrator',
@@ -1049,7 +1086,7 @@ function rest(_s: GameState) {
 }
 
 /** The keeper's offers right now. `target` sets the gate offer (default one turn more open). */
-export function offersFor(s: GameState, id: KeeperId, target?: number): Affordance[] {
+export function offersFor(s: GameState, id: KeeperId, target?: number, wantsNap = false): Affordance[] {
   const k = keeperOf(s, id);
   const p = personOf(s, id);
   const plan = planOf(s);
@@ -1114,7 +1151,7 @@ export function offersFor(s: GameState, id: KeeperId, target?: number): Affordan
       advertises: { rest: 0.25, food: 0.05, water: 0.15 },
     }),
   );
-  if (k.pending?.job === 'nap' || k.deferred?.job === 'nap')
+  if (wantsNap || k.pending?.job === 'nap' || k.deferred?.job === 'nap')
     list.push(
       offer('nap', {
         action: 'sleep',
@@ -1140,7 +1177,7 @@ const suggestion = (job: Job, insist = false): Suggestion => ({
 export interface Hint {
   job: Job;
   target?: number;
-  verdict: SuggestionResolution['verdict'];
+  verdict: SuggestionResolution['verdict'] | 'unknown';
   says: string;
   short: string;
   /** His own forecast for the work, in his words; '' when nothing follows. */
@@ -1172,19 +1209,26 @@ export function hint(s: GameState, id: KeeperId, job: Job, target?: number, insi
       forecast: '',
       minutes: 0,
     };
+  if (physicallyAway(s, id))
+    return {
+      job,
+      ...(target !== undefined ? { target } : {}),
+      verdict: 'refused',
+      says: '',
+      short: 'He remains away. Invite a separate return; no on-site job is promised.',
+      forecast: '',
+      minutes: 0,
+    };
   const p = personOf(s, id);
   const k = keeperOf(s, id);
-  const saved = k.pending;
-  if (job === 'nap') k.pending = { s: suggestion('nap'), job: 'nap' };
-  const offers = offersFor(s, id, target);
-  k.pending = saved;
+  const offers = offersFor(s, id, target, job === 'nap');
   const r = predict(p, offers, suggestion(job, insist));
   const aff = offers.find((o) => o.id === job);
   const out: Hint = {
     job,
-    verdict: r.verdict,
-    says: r.says,
-    short: shortOf(r),
+    verdict: r?.verdict ?? 'unknown',
+    says: r?.says ?? '',
+    short: r ? shortOf(r) : 'Call and wait for an answer.',
     forecast: '',
     minutes: aff ? Math.max(5, Math.round(aff.duration / 5) * 5) : 0,
   };
@@ -1244,6 +1288,7 @@ function shortOf(r: SuggestionResolution): string {
 // ---------- inputs ----------
 
 export function queueInput(s: GameState, input: NewInput): void {
+  if (displayOwner(s)) throw Error('This watch is held by its source worker.');
   s.inputs.push({ ...input, at: s.minute } as Input);
   if (s.phase !== 'watch' || s.chapterPaused) applyPending(s);
 }
@@ -1433,28 +1478,7 @@ function apply(s: GameState, inp: Input) {
     }
     case 'next': {
       if (s.phase !== 'dawn') return;
-      if (s.rules) {
-        // Background day keeper covers the wheel; same physical water store through all 16 hours.
-        s.water.gate = 1;
-        s.water.blocked = false;
-        for (let at = watchTo(s.night); at < watchFrom(s.night + 1); at++) {
-          stepWater(s.water, 0.35);
-          if (s.water.overtopped) {
-            const dawn = s.dawns.at(-1);
-            if (dawn) dawn.daytimeLoss = { at };
-            s.minute = at;
-            s.phase = 'end';
-            say(
-              s,
-              'narrator',
-              `The day keeper reports water over the top of the dam at ${clock(at)}. There will be no next watch.`,
-              'journal',
-            );
-            return;
-          }
-        }
-      }
-      dayHours(s, s.night + 1);
+      if (!advanceDay(s)) return;
       startNight(s, s.night + 1);
       return;
     }
@@ -1462,6 +1486,16 @@ function apply(s: GameState, inp: Input) {
 }
 
 function ringInn(s: GameState) {
+  if (s.privateScenes?.active?.action === 'telescope') {
+    s.nerys.ringing = s.minute;
+    say(
+      s,
+      'narrator',
+      'The river call is waiting. Nerys is away with her telescope; she must choose and complete a return before considering the river steps.',
+      'journal',
+    );
+    return;
+  }
   if (!lifeReady(s, 'nerys')) {
     say(
       s,
@@ -1486,28 +1520,52 @@ function ringInn(s: GameState) {
   }
   if (late) s.nerys.goodwill -= 0.08;
   if (s.nerys.calls > 3) s.nerys.goodwill -= 0.06 * (s.nerys.calls - 3);
+  const p = s.people.find((p) => p.id === 'nerys')!;
+  if (readDoze(p)?.asleep || p.activity) {
+    say(s, 'radio', 'Nerys is not available to answer and walk to the steps.', 'radio');
+    return;
+  }
+  const aff = offer('inn-report', {
+    action: 'walk',
+    duration: late ? 6 : 3,
+    effort: 0.12,
+    label: 'walk to the river steps and report what is seen',
+  });
+  const rec = decide(p, [aff, offer('wait', { advertises: { rest: 0.2 } })], {
+    suggestion: { voiceId: 'engineer', affordanceId: aff.id, strength: 0.6 },
+  });
+  if (rec.chosenAffordanceId !== aff.id || !begin(p, aff, rec)) {
+    say(s, 'radio', 'Nerys did not begin a river report.', 'radio');
+    return;
+  }
   s.nerys.ringing = s.minute + (late ? 6 : 3);
-  say(
-    s,
-    'nerys',
-    late
-      ? ([
-          'Mm? What time is it… Wait a moment. I’ll look.',
-          'You’re calling again. Wait a moment.',
-          'I was just falling asleep. Wait a moment.',
-          'All right. I’ll put my coat on.',
-        ][Math.min(3, s.nerys.calls - 1)] ?? 'Wait a moment.')
-      : s.nerys.calls > 1
-        ? 'Are you calling again? All right, I’ll look.'
-        : 'Wait a moment. I’ll go and look.',
-    'answer',
-  );
+  say(s, 'nerys', 'I am going to the steps to look.', 'answer');
 }
 
 function innAnswers(s: GameState) {
+  const keeper = s.people.find((p) => p.id === 'nerys')!;
+  if (innUnavailable(s)) return;
+  if (keeper.activity?.affordanceId !== 'inn-report') {
+    if (keeper.activity) {
+      s.nerys.ringing = null;
+      say(s, 'narrator', 'Nerys cannot take the river call while attending her other work.', 'journal');
+      return;
+    }
+    s.nerys.ringing = null;
+    ringInn(s);
+    return;
+  }
   if (viewingInnUnavailable(s)) return;
+  const p = s.people.find((p) => p.id === 'nerys')!;
+  tick(p, s.minute);
+  if (readDoze(p)?.asleep || p.activity?.affordanceId !== 'inn-report') {
+    s.nerys.ringing = null;
+    return;
+  }
+  finish(p, { action: 'walk', at: s.minute, status: 'completed' });
   const b = bridgeOf(s.water);
-  const step = Math.max(0, Math.round(b + 0.45 * hashNormal(s.seed, DRAW.nerys, s.night, s.minute)));
+  const estimate = estimateQuantity(p, { truth: b, difficulty: 0.45 });
+  const step = Math.max(0, Math.round(estimate.value));
   const r: Report = {
     at: s.minute,
     wrote: s.minute,
@@ -1515,9 +1573,9 @@ function innAnswers(s: GameState) {
     gauge: 'bridge',
     value: step,
     truth: b,
-    conf: 0.5,
-    clarity: 0.6,
-    cause: 'gossip',
+    conf: estimate.confidence,
+    clarity: estimate.confidence,
+    cause: 'unattributed',
     skipped: false,
   };
   s.reports.push(r);
@@ -1542,6 +1600,7 @@ function innAnswers(s: GameState) {
 
 /** Advance one sim minute of the watch. */
 export function step(s: GameState): void {
+  if (displayOwner(s)) throw Error('This watch is held by its source worker.');
   if (s.phase !== 'watch' || s.chapterPaused) return;
   applyPending(s);
   if (s.chapterPaused) return;
@@ -1585,7 +1644,7 @@ export function step(s: GameState): void {
     s.nerys.ringing !== null &&
     s.minute >= s.nerys.ringing &&
     s.privateScenes?.active?.action !== 'telescope' &&
-    !viewingInnUnavailable(s)
+    !innUnavailable(s)
   )
     innAnswers(s);
   // Supporting people have their own HF bodies, not dam operating skills.
@@ -1645,20 +1704,23 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
       (k.place === 'hut' && k.job?.job === 'stove' && s.minute >= k.job.startedAt + k.job.walk) ||
       (callumAway(s) && p.activity?.affordanceId === 'family-home-rest') ||
       (rotaAway(s, k.id) && p.activity?.mode === 'sleep');
-    setDozeContext(p, { posture: sitting ? 'seated' : 'upright', stimulation: sitting ? 0.1 : 1 });
+    if (!readDoze(p)?.asleep)
+      setDozeContext(p, { posture: sitting ? 'seated' : 'upright', stimulation: sitting ? 0.1 : 1 });
   }
   tick(p, s.minute);
   if (s.rules) retainWatchReview(s, k, p);
   if (outcomeOccupies(s, k)) return;
   if (s.rules && readDoze(p)?.asleep) {
-    if (p.activity?.dozedAt !== undefined) {
-      const from = p.activity.dozedAt;
-      endActivity(p, 'interrupted', from);
+    // HF may already have resolved its interruption and removed the activity.
+    // The public doze boundary still owns the stopped physical job and span.
+    const from = p.body.doze!.since! / 60000;
+    if (k.job || p.activity) {
+      finish(p, { action: p.activity?.action ?? k.job?.job ?? 'wait', at: from, status: 'interrupted' });
       k.job = null;
-      k.dozes.push({ from, to: s.minute });
     }
-    const doze = k.dozes.at(-1);
-    if (doze) doze.to = s.minute;
+    if (k.dozes.at(-1)?.from !== from) k.dozes.push({ from, to: s.minute });
+    const doze = k.dozes.at(-1)!;
+    doze.to = s.minute;
     return;
   }
   let a = p.activity;
@@ -1669,33 +1731,6 @@ function keeperMinute(s: GameState, k: KeeperState, rain: number) {
     a = null;
   }
   if (a && (a.affordanceId === 'doze' || a.affordanceId === 'nap') && s.minute >= a.endsAt) a = null;
-  // Dozing off by the stove: a host roll from true sleepiness (he does not choose it).
-  const walking = k.job !== null && s.minute < k.job.startedAt + k.job.walk;
-  if (!s.rules && a && a.affordanceId === 'stove' && !k.pending && !walking) {
-    const sl = readPerson(p).body.sleepiness;
-    const q = Math.floor(s.minute / 15);
-    if (sl > 0.84 && hashUnit(s.seed, DRAW.doze, s.night, q, KEEPERS.indexOf(k.id)) < (sl - 0.84) * 2.2) {
-      if (!k.dozes.some((d) => d.to >= s.minute - 30)) {
-        endActivity(p, 'interrupted', s.minute);
-        const len = 15 + Math.floor(hashUnit(s.seed, DRAW.doze, s.night, q, 7) * 25);
-        const doze = offer('doze', {
-          action: 'sleep',
-          mode: 'sleep',
-          duration: len,
-          effort: 0,
-          advertises: { sleep: 1 },
-        });
-        const rec = decide(p, [doze], {});
-        if (begin(p, doze, rec)) {
-          // He sleeps where he sat down: the hut.
-          if (k.job) k.place = k.job.to;
-          k.job = null;
-          k.dozes.push({ from: s.minute, to: s.minute + len });
-          return;
-        }
-      }
-    }
-  }
   const due = k.pending !== null || (a ? s.minute >= a.reviewAt : s.minute >= k.idleUntil);
   if (!due) return;
   if (a && (a.affordanceId === 'doze' || a.affordanceId === 'nap') && !k.pending) {
@@ -1748,55 +1783,7 @@ function idleOffers(s: GameState, k: KeeperState): Affordance[] {
 }
 
 /** HF's answer, in his voice where HF's words are generic. The pick is keyed by seed and minute, so replay holds. */
-const LINES: Record<KeeperId, Record<'assented' | 'complied' | 'cannot', string[]>> = {
-  dai: {
-    assented: [
-      'Yes, I’ll do that.',
-      'I’ll do that.',
-      'I’m going now.',
-      'Yes, I’ll look.',
-      'I’m on my way.',
-      'That is reasonable.',
-    ],
-    complied: [
-      'I’ll do it if you say so.',
-      'You’re in charge at the desk.',
-      'Yes. I’ll do it if that’s what you want.',
-      'You decide.',
-    ],
-    cannot: [
-      'I can’t. I’m exhausted. Give me twenty minutes.',
-      'I can’t do it yet. I have no energy left. Give me twenty minutes.',
-    ],
-  },
-  bilal: {
-    assented: ['I can cover a round of gauge readings.'],
-    complied: ['I will check, but I need rest afterwards.'],
-    cannot: ['I cannot cover that safely yet.'],
-  },
-  callum: {
-    assented: ['I’ll do it, sir.', 'I’m going, sir.', 'I’ll do it now.', 'Yes! I’ll do it.', 'I’ll go now.'],
-    complied: ['Yes, I’ll do it, sir.', 'I’ll do it if you think so, sir.', 'OK. OK, I’m going.'],
-    cannot: ['I… I can’t, sir. I’m sorry. I need a minute.', 'I’m exhausted, sir. Give me a little time.'],
-  },
-};
-function flavour(s: GameState, id: KeeperId, r: SuggestionResolution): string {
-  const pick = (xs: string[]) =>
-    xs[Math.floor(hashUnit(s.seed, DRAW.words, s.night, s.minute, KEEPERS.indexOf(id)) * xs.length)] ??
-    xs[0] ??
-    '';
-  if (r.verdict === 'assented') return pick(LINES[id].assented);
-  if (r.verdict === 'complied') return pick(LINES[id].complied);
-  if (r.verdict === 'refused' && r.kind === 'cannot') return pick(LINES[id].cannot);
-  // "After I sit by the stove" from a man already by the stove reads as a loop: say what he means.
-  if (r.verdict === 'deferred' && /sit by the stove/.test(r.counterOffer?.label ?? ''))
-    return id === 'dai'
-      ? pick([
-          'I can’t do it yet. Let me warm my hands first.',
-          'Give me a minute by the stove first.',
-          'I’ll do it in a little while. The kettle is nearly boiling.',
-        ])
-      : pick(['Can I just warm up a minute, sir?', 'Give me two minutes, sir. I’m very cold.']);
+function flavour(_s: GameState, _id: KeeperId, r: SuggestionResolution): string {
   return r.says;
 }
 
@@ -1810,22 +1797,8 @@ function startJob(
   _rain: number,
 ) {
   const job = aff.id as Job;
-  let skip = false;
-  if (job === 'level' || job === 'weir') {
-    // A long walk in the rain, very sleepy: some nights he reads it from the hut and gives the last figure.
-    const prior = s.board[job === 'level' ? 'level' : 'weir'];
-    const sl = readPerson(p).body.sleepiness;
-    const far = job === 'weir' ? 1 : 0.45;
-    const lazy = 1 - p.traits.conscientiousness * 0.6 - p.traits.emotionality * 0.5;
-    if (
-      prior &&
-      s.minute - prior.at < 90 &&
-      sl > 0.72 &&
-      hashUnit(s.seed, DRAW.skip, s.night, s.minute, KEEPERS.indexOf(k.id)) <
-        (sl - 0.68) * 2.5 * far * Math.max(0, lazy)
-    )
-      skip = true;
-  }
+  // An actual read requires walking. HF chooses work/rest; the host invents no skipped cognition.
+  const skip = false;
   const to = skip ? k.place : DEST[job];
   const walk = walkFor(s, k.place, to);
   const a2 = skip ? { ...aff, duration: 4 } : aff;
@@ -1864,8 +1837,7 @@ function workMinute(s: GameState, k: KeeperState, p: Person, a: Activity) {
     w.gate += j.target > w.gate ? 1 : -1;
     k.night.turns += 1;
     if (w.gate === j.target) {
-      // Done early: bring the activity's end forward.
-      a.endsAt = Math.min(a.endsAt, s.minute + 1);
+      // The gate reached its target. The actual accepted HF activity continues to its boundary.
     }
   }
 }
@@ -1972,32 +1944,15 @@ function notice(s: GameState, k: KeeperState, p: Person) {
 /** A reading: the truth, plus his error. Words from how he feels. */
 function readGauge(s: GameState, who: KeeperId, gauge: Gauge, skipped: boolean): Report {
   const p = personOf(s, who);
-  const c = clarityOf(p, weatherAt(s));
   const w = s.water;
   const truth = gauge === 'level' ? w.level : weirOf(inflowOf(w));
-  const scale = gauge === 'level' ? 1 : 0.35;
-  const z = hashNormal(
-    s.seed,
-    DRAW.readError,
-    s.night,
-    s.minute,
-    KEEPERS.indexOf(who),
-    gauge === 'level' ? 0 : 1,
-  );
-  const estimate = s.rules && !skipped ? estimateRead(p, who, truth, weatherAt(s), scale) : null;
-  let value = estimate ? estimate.value : truth + scale * (biasOf(who, c) + errorSd(c) * z);
+  const estimate = skipped ? null : estimateRead(p, who, truth, weatherAt(s), gauge === 'level' ? 1 : 0.35);
   const prior = s.board[gauge];
-  if (skipped && prior) value = prior.value;
-  value = gauge === 'level' ? Math.round(value * 10) / 10 : Math.round(value * 100) / 100;
-  // Dai rounds the way he wants it: down, once he is tired.
-  if (who === 'dai' && gauge === 'level' && c.true < 0.5 && !skipped)
-    value = Math.floor((value + 0.0001) * 10) / 10;
-  value = Math.max(0, value);
-  let wrote = s.minute;
-  // A tired man writes the wrong time: a tell on the board, never before the shift began.
-  if (c.true < 0.38 && hashUnit(s.seed, DRAW.timeSlip, s.night, s.minute) < 0.4)
-    wrote = Math.max(watchFrom(s.night), s.minute - 30);
-  const conf = estimate ? estimate.confidence : confidenceOf(p, c);
+  if (skipped && !prior) throw Error('No retained reading exists for a stale report');
+  let value = estimate ? estimate.value : prior!.value;
+  value = Math.max(0, gauge === 'level' ? Math.round(value * 10) / 10 : Math.round(value * 100) / 100);
+  const wrote = skipped ? prior!.wrote : s.minute;
+  const conf = estimate?.confidence ?? prior!.conf;
   const r: Report = {
     at: s.minute,
     wrote,
@@ -2006,8 +1961,8 @@ function readGauge(s: GameState, who: KeeperId, gauge: Gauge, skipped: boolean):
     value,
     truth: round3(truth),
     conf: round3(conf),
-    clarity: round3(c.true),
-    cause: skipped ? 'skipped' : c.cause,
+    clarity: round3(conf),
+    cause: skipped ? 'skipped' : 'unattributed',
     skipped,
   };
   s.reports.push(r);
@@ -2065,8 +2020,7 @@ export function reportWords(_s: GameState, r: Report): string {
   const k = r.at + KEEPERS.indexOf(who) * 7;
   const lead =
     r.gauge === 'weir' ? (who === 'dai' ? 'This is the weir reading. ' : 'I read the weir board. ') : '';
-  const yawn = r.clarity < 0.35 && k % 3 === 0 ? (who === 'dai' ? '(a long yawn) ' : '') : '';
-  return `${yawn}${lead}${hedge(who, r.conf, fig, k)}`;
+  return `${lead}${hedge(who, r.conf, fig, k)}`;
 }
 
 export const clock = (m: number) => {
@@ -2078,8 +2032,7 @@ export const clock = (m: number) => {
 function endActivity(p: Person, status: Outcome['status'], at: number) {
   const a = p.activity as Activity;
   const out: Outcome = { affordanceId: a.affordanceId, action: a.action, status, at };
-  if (a.affordanceId === 'relief-briefing' && status === 'completed')
-    out.material = a.affordance.material ?? 0;
+  if (a.affordanceId === 'relief-briefing' && status === 'completed') out.material = 5;
   if (a.affordanceId === 'stove') out.needs = { water: 0.15, food: 0.05 };
   finish(p, out);
 }
@@ -2156,22 +2109,8 @@ function aboutYou(s: GameState, k: KeeperState, overtopped: boolean): string {
  * HF's review line in his own words. The review itself (did he keep his promise to stay awake) is HF's; the
  * wording of a broken watch varies by night, because the same sentence every dawn read as a template.
  */
-function ownWatchLine(s: GameState, id: KeeperId, line: string): string {
-  if (!/didn't keep my watch/i.test(line)) return line.replace(/^Today/, 'Tonight');
-  const dai = [
-    'I fell asleep by the stove. I know I did.',
-    'I shut my eyes for a minute. It was longer than a minute.',
-    'I never slept on watch in thirty years. Now look at me.',
-    'I fell asleep. Don’t write that in the log.',
-    'I slept in the chair. My dad would have scolded me.',
-  ];
-  const callum = [
-    'I fell asleep, sir. I’m sorry. It won’t happen again.',
-    'I only sat down for a second.',
-    'I fell asleep at once. The baby kept me awake all day.',
-  ];
-  const xs = id === 'dai' ? dai : callum;
-  return xs[(s.night + s.seed) % xs.length] ?? line;
+function ownWatchLine(_s: GameState, _id: KeeperId, line: string): string {
+  return line;
 }
 
 /** Retain the actual HF review of this watch before a later morning review replaces it.
@@ -2185,6 +2124,7 @@ function retainWatchReview(s: GameState, k: KeeperState, p: Person) {
     (!review.missed.includes('my watch') && !review.kept.includes('my watch'))
   )
     return;
+  if (JSON.stringify(k.watchReview) === JSON.stringify(review)) return;
   if (k.watchReview?.missed.includes('my watch') && !review.missed.includes('my watch')) return;
   k.watchReview = structuredClone(review);
   k.watchReviewLine = (
@@ -2209,7 +2149,7 @@ function closeNight(s: GameState, overtopped: boolean) {
   const night = s.night;
   for (const k of s.keepers) {
     const p = personOf(s, k.id);
-    if (k.on && p.activity) endActivity(p, 'completed', s.minute);
+    if (k.on && p.activity) endActivity(p, 'interrupted', s.minute);
     k.job = null;
   }
   deliverHeld(s);
@@ -2241,16 +2181,13 @@ function closeNight(s: GameState, overtopped: boolean) {
       said: r.value,
       truth: r.truth,
       cause: r.cause,
-      caught:
-        s.rules?.edition === 'extended-1'
-          ? r.doubted === true
-          : again || flash || (s.rules?.edition === 'extended-2' && r.doubted === true),
+      caught: again || flash || r.doubted === true,
     });
   }
   if (s.rules)
     for (const k of s.keepers) {
       const p = personOf(s, k.id);
-      if (readDoze(p)?.asleep && !rotaAway(s, k.id)) {
+      if (readDoze(p)?.asleep && !physicallyAway(s, k.id)) {
         tick(p, s.minute);
         perceive(p, [
           {
@@ -2267,9 +2204,8 @@ function closeNight(s: GameState, overtopped: boolean) {
         if (span) span.to = Math.min(s.minute, p.now);
       }
     }
-  // Morning: home, review, sleep.
-  s.minute = watchTo(night);
-  morningHours(s, night);
+  // End at the actual reached source frontier. Daytime is a separate input.
+  tick(s.people[0]!, s.minute);
   if (s.rules) for (const k of s.keepers) if (k.on) retainWatchReview(s, k, personOf(s, k.id));
   const dawn: Dawn = {
     ...(s.rules
@@ -2304,7 +2240,7 @@ function closeNight(s: GameState, overtopped: boolean) {
     dozes: s.keepers.flatMap((k) => k.dozes.map((d) => ({ who: k.id, from: d.from, to: d.to }))),
     strain: s.keepers.filter((k) => k.strained && k.on).map((k) => k.id),
     lines: s.keepers
-      .filter((k) => k.on && !rotaAway(s, k.id))
+      .filter((k) => k.on && !physicallyAway(s, k.id))
       .map((k) => ({
         id: k.id,
         line: s.rules
@@ -2337,11 +2273,15 @@ export function exportRun(s: GameState, framework: string): Export {
 }
 
 export function cloneState(s: GameState): GameState {
-  return { ...structuredClone({ ...s, people: [] }), people: s.people.map((p) => snapshot(p)) };
+  const detached = displayArchive(s);
+  if (detached) return structuredClone(detached);
+  return { ...structuredClone({ ...s, people: [] }), hf: archiveWatch(s.people[0]!) } as unknown as GameState;
 }
-
 export function restoreState(json: GameState): GameState {
-  return { ...structuredClone({ ...json, people: [] }), people: json.people.map((p) => restore(p)) };
+  const raw = json as GameState & { hf: WatchArchive };
+  const restored = restoreWatch(raw.hf);
+  const { hf: _archive, ...host } = structuredClone(raw);
+  return { ...host, people: restored.people };
 }
 
 /** Rebuild a run from its seed and input log, stepping watch minutes until `until` (or the last input). */

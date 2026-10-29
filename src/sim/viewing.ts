@@ -7,19 +7,11 @@
  * HF owns decisions, attendance, body time and perception. The host owns this geometry,
  * the actual local weather, river danger and sky event. No host rewards or Person edits.
  */
-import {
-  type Affordance,
-  begin,
-  decide,
-  finish,
-  perceive,
-  readDoze,
-  reviewed,
-  tick,
-} from '@adam0white/human-framework';
+
 import { required } from '../required.ts';
 import { lifeReady, rememberedConversation } from './cast.ts';
 import type { GameState } from './dam.ts';
+import { type Affordance, begin, decide, finish, perceive, readDoze, reviewed, tick } from './hf4.ts';
 import { cornerSky } from './private-scenes.ts';
 import { hashUnit } from './rng.ts';
 import { bridgeOf, MILL_LANE } from './water.ts';
@@ -92,6 +84,15 @@ function choose(s: GameState, action: 'walk' | 'watch' | 'return') {
     ],
     { suggestion: { voiceId: 'engineer', affordanceId: a.id, strength: 0.6 } },
   );
+  const alternative = {
+    id: 'sky-keep-time',
+    action: 'rest',
+    label: 'keep my own time',
+    duration: 20,
+    effort: 0,
+    advertises: { rest: 0.25, water: 0.15, food: 0.05 },
+  };
+  if (rec.chosenAffordanceId === alternative.id) begin(p, alternative, rec);
   const willing = rec.chosenAffordanceId === a.id && rec.suggestion?.verdict === 'assented';
   const began = willing && begin(p, a, rec);
   required(s.viewing).decisions.push({
@@ -104,7 +105,7 @@ function choose(s: GameState, action: 'walk' | 'watch' | 'return') {
 function finishOwn(s: GameState, status: 'completed' | 'interrupted') {
   const p = person(s),
     a = p.activity;
-  if (a?.affordanceId.startsWith('sky-'))
+  if (a?.affordanceId.startsWith('sky-') && a.affordanceId !== 'sky-keep-time')
     finish(p, { affordanceId: a.affordanceId, action: a.action, at: a.dozedAt ?? s.minute, status });
 }
 export function viewingAvailable(s: GameState, action: 'invite' | 'return'): string | null {
@@ -204,6 +205,9 @@ export function requestViewing(s: GameState, action: ViewingAction) {
 }
 export function advanceViewing(s: GameState) {
   const v = s.viewing;
+  const rest = person(s).activity;
+  if (rest?.affordanceId === 'sky-keep-time' && Math.floor(rest.endsAt) <= s.minute)
+    finish(person(s), { action: 'rest', at: s.minute, status: 'completed' });
   if (!v?.away || v.stage === 'waiting') return;
   const p = person(s),
     a = p.activity;
@@ -213,7 +217,7 @@ export function advanceViewing(s: GameState) {
     return;
   }
   if (v.stage === 'returning') {
-    if (s.minute >= a.endsAt) {
+    if (s.minute >= Math.floor(a.endsAt)) {
       finishOwn(s, 'completed');
       v.returnedAt = s.minute;
       v.away = false;
@@ -238,7 +242,7 @@ export function advanceViewing(s: GameState) {
     stopViewing(s, 'Weather, river conditions or the available time ended the trip.');
     return;
   }
-  if (s.minute >= a.reviewAt && s.minute < a.endsAt) {
+  if (s.minute >= a.reviewAt && s.minute < Math.floor(a.endsAt)) {
     const rec = decide(p, [
       offer(v.stage === 'walking' ? 'walk' : 'watch'),
       {
@@ -256,7 +260,7 @@ export function advanceViewing(s: GameState) {
     }
     reviewed(p);
   }
-  if (v.stage === 'walking' && s.minute >= a.endsAt) {
+  if (v.stage === 'walking' && s.minute >= Math.floor(a.endsAt)) {
     finishOwn(s, 'completed');
     v.arrivedAt = s.minute;
     if (choose(s, 'watch')) {
@@ -295,7 +299,7 @@ export function advanceViewing(s: GameState) {
       );
     }
   }
-  if (s.minute >= a.endsAt) {
+  if (s.minute >= Math.floor(a.endsAt)) {
     finishOwn(s, 'completed');
     v.finishedAt = s.minute;
     v.stage = 'waiting';
