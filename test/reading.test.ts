@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   cloneState,
   newGame,
@@ -114,29 +114,34 @@ it('allows a sleepy keeper to reuse a recent reading but a rested keeper walks',
   expect(skipsWalk(p, 'gate', 20, 0)).toBe(false);
 });
 
-it('a skipped walk repeats the retained figure and written time without observing a gauge', () => {
-  const s = newGame(1);
+// Public source preparation is separate from the short activity under test.
+describe('a physical skipped reading', () => {
+  let s: ReturnType<typeof newGame>;
+  let beforeSkip: number;
   const observations = () =>
     archiveWatch(s.people[0]!)
       .run.history.flatMap((h) => h.inputs)
       .filter((i) => i.kind === 'quantity.observed').length;
-  let beforeSkip: number | undefined;
-  while (s.phase === 'watch' && !s.reports.some((r) => r.skipped)) {
-    if ((s.minute - 1320) % 15 === 0)
-      queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level', insist: true });
-    step(s);
-    if (s.keepers[0]!.job?.skip && beforeSkip === undefined) {
-      beforeSkip = observations();
-      const activity = s.people[0]!.activity!;
-      expect(activity.endsAt - activity.startedAt).toBe(4);
+  beforeAll(() => {
+    s = newGame(1);
+    while (s.phase === 'watch' && !s.keepers[0]!.job?.skip) {
+      if ((s.minute - 1320) % 15 === 0)
+        queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level', insist: true });
+      step(s);
     }
-  }
-  const stale = s.reports.at(-1)!;
-  const prior = s.reports.at(-2)!;
-  expect(stale.skipped).toBe(true);
-  expect(stale.value).toBe(prior.value);
-  expect(stale.wrote).toBe(prior.wrote);
-  expect(stale.at).toBeGreaterThan(stale.wrote);
-  expect(beforeSkip).toBeDefined();
-  expect(observations()).toBe(beforeSkip);
+    if (!s.keepers[0]!.job?.skip) throw Error('The public watch did not reach a skipped walk');
+    beforeSkip = observations();
+  });
+  it('uses four HF minutes and copies the retained figure/time without observing a gauge', () => {
+    const activity = s.people[0]!.activity!;
+    expect(activity.endsAt - activity.startedAt).toBe(4);
+    const prior = s.board.level!;
+    while (s.phase === 'watch' && !s.reports.some((r) => r.skipped)) step(s);
+    const stale = s.reports.at(-1)!;
+    expect(stale.skipped).toBe(true);
+    expect(stale.value).toBe(prior.value);
+    expect(stale.wrote).toBe(prior.wrote);
+    expect(stale.at).toBeGreaterThan(stale.wrote);
+    expect(observations()).toBe(beforeSkip);
+  });
 });
