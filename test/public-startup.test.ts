@@ -94,7 +94,26 @@ it('starts public rules directly and retains the physical dam and old save throu
   );
   expect(document.querySelector('.continuity-notice')?.textContent).toContain('Dai');
   expect(document.querySelector('.continuity-notice')?.textContent).toContain('Wren');
+  expect(document.querySelector('.continuity-notice')?.textContent).toContain(
+    'They start this game new, without their past from other games. Their saved past stays on this device.',
+  );
+  const state = required(_debug.state);
+  const chapter = required(state.chapter);
+  state.chapter = {
+    ...chapter,
+    blocked: [
+      ...(chapter.blocked ?? []),
+      { castId: 'unrecognized-cast-id', reason: 'Synthetic unknown person.' },
+    ],
+  };
   click('menu');
+  expect(document.querySelector('#game-menu .continuity-notice')?.textContent).toContain(
+    'someone from another game',
+  );
+  expect(document.querySelector('#game-menu .continuity-notice')?.textContent).not.toContain(
+    'unrecognized-cast-id',
+  );
+  state.chapter = chapter;
   expect(document.querySelector('#game-menu .continuity-notice')?.textContent).not.toContain(
     'Unsupported saved history version.',
   );

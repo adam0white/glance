@@ -94,8 +94,6 @@ const continuity = new Continuity(
   fileMode ? undefined : personaChannel(),
   () => {
     if (s && !fileMode) writeSave();
-    const status = document.getElementById('continuity-status');
-    if (status) status.textContent = continuity.status;
   },
   fileMode,
 );
@@ -359,7 +357,7 @@ export function start() {
     if (lab.preservationStatus !== 'existing-local') {
       lab.dispose();
       app.innerHTML =
-        '<p>File play cannot start with this browser’s recording profile. No native save was opened. Use a compatible existing lab profile or return to the ordinary address.</p>';
+        '<p>File play cannot start with this browser’s recording profile. No native save was opened. Use a compatible existing lab profile or return to the Glance page at glance.adamwhite.work.</p>';
       return;
     }
   }
@@ -550,7 +548,7 @@ function fileChooser() {
     } catch {
       if (continuity.isFileSelection(selection) && result?.isConnected)
         result.textContent =
-          'That saved file could not be loaded. Keep the file. Start a new game at the ordinary address, or choose another file. Your current file is unchanged.';
+          'That saved file could not be loaded. Your current game is unchanged. Choose another file, or start a new game from the Glance page at glance.adamwhite.work.';
     }
     if (continuity.isFileSelection(selection)) {
       file.value = '';
@@ -706,12 +704,14 @@ function bindPace(d: HTMLElement) {
 function carryNotice() {
   const blocked = s?.chapter?.blocked ?? [];
   if (!blocked.length) return '';
-  const names = blocked.map((b) => ALLOCATION.find((c) => c.castId === b.castId)?.name ?? b.castId);
+  const names = blocked.map(
+    (b) => ALLOCATION.find((c) => c.castId === b.castId)?.name ?? 'someone from another game',
+  );
   const diagnostics =
     new URLSearchParams(location.search).get('lab') === '1'
       ? `<ul>${blocked.map((b) => `<li>${esc(b.reason)}</li>`).join('')}</ul>`
       : '';
-  return `<details class="continuity-notice" role="status"><summary>Saved histories could not carry over: ${esc(names.join(', '))}.</summary><p>Their local roles start fresh. Their saved histories stay on the shelf.</p>${diagnostics}</details>`;
+  return `<details class="continuity-notice" role="status"><summary>Saved histories could not carry over: ${esc(names.join(', '))}.</summary><p>They start this game new, without their past from other games. Their saved past stays on this device.</p>${diagnostics}</details>`;
 }
 
 function gameMenu() {
@@ -2107,7 +2107,6 @@ function closeOwnedDeaths() {
     ) {
       terminalAttempts.add(key);
       void continuity.checkpoint(cast.castId).catch((error) => {
-        continuity.status = String(error);
         if (!/stale|parent|conflict/i.test(String(error))) terminalAttempts.delete(key);
       });
     }

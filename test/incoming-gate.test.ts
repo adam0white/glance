@@ -123,13 +123,14 @@ it('uses the published default gate to admit Callum and name all four blocked pe
   const state = await c.fresh(7);
   expect(state.chapter?.inputs.map((i) => i.parent.castId)).toEqual(['hf.cast.callum.glance']);
   expect(state.people.map((p) => p.id)).toEqual(['dai', 'callum', 'nerys', 'bilal', 'wren']);
-  for (const name of ['Dai', 'Nerys', 'Bilal', 'Wren']) expect(c.status).toContain(name);
+  for (const name of ['Dai', 'Nerys', 'Bilal', 'Wren'])
+    expect(state.chapter?.blocked?.some((b) => b.reason.includes(name))).toBe(true);
   for (const parent of inputs.filter((i) => i.parent.castId !== 'hf.cast.callum.glance'))
     expect(store.heads[parent.parent.castId]).toBe(original.heads[parent.parent.castId]);
   capture('installed-current-gated-native', {
     native: c.localSave(state),
     requests,
-    status: c.status,
+    blocked: state.chapter?.blocked,
     original,
     store,
   });

@@ -41,8 +41,9 @@ it('names unsupported people and starts the other local people without claiming 
   const { c, requests } = harness([{ castId: 'hf.cast.dai.glance', reason: 'Unsupported source family' }]);
   const s = await c.fresh(7);
   expect(s.people.map((p) => p.id)).toEqual(['dai', 'callum', 'nerys', 'bilal', 'wren']);
-  expect(c.status).toContain('Dai');
-  expect(c.status).toContain('Unsupported source family');
+  expect(s.chapter?.blocked).toEqual([
+    { castId: 'hf.cast.dai.glance', reason: 'Dai: Unsupported source family' },
+  ]);
   expect(c.heads).toEqual([]);
   expect(requests.filter((r) => r.action === 'putBatch').flatMap((r) => r.envelopes)).toEqual([]);
 });
