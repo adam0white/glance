@@ -209,7 +209,6 @@ it('IN-R3 pins SDK-owned blocked identities in blocked-only and mixed durable ch
   const h = harness([owned], [unclaimed.parent]);
   let state = await h.c.fresh(7);
   expect(state.chapter?.blocked?.[0]?.reason).toContain('Wren is still in rope');
-  expect(h.c.status).toContain('Wren');
   capture('blocked-only', { state: h.c.localSave(state), requests: h.requests });
   const mixed = harness([owned, await input('callum')], [unclaimed.parent]);
   mixed.wire.onPut = async () => {
@@ -221,7 +220,7 @@ it('IN-R3 pins SDK-owned blocked identities in blocked-only and mixed durable ch
   };
   state = await mixed.c.fresh(7);
   expect(state.chapter?.blocked).toHaveLength(1);
-  expect(mixed.c.status).toContain('Wren');
+  expect(state.chapter?.blocked?.[0]?.reason).toContain('Wren is still in rope');
 });
 it('IN-R4 hides historical acknowledged openings and preserves a newer native recovery basis', async () => {
   const h = harness([await input()]);

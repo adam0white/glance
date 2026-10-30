@@ -57,7 +57,6 @@ export class Continuity {
   heads: PersonaEnvelope[] = [];
   fileOrigin = false;
   busy = false;
-  status = 'Browser continuity and lab recording are separate choices.';
   runId: string = crypto.randomUUID();
   sources: SourceArchive[] = [];
   private key = crypto.randomUUID();
@@ -172,7 +171,6 @@ export class Continuity {
           throw Error(
             'A saved prepared opening needs its claim checked first. Your current watch is unchanged.',
           );
-        this.status = 'Checking saved people and preparing the complete opening…';
         this.changed();
         let batch: LifeBatchPreparation | undefined;
         const staged: { kind: 'local-planning-only'; request?: PersonaRequest } = {
@@ -292,15 +290,8 @@ export class Continuity {
           if (reservation) await this.preparations.transition(reservation, 'prepared');
           throw Error('Preparation cancelled before its claim.');
         }
-        try {
-          // This is the only real transport call. Local SDK staging did not acknowledge it.
-          await this.shelf.request(staged.request);
-        } catch (error) {
-          this.status = reservation
-            ? 'The prepared opening remains saved. Its claim needs checking; your current watch is unchanged.'
-            : String(error);
-          throw error;
-        }
+        // This is the only real transport call. Local SDK staging did not acknowledge it.
+        await this.shelf.request(staged.request);
         if (reservation) reservation = await this.preparations.transition(reservation, 'acknowledged');
       }
       if (!current())
@@ -315,13 +306,6 @@ export class Continuity {
       this.heads = chapter?.claims ?? [];
       this.preparation = reservation;
       this.fileOrigin = false;
-      const refused = chapter?.blocked ?? [];
-      const reasons = refused.map((x) => x.reason).join('; ');
-      this.status = chapter?.inputs.length
-        ? `${chapter.inputs.length} saved ${chapter.inputs.length === 1 ? 'person continues' : 'people continue'} in this prepared opening. ${refused.length ? `Could not carry: ${reasons}. Their local roles start fresh.` : 'Other roles keep their authored local histories.'} No other game's chapter was closed.`
-        : refused.length
-          ? `Saved people could not be carried: ${reasons}. The local people start fresh.`
-          : 'A new chapter has started with the original people. No saved histories were carried over.';
       return state;
     } finally {
       this.validation.cancel(operation);
@@ -409,8 +393,7 @@ export class Continuity {
     try {
       const state = await this.validation.native(
         text,
-        (message) => {
-          this.status = message;
+        () => {
           this.changed();
         },
         operation,
@@ -428,7 +411,6 @@ export class Continuity {
       this.fileOrigin = saved.fileOrigin;
       this.sources = structuredClone(saved.sources);
       this.preparation = saved.preparation;
-      this.status = 'The complete local watch was restored. No newer browser histories were loaded.';
       return state;
     } finally {
       this.validation.cancel(operation);
@@ -442,8 +424,7 @@ export class Continuity {
     try {
       const state = await this.validation.load(
         JSON.parse(text),
-        (message) => {
-          this.status = message;
+        () => {
           this.changed();
         },
         operation,
@@ -490,8 +471,7 @@ export class Continuity {
     try {
       const state = await this.validation.file(
         text,
-        (message) => {
-          this.status = message;
+        () => {
           this.changed();
         },
         operation,
@@ -510,7 +490,6 @@ export class Continuity {
       this.preparation = undefined;
       this.fileOrigin = true;
       this.runId = crypto.randomUUID();
-      this.status = 'Progress stays in memory. Download this run before closing the page.';
       return state;
     } finally {
       this.validation.cancel(operation);
@@ -577,8 +556,6 @@ export class Continuity {
     this.invalidate();
     await this.shelf.ready;
     this.shelf.setEnabled(value);
-    this.status =
-      'Your choice about carrying people between games has changed. This loaded chapter keeps its saved people. Only a new chapter can load browser histories.';
   }
   checkpoint(_castId: string, _fork = false): Promise<never> {
     this.nativeOnly();
@@ -605,10 +582,9 @@ export class Continuity {
         if (!current()) break;
         if (saved) published++;
         else refused++;
-      } catch (error) {
+      } catch {
         if (!current()) break;
         refused++;
-        this.status = String(error);
       }
     }
     if (current()) this.changed();
