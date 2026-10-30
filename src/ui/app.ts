@@ -702,6 +702,18 @@ function bindPace(d: HTMLElement) {
     });
   });
 }
+/** Saved individual refusals stay visible after native reload; this notice grants no write permission. */
+function carryNotice() {
+  const blocked = s?.chapter?.blocked ?? [];
+  if (!blocked.length) return '';
+  const names = blocked.map((b) => ALLOCATION.find((c) => c.castId === b.castId)?.name ?? b.castId);
+  const diagnostics =
+    new URLSearchParams(location.search).get('lab') === '1'
+      ? `<ul>${blocked.map((b) => `<li>${esc(b.reason)}</li>`).join('')}</ul>`
+      : '';
+  return `<details class="continuity-notice" role="status"><summary>Saved histories could not carry over: ${esc(names.join(', '))}.</summary><p>Their local roles start fresh. Their saved histories stay on the shelf.</p>${diagnostics}</details>`;
+}
+
 function gameMenu() {
   if (fileMode) {
     writeSave();
@@ -732,7 +744,7 @@ function gameMenu() {
   const d = dialog(
     'game-menu',
     `Game menu${s ? ` · ${planOf(s).title} ${clock(s.minute)}` : ''}`,
-    `<p>Time stops while this menu is open.</p>
+    `<p>Time stops while this menu is open.</p>${carryNotice()}
     ${paceSetting()}<button class="reading-row" id="to-title">To the title page</button>
     <button class="reading-row" id="send-word">Feedback</button><button class="reading-row" id="fullscreen">Full screen</button><a class="reading-row" href="${GAMES}" target="_top">All games</a>${recordSwitch('record-menu')}<button id="menu-new">New game</button><div id="menu-confirm" hidden><p>Start a new game? This replaces your saved watch after the new game is ready.</p><button id="menu-confirm-new">Yes, start again</button><button id="menu-cancel-new">Cancel</button></div>${debugFooter()}`,
     '<button class="primary" id="dialog-back">Resume</button>',
@@ -925,7 +937,7 @@ function watch() {
   skipUntil = 0;
   app.innerHTML = `<div class="watch lk-stage">${topbar('<span id="night"></span> · <span class="clock" id="clock"></span>')}
     <div class="state-strip"><div id="concern" class="attention keeper-chips lk-strip" aria-live="polite"></div><div id="clock-rate" role="status"></div></div>
-    <div class="desk-reminder"><p id="desk-goal">Until ${s.rules ? 'the second Friday' : 'Friday'}'s first light: keep the dam below its crest and the town dry, or warned in time.</p><button id="compare-observations">Compare observations</button></div>
+    <div class="desk-reminder">${carryNotice()}<p id="desk-goal">Until ${s.rules ? 'the second Friday' : 'Friday'}'s first light: keep the dam below its crest and the town dry, or warned in time.</p><button id="compare-observations">Compare observations</button></div>
     <div class="desk-main"><div class="desk-picture"><div class="scene-zone"><canvas id="scene" class="scene lk-scene" aria-label="The dam, as reported"></canvas><div id="latest-radio" class="latest-radio hand"></div></div><div class="board" id="board"></div></div>
     <div class="desk-context"><div class="sheet lk-sheet" id="sheet"></div>${s.dawns.length ? '<button id="mornings" class="reading-row">This week’s mornings</button>' : ''}<div class="actionbar" id="skip-bar"><button id="skip" aria-label="Skip to the next event">Skip ⏩</button><span id="skip-caption" class="soft"></span></div></div></div></div>`;
   bindTopbar();
