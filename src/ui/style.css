@@ -1508,3 +1508,15 @@ input[type="text"],
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Phone: keep the keeper status inside the row. It shrinks with an ellipsis and costs no height;
+   the full status is in the keeper's own sheet. */
+@media (max-width: 767px) {
+  #concern .keeper-chip {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
