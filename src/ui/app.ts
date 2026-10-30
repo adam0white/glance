@@ -82,6 +82,7 @@ import { CREST, LIP, TURNS } from '../sim/water.ts';
 import { CandidateValidation } from '../validation.ts';
 import { concernLines, thresholdWords } from './concern.ts';
 import { drawDawn } from './dawn.ts';
+import { gateAfterLevel } from './gate-note.ts';
 import { lab } from './lab.ts';
 import { SAMPLE_DAWN } from './opener.ts';
 import { eventStamp, playback } from './playback.ts';
@@ -1391,7 +1392,7 @@ function drawSheet() {
     const firstReading = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
       ${job === 'level' ? observation(s) : ''}
-      ${job === 'level' ? gateAfterLevel(s) : ''}
+      ${job === 'level' ? gateAfterLevel(s.board.level, s.board.gate) : ''}
       <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">How ${NAMES[who]} expects to feel after this job:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'He has not said how he expects to feel.'}</span></p>
       <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every reading is what a keeper saw. It may be wrong.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
@@ -1479,13 +1480,6 @@ function bindReadingNote(el: HTMLElement) {
 }
 
 /** Compare only evidence the player has already received, never the live water state. */
-/** A gate report newer than the level reading: the reading cannot show what the gate has done since. */
-function gateAfterLevel(st: GameState): string {
-  const level = st.board.level;
-  const gate = st.board.gate;
-  if (!level || !gate || gate.at <= level.at) return '';
-  return `<p class="soft gate-after">${NAMES[gate.who as KeeperId] ?? 'The keeper'} reported the gate at ${clock(gate.at)}, after this level reading. The reading cannot show what the gate has done since. Ask for a new reading.</p>`;
-}
 function observation(st: GameState): string {
   const flash = st.flashes.at(-1);
   if (!flash)
@@ -1750,16 +1744,25 @@ function deskHint(st: GameState, who: KeeperId, job: Job, target?: number, insis
   if (st.radioOut) return { ...h, short: 'The radio is out.', minutes: 0, forecast: '' };
   if (activity === 'doze' || activity === 'nap' || (st.rules && keeperAsleep(st, who)))
     return { ...h, short: 'Call and wait for his answer.', minutes: 0, forecast: '' };
-  // A new call to the same keeper replaces any job he has not finished or started.
+  return { ...h, short: `${h.short}${callNote(st, who, job, target)}` };
+}
+
+/**
+ * What a new call does to this keeper's earlier work, from the actual input rules. Every accepted call first
+ * interrupts his activity and replaces any call still waiting, whatever he then decides. The radio, away,
+ * asleep and doze cases return before this note; the note never says the call was accepted.
+ */
+function callNote(st: GameState, who: KeeperId, job: Job, target: number | undefined): string {
   const k = keeperOf(st, who);
-  const unfinished =
-    k.pending !== undefined && k.pending !== null
-      ? k.pending.job !== job || k.pending.target !== target
-      : !!k.job &&
-        k.job.job !== 'stove' &&
-        k.job.job !== 'nap' &&
-        (k.job.job !== job || k.job.target !== target);
-  return unfinished ? { ...h, short: `${h.short} This call replaces his unfinished job.` } : h;
+  const waiting =
+    st.inputs.slice(st.applied).some((i) => i.at <= st.minute && i.kind === 'ask' && i.keeper === who) ||
+    !!k.pending;
+  if (waiting)
+    return ' Your earlier call to him is still waiting. This call replaces it. A call interrupts what he is doing, even if he does not agree.';
+  const j = k.job;
+  if (!j || j.job === 'stove' || j.job === 'nap') return '';
+  const again = j.job === job && j.target === target;
+  return ` A call interrupts his current job, even if he does not agree.${again ? ' If he does the same job, it starts again and its report can come later.' : ' If he goes back to it afterwards, its report can come later.'}`;
 }
 
 function verbButtons(items: { h: Hint; label: string; insist: Hint | undefined }[], grid = false): string {

@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { newGame } from '../src/sim/dam.ts';
+import type { Report } from '../src/sim/dam.ts';
+import { clock, exportRun, keeperOf, newGame, queueInput, replay, step } from '../src/sim/dam.ts';
 import { PRIVATE_PREMISE } from '../src/sim/private-scenes.ts';
+import { gateAfterLevel } from '../src/ui/gate-note.ts';
 import { BrowserWorker, disposeBrowserWorkers } from './browser-worker.ts';
 
 vi.mock('../src/ui/lab.ts', () => ({
@@ -158,7 +160,7 @@ describe('F-2208 standing request wording', () => {
   });
 });
 
-describe('F-2206 night one river side and F-2203 gate effect', () => {
+describe('F-2206 night one river side', () => {
   it('says on night one when the river reports begin, using the authored plan', async () => {
     await boot();
     await click('new');
@@ -167,43 +169,129 @@ describe('F-2206 night one river side and F-2203 gate effect', () => {
       'Tonight the board shows only the dam. The Bridge Inn’s river reports begin on Tuesday.',
     );
   });
-  it('says a level reading cannot show a gate change reported after it', async () => {
-    const debug = await boot();
-    await click('new');
-    await tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
-    await debug.step(30);
-    expect(debug.state?.board.level).toBeTruthy();
+});
+
+describe('F-2203 gate reading against level reading, by written time', () => {
+  const report = (gauge: 'level' | 'gate', at: number, wrote: number): Report => ({
+    at,
+    wrote,
+    who: 'dai',
+    gauge,
+    value: gauge === 'gate' ? 2 : 3.5,
+    truth: 0,
+    conf: 1,
+    clarity: 1,
+    cause: 'fresh',
+    skipped: false,
+  });
+  it('names both written times, not the delivery time of a held gate report', () => {
+    // Written 22:30 (1350); delivered after a radio outage at 23:50 (1430).
+    const text = gateAfterLevel(report('level', 1335, 1335), report('gate', 1430, 1350));
+    expect(text).toContain('read 22:30 (as written)');
+    expect(text).toContain('read 22:15 (as written)');
+    expect(text).not.toContain(clock(1430));
+    expect(text).not.toMatch(/because|caused|lowered|raised/);
+  });
+  it('says nothing when the gate reading was written before the level reading', () => {
+    expect(gateAfterLevel(report('level', 1360, 1360), report('gate', 1430, 1350))).toBe('');
+    expect(gateAfterLevel(undefined, report('gate', 1350, 1350))).toBe('');
+  });
+  it('shows it in the level sheet of a saved first night with a bounded generated fixture', async () => {
+    const saved = replay(
+      7,
+      [
+        { at: 1321, kind: 'ask', keeper: 'dai', job: 'level', insist: false },
+        { at: 1335, kind: 'ask', keeper: 'dai', job: 'gate', target: 2, insist: false },
+      ],
+      1370,
+    );
+    expect(saved.board.gate?.wrote).toBeGreaterThan(saved.board.level?.wrote ?? Number.MAX_SAFE_INTEGER);
+    localStorage.setItem(
+      'glance-cast-local-v3',
+      JSON.stringify({
+        run: exportRun(saved, '4.14.0'),
+        runId: 'test-run',
+        heads: [],
+        fileOrigin: false,
+        sources: [],
+      }),
+    );
+    await boot();
+    await click('cont');
     (document.querySelector('[data-g="level"]') as HTMLElement).click();
-    expect(document.querySelector('.gate-after')).toBeNull();
-    await click('x');
-    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
-    await tap(document.querySelector('.turns [data-t="2"]') as HTMLElement);
-    await debug.step(40);
-    const gate = debug.state?.board.gate;
-    expect(gate?.at).toBeGreaterThan(debug.state?.board.level?.at ?? 0);
-    (document.querySelector('[data-g="level"]') as HTMLElement).click();
-    expect(document.querySelector('.gate-after')?.textContent).toContain('after this level reading');
-    expect(document.querySelector('.gate-after')?.textContent).toContain('Ask for a new reading.');
+    const note = document.querySelector('.gate-after')?.textContent ?? '';
+    expect(note).toContain(`read ${clock(saved.board.gate?.wrote ?? 0)} (as written)`);
+    expect(note).toContain(`read ${clock(saved.board.level?.wrote ?? 0)} (as written)`);
   });
 });
 
-describe('F-2209 a new call replaces an unfinished job', () => {
-  it('says so on the gate buttons while Dai is reading the level, and not before', async () => {
+describe('F-2209 what a new call does to earlier work', () => {
+  const dai = (s: ReturnType<typeof newGame>) => keeperOf(s, 'dai');
+  const levelReports = (s: ReturnType<typeof newGame>) =>
+    s.reports.filter((r) => r.gauge === 'level').map((r) => r.at);
+  const play = (second?: { job: 'level' | 'gate' | 'nap'; target?: number }, between = 3) => {
+    const s = newGame(7);
+    step(s);
+    queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level', insist: false });
+    for (let i = 0; i < between; i++) step(s);
+    if (second)
+      queueInput(s, {
+        kind: 'ask',
+        keeper: 'dai',
+        job: second.job,
+        ...(second.target === undefined ? {} : { target: second.target }),
+        insist: false,
+      });
+    for (let i = 0; i < 40; i++) step(s);
+    return s;
+  };
+  it('source: two calls with no step between leave only the second one', () => {
+    const s = newGame(7);
+    step(s);
+    queueInput(s, { kind: 'ask', keeper: 'dai', job: 'level', insist: false });
+    queueInput(s, { kind: 'ask', keeper: 'dai', job: 'gate', target: 2, insist: false });
+    expect(s.inputs.slice(s.applied).map((i) => i.kind)).toEqual(['ask', 'ask']);
+    for (let i = 0; i < 40; i++) step(s);
+    expect(levelReports(s)).toEqual([1320]);
+    expect(s.reports.some((r) => r.gauge === 'gate' && r.at > 1320)).toBe(true);
+  });
+  it('source: repeating the active level call restarts it and the report comes later', () => {
+    expect(levelReports(play())).toEqual([1320, 1331]);
+    expect(levelReports(play({ job: 'level' }))).toEqual([1320, 1334]);
+  });
+  it('source: a request he does not take up still interrupts the active job and delays its report', () => {
+    const s = play({ job: 'nap' });
+    expect(dai(s).job?.job).not.toBe('nap');
+    expect(levelReports(s)).toEqual([1320, 1334]);
+  });
+  it('desk: with the first call still queued, the next call button says it replaces it', async () => {
+    const debug = await boot();
+    await click('new');
+    await tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
+    const queued = debug.state?.inputs.slice(debug.state.applied) ?? [];
+    expect(queued.map((i) => i.kind)).toEqual(['ask']);
+    expect(debug.state?.keepers.find((k) => k.id === 'dai')?.pending ?? null).toBeNull();
+    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
+    expect(document.querySelector('.turns .h')?.textContent).toContain(
+      'Your earlier call to him is still waiting. This call replaces it.',
+    );
+    expect(document.querySelector('.turns .h')?.textContent).toContain('even if he does not agree');
+  });
+  it('desk: during an active level job a repeat call says it starts again; no notice before any call', async () => {
     const debug = await boot();
     await click('new');
     (document.querySelector('[data-g="gate"]') as HTMLElement).click();
-    expect(document.querySelector('.turns .h')?.textContent).not.toContain('replaces');
+    expect(document.querySelector('.turns .h')?.textContent).not.toContain('interrupts');
     await click('x');
     await tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
     await debug.step(3);
     expect(debug.state?.keepers.find((k) => k.id === 'dai')?.job?.job).toBe('level');
-    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
-    expect(document.querySelector('.turns .h')?.textContent).toContain(
-      'This call replaces his unfinished job.',
-    );
-    // The same job again is not a replacement.
-    await click('x');
     (document.querySelector('[data-g="level"]') as HTMLElement).click();
-    expect(document.querySelector('.sheet [data-job="level"] .h')?.textContent).not.toContain('replaces');
+    const again = document.querySelector('.sheet [data-job="level"] .h')?.textContent ?? '';
+    expect(again).toContain('A call interrupts his current job, even if he does not agree.');
+    expect(again).toContain('it starts again and its report can come later');
+    await click('x');
+    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
+    expect(document.querySelector('.turns .h')?.textContent).toContain('If he goes back to it afterwards');
   });
 });
