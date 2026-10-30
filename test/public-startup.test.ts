@@ -21,7 +21,10 @@ vi.mock('@adam0white/lab-client', async (original) => {
           return {
             expectedHeads: Object.fromEntries((request.castIds ?? []).map((id) => [id, null])),
             inputs: [],
-            blocked: [],
+            blocked: [
+              { castId: 'hf.cast.dai.glance', reason: 'Unsupported saved history version.' },
+              { castId: 'hf.cast.wren.rope', reason: 'Occupied source chapter.' },
+            ],
           };
         if (request.action === 'putBatch') return null;
         throw new Error(`Unexpected shelf operation: ${request.action}`);
@@ -89,6 +92,26 @@ it('starts public rules directly and retains the physical dam and old save throu
       outcomes: 'private-scenes-1',
     }),
   );
+  expect(document.querySelector('.continuity-notice')?.textContent).toContain('Dai');
+  expect(document.querySelector('.continuity-notice')?.textContent).toContain('Wren');
+  click('menu');
+  expect(document.querySelector('#game-menu .continuity-notice')?.textContent).not.toContain(
+    'Unsupported saved history version.',
+  );
+  click('dialog-back');
+  history.replaceState(null, '', '?lab=1');
+  click('menu');
+  expect(document.querySelector('#game-menu .continuity-notice')?.textContent).toContain(
+    'Unsupported saved history version.',
+  );
+  click('dialog-back');
+  history.replaceState(null, '', '/');
+  // The saved blocked identities, rather than a transient status string, survive reload.
+  click('menu');
+  click('to-title');
+  click('cont');
+  await vi.waitFor(() => expect(document.querySelector('.watch')).not.toBeNull());
+  expect(document.querySelector('.continuity-notice')?.textContent).toContain('Wren');
   expect(_debug.state?.outcomes).toBeDefined();
   expect(_debug.state?.privateScenes).toBeDefined();
 

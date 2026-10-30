@@ -1,5 +1,14 @@
 # Glance HF 4.14 migration — delivery in progress
 
+## Named carryover refusals — 2026-10-30
+
+Remaining: independent source review, signed integration, exact source/main CI, normal deployment and current live reader qualification. Adam accepts feel separately. Player rounds, friends' tests and Show HN remain paused.
+
+The watch and Game menu now name people whose saved histories could not carry over. The notice uses the saved chapter's blocked list, so it remains after reload; its disclosure explains that local roles start fresh. Raw refusal diagnostics remain saved and appear only with `?lab=1`. Unsupported and occupied synthetic histories remain unchanged on the shelf. The reader controls admit only the eligible person, retain all expected heads for atomic conflict checks, replay the complete export and refuse outgoing checkpoint/fork work. This is synthetic qualification evidence, not a cross-game journey.
+
+The patch keeps HF4.14.0/client0.5.13/kit0.5.30. Client0.5.15 embeds HF4.15 and would add a second current HF module; that dependency bump is outside this notice repair. Departure, suspension, reconciliation and producer retirement remain unsupported; outgoing publication still refuses before writes. Final release qualification must bind the exact deployed commit, complete envelope hashes and all required browser sizes/engines. External report: games-deferred/resume-glance-reader-report.md.
+
+
 Remaining: exact source CI, merge PR #12, exact merged-commit CI, normal deployment, clean matching release manifest and live Chromium/WebKit checks. Adam accepts feel and readiness separately. Report: `~/code/.lab-scratch/codex/glance-hf413.md`.
 
 Retargeted the prepared 4.13 migration to published HF 4.14.0, client 0.5.13 and kit 0.5.30. The client embeds exactly 4.14.0; the kit peer range accepts 0.5.13. No provisional pins remain. Read published CHANGELOG from 4.8.1 through 4.14.0. Glance does not branch live Runs, so the new `forkRun` API needs no adoption. Untrusted files still use restore and complete replay validation. No newborn or retelling inputs are used.
