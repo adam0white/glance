@@ -1,5 +1,9 @@
 # Glance HF 4.14 migration — delivery in progress
 
+## Remaining twelve asks — 2026-10-30
+
+Order/label follow-up on 2e3fd99: phone order puts scene and gauges above the latest-radio note (F-2199); the collapsed optional-chapter label drops the three unmet names (F-2198); the existing Talk disclosure names the person, such as "Talk with Dai · optional" (F-2202), with no Morgan, town or biography promise. Dispositions for F-2198 to F-2209 are in `docs/design.md` Deferred; none is closed. Source 2e3fd99 supplied separate verified layout improvements, including natural wheel access to a caption across a 22px outer phone range. The literal phone-order request belongs to this follow-up; unchanged sizing declarations and desktop rules do not establish actual heights or action reach. Those need the four-size geometry check. Delivery requires signed source, exact source/main CI, normal deployment, and Chromium/WebKit checks at four sizes. D6: SDK 16/33 is UNPUBLISHED, eligibility stays blocked. D7: no Wren field page found; no finding authored. Both re-dated 2026-11-03. Adam accepts feel and readiness separately.
+
 ## Named carryover refusals — 2026-10-30
 
 Remaining: independent source review, signed integration, exact source/main CI, normal deployment and current live reader qualification. Adam accepts feel separately. Player rounds, friends' tests and Show HN remain paused.
