@@ -1,4 +1,18 @@
-# Glance HF 4.14 migration — delivery in progress
+# Glance current checkpoint — 2026-10-31 (read first)
+
+Remaining: parent integration of the dated retest-2 record in `docs/design.md` Deferred ("Retest 2 — dated remaining asks, 2026-10-31"), then signed source, exact review, source and main CI, merge and cleanup. The normal full-suite lane has passed 242 tests in 43 files; delivery receipts retain the initial formatting failure and the successful rerun. A final lane check covers this handoff receipt update before signing. Then the fifteen open asks: F-2556, F-2561, F-2564, F-2565, F-2566, F-2567 and F-2568 are the glance author's, target 2026-11-03, with the F-2555 chart/text source inspection. F-2557, F-2558, F-2559, F-2560, F-2562, F-2563, F-2569 and F-2570 are Adam's owner preferences, target 2026-11-10. The conditional C14 human-speed comparison applies only before any clock skip or speed retune on F-2560, F-2563 and F-2569; it does not gate layout, balance or actor-permission work. Nothing is fixed, closed or accepted.
+
+Loop: the Glance retest loop ended after two fix/retest iterations (round `light-1031-glance-retest2`, five testers, ten stops). That ending is CONDITIONAL only on later integration of the dated Deferred record (the owner rule for closing the player loop). The mandatory technical delivery gates (normal lane, reviewed source, signed commits, exact source and main CI, merge and cleanup) are separate and not part of that condition. It claims no no-new-blocker, bug-free, fixed-ask, technical, player or Adam acceptance. Adam accepts feel and readiness separately. The source gate adds no extra human-permission prerequisite.
+
+Scope: documentation only. No runtime, deployment or current-release change. The live build tested remains `c112497284e78d4c99aa62895262368214f37d9f` with HF 4.14.0. The four-size, Chromium/WebKit engine, font and native-file gates stay separate and unproved by this record.
+
+Source identity: sealed scratch packet `/Users/abdul/code/.lab-scratch/playtest/light-1030/source-packets/glance-retest2` (sealed 2026-10-31T09:30:31Z). `ask-ledger.md` SHA256 `adb2c521173012b236c0f693460525ba52f6919901353fa4f72fb68cbeedc20d`; `sha256.json` SHA256 `148132c3ecd8983f62164159ca54831a5b842653f954573313751c7d5920192d`; the five reports and the other file hashes are in `docs/design.md`. Its prospective canonical path `docs/lab/reviews/light-2026-10-30/glance-retest2/` belongs to the human-framework repository; nothing was imported here and no local link is made.
+
+Qualifications: native-tap-v2 is the same private, hash-bound, fork-unverified driver, but the history method changed, so no difference from earlier rounds is attributed to the game alone. Eszter's two devices ran the same evening with actual Fast on the second, so pace, device, order and learning are confounded; she played two full Mondays and two partial Tuesdays. Her chart/text disagreement and its guessed clipping cause are unverified. Rosa did not scroll the lower desktop gate text. Samir viewed no phone gameplay. 13 of Mei's raw reactions are absent from her report; the raw companion is preserved.
+
+Everything below is earlier context. Its "Remaining" and "awaits review" statements were true when written and are not the current status.
+
+# Glance HF 4.14 migration — delivery in progress (historical 2026-10-30 context; superseded as current by the checkpoint above)
 
 ## Remaining asks — 2026-10-30
 
