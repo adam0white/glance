@@ -6,6 +6,7 @@ import { clock, exportRun, keeperOf, newGame, queueInput, replay, step } from '.
 import { PRIVATE_PREMISE } from '../src/sim/private-scenes.ts';
 import { concernLines } from '../src/ui/concern.ts';
 import { gateAfterLevel } from '../src/ui/gate-note.ts';
+import { exactWords } from '../src/ui/report-words.ts';
 import { riverStairsWords, weirWords } from '../src/ui/river-notes.ts';
 import { catchWords } from '../src/ui/watch-copy.ts';
 import { BrowserWorker, disposeBrowserWorkers } from './browser-worker.ts';
@@ -322,6 +323,18 @@ describe('F-2209 what a new call does to earlier work', () => {
     for (const b of buttons)
       expect(b.textContent).not.toMatch(/interrupt|still waiting|report can come later/);
   });
+  it('source (pure function on a built state, as concern.test.ts does): a live deferred request counts as waiting; an expired one does not', async () => {
+    const { callExplanation } = await import('../src/ui/app.ts');
+    const state = newGame(7);
+    const dai = keeperOf(state, 'dai');
+    expect(callExplanation(state, 'dai')).not.toContain('still waiting');
+    dai.deferred = { s: { voiceId: 'engineer', strength: 0.6 }, job: 'gate', until: state.minute + 5 };
+    expect(callExplanation(state, 'dai')).toContain(
+      'Your earlier call to Dai is still waiting. A new call replaces it.',
+    );
+    state.minute += 6;
+    expect(callExplanation(state, 'dai')).not.toContain('still waiting');
+  });
   it('desk: during an active level job the sheet says once that a call interrupts; none before any call', async () => {
     const debug = await boot();
     await click('new');
@@ -593,14 +606,21 @@ describe('F-2357 the caught heading says what caught means', () => {
 });
 
 describe('F-2360 the saved lightning drawing on a narrow screen (source candidate, size not measured)', () => {
-  async function levelSheet(narrow: boolean) {
+  // Scope: happy-dom with a stubbed media query. This checks which drawing the code builds for the same
+  // saved evidence; it is not live geometry, rendered size, scrolling or pointer proof.
+  it('keeps the same saved time, lines and text, and only stretches the height', async () => {
+    let narrow = false;
+    const changes: (() => void)[] = [];
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: narrow && query.includes('767px'),
       media: query,
-      addEventListener() {},
+      addEventListener(_: string, fn: () => void) {
+        changes.push(fn);
+      },
       removeEventListener() {},
     }));
     window.matchMedia = globalThis.matchMedia;
+    // One computed state and one native boot. The state is paused at the same minute for both drawings.
     const state = replay(7, [], 1320 + 120);
     expect(state.flashes.length).toBeGreaterThan(0);
     localStorage['glance-cast-local-v3'] = JSON.stringify({
@@ -610,27 +630,33 @@ describe('F-2360 the saved lightning drawing on a narrow screen (source candidat
       fileOrigin: false,
       sources: [],
     });
-    await boot();
+    const debug = await boot();
     await click('cont');
-    (document.querySelector('[data-g="level"]') as HTMLElement).click();
-    await settle();
-    return state;
-  }
-  it('keeps the same saved time, lines and text, and only stretches the height', async () => {
-    const state = await levelSheet(false);
-    const wide = document.querySelector('#observation');
+    const openLevel = async () => {
+      (document.querySelector('[data-g="level"]') as HTMLElement).click();
+      await settle();
+      return document.querySelector('#observation');
+    };
+    const wide = await openLevel();
     const wideText = wide?.textContent;
     const wideLines = [...(wide?.querySelectorAll('svg path') ?? [])].map((p) => p.getAttribute('d'));
     expect(wide?.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 300 170');
     expect(wideText).toContain(`Lightning at ${clock(state.flashes.at(-1)?.at ?? 0)}`);
-    document.body.innerHTML = '<div id="app"></div>';
-    vi.resetModules();
-    await levelSheet(true);
-    const narrow = document.querySelector('#observation');
-    expect(narrow?.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 300 238');
-    expect(narrow?.textContent).toBe(wideText);
-    expect([...(narrow?.querySelectorAll('svg path') ?? [])]).toHaveLength(wideLines.length);
-    expect(narrow?.querySelector('svg text')?.textContent).toBe('Dam crest');
+    // The boundary changes with the sheet still open: only the saved drawing is redrawn.
+    const mark = document.getElementById('reading-note');
+    const minute = debug.state?.minute;
+    narrow = true;
+    for (const fn of changes) fn();
+    expect(document.getElementById('reading-note')).toBe(mark);
+    expect(debug.state?.minute).toBe(minute);
+    expect(document.querySelector('#observation svg')?.getAttribute('viewBox')).toBe('0 0 300 238');
+    // Reopen the same sheet, with no step between, once the media query matches.
+    await click('x');
+    const narrowSection = await openLevel();
+    expect(narrowSection?.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 300 238');
+    expect(narrowSection?.textContent).toBe(wideText);
+    expect([...(narrowSection?.querySelectorAll('svg path') ?? [])]).toHaveLength(wideLines.length);
+    expect(narrowSection?.querySelector('svg text')?.textContent).toBe('Dam crest');
   });
 });
 
@@ -673,7 +699,7 @@ describe('RT2 doubt submission before the watch answers', () => {
     const [held] = heldRequests.splice(0);
     held?.worker.refuse(held.value);
     await settle();
-    expect(status()).toContain('The watch did not accept the doubt mark. Nothing changed.');
+    expect(status()).toContain('The watch did not accept that change. Nothing changed.');
     expect(status()).not.toContain('no longer on the board');
     expect(document.querySelector('[data-g="level"]')?.textContent).not.toContain('Doubt mark waiting');
     vi.advanceTimersByTime(9_000);
@@ -771,5 +797,63 @@ describe('RT7 first-call instruction after a volunteered level report', () => {
     await boot();
     await click('new');
     expect(document.querySelector('.first-call')?.textContent).toContain('Nobody has read the level tonight');
+  });
+});
+
+describe('Level tile name and quoted keeper words (UI fixture: happy-dom, real worker owner, seed 7)', () => {
+  async function dayOneRead(steps: number) {
+    const debug = await boot();
+    await click('new');
+    await tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
+    await debug.step(steps);
+    return debug;
+  }
+  it('the level tile keeps its handwriting letters but has one whole accessible name', async () => {
+    const debug = await dayOneRead(15);
+    const report = debug.state?.board.level as Report;
+    expect(report.at).toBeGreaterThan(1320);
+    const tile = document.querySelector<HTMLElement>('[data-g="level"]') as HTMLElement;
+    // Visual handwriting is kept: the byline is still split into one span per letter.
+    expect(tile.querySelectorAll('.by .w > span').length).toBeGreaterThan(10);
+    const name = tile.getAttribute('aria-label') ?? '';
+    expect(name).toBe(
+      `level, ${report.value.toFixed(2)} m, Dai · read ${clock(report.wrote)} (as written)${tile.querySelector('.was')?.textContent ? `, ${tile.querySelector('.was')?.textContent}` : ''}`,
+    );
+    expect(name).not.toMatch(/\b\w \w \w\b/);
+    expect(tile.getAttribute('aria-pressed')).toBe('false');
+  });
+  it('before Dai reads again the level sheet quotes his real opening sentence, not a rebuilt phrase', async () => {
+    const debug = await dayOneRead(3);
+    const state = debug.state as ReturnType<typeof newGame>;
+    const opening = state.board.level as Report;
+    expect(opening.at).toBe(1320);
+    const said = state.said.find((x) => x.kind === 'report' && x.who === 'dai' && x.at === 1320);
+    expect(said?.text).toMatch(/^Good evening\. The level is .*, and the gate is /);
+    (document.querySelector('[data-g="level"]') as HTMLElement).click();
+    await settle();
+    const hint = document.getElementById('sheet')?.textContent ?? '';
+    expect(hint).toContain(`“${said?.text}”`);
+    expect(hint).not.toContain("I'm sure");
+  });
+  it('a later report is quoted only when its retained line matches; a radio-delayed one never is', async () => {
+    const debug = await dayOneRead(15);
+    const state = debug.state as ReturnType<typeof newGame>;
+    const later = state.board.level as Report;
+    const line = state.said.find((x) => x.kind === 'report' && x.who === 'dai' && x.at === later.at);
+    expect(exactWords(state, later)).toBe(line?.text);
+    // Same retained log, a copy of that report marked late: the association is not guessed.
+    expect(exactWords(state, { ...later, late: true })).toBeNull();
+    // A second line for the same keeper and minute makes the match ambiguous.
+    const twice = { ...state, said: [...state.said, ...(line ? [line] : [])] } as typeof state;
+    expect(exactWords(twice, later)).toBeNull();
+    // Pure view fixture on those copies, not a played journey: no quotation marks, no claim about stored words.
+    const { lastWords } = await import('../src/ui/app.ts');
+    const unmatched = lastWords(twice, 'level');
+    expect(unmatched).toContain('This panel cannot match an exact quote to this reading.');
+    expect(unmatched).not.toMatch(/[“”]|not kept/);
+    expect(unmatched).toContain(clock(later.wrote));
+    (document.querySelector('[data-g="level"]') as HTMLElement).click();
+    await settle();
+    expect(document.getElementById('sheet')?.textContent).toContain(`“${line?.text}”`);
   });
 });

@@ -53,7 +53,6 @@ import {
   personOf,
   planOf,
   type Report,
-  reportWords,
   restoreState,
   type Said,
   step,
@@ -88,6 +87,7 @@ import { SAMPLE_DAWN } from './opener.ts';
 import { eventStamp, playback } from './playback.ts';
 import { receivedReadings } from './readings.ts';
 import { reportBody } from './report.ts';
+import { exactWords } from './report-words.ts';
 import { riverStairsWords, weirWords } from './river-notes.ts';
 import { drawScene, type SceneFx, sceneHit } from './scene.ts';
 import { watchStage } from './stage.ts';
@@ -367,7 +367,13 @@ function needleAngle(r: Report | null, g: Gauge): number {
 
 // ---------- title ----------
 
+let watchingNarrow = false;
+
 export function start() {
+  if (!watchingNarrow) {
+    watchingNarrow = true;
+    window.matchMedia?.(NARROW)?.addEventListener?.('change', redrawObservation);
+  }
   if (fileMode) {
     const notice = telemetryNotice(undefined, { preservation: 'preserve' });
     if (notice) document.body.append(notice);
@@ -1165,6 +1171,17 @@ function drawBoard() {
     })
     .join('');
   setHtml(el, html);
+  // Handwriting splits words into one span per letter, which a screen reader reads letter by letter. The
+  // control keeps all its visible text and takes its name from the same pieces, whole.
+  for (const tile of el.querySelectorAll<HTMLElement>('button.gauge'))
+    tile.setAttribute(
+      'aria-label',
+      [...tile.children]
+        .filter((c) => c.tagName !== 'svg')
+        .map((c) => c.textContent?.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .join(', '),
+    );
 }
 
 /** The figure before this one, as a desk keeps it beside the new one: two men's readings side by side. */
@@ -1508,7 +1525,7 @@ function doubtReceipt(now: number): string {
       doubtNote = null;
       return '';
     }
-    return 'The watch did not accept the doubt mark. Nothing changed.';
+    return 'The watch did not accept that change. Nothing changed.';
   }
   const queued = s.inputs
     .slice(s.applied)
@@ -1561,6 +1578,21 @@ function bindReadingNote(el: HTMLElement) {
 }
 
 /** Compare only evidence the player has already received, never the live water state. */
+const NARROW = '(max-width: 767px)';
+
+/**
+ * Redraws only the saved lightning section when the narrow/wide boundary changes with the sheet open.
+ * It reads the same saved flash and board reading, so no time, gauge or control changes.
+ */
+function redrawObservation() {
+  const old = document.getElementById('observation');
+  if (!s || !old) return;
+  const fresh = document.createElement('div');
+  fresh.innerHTML = observation(s);
+  const next = fresh.firstElementChild;
+  if (next) old.replaceWith(next);
+}
+
 function observation(st: GameState): string {
   const flash = st.flashes.at(-1);
   if (!flash)
@@ -1568,7 +1600,7 @@ function observation(st: GameState): string {
   const report = st.board.level;
   // This is a visual estimate on the same wall, with no extra numerical readout.
   // On a narrow screen the same drawing is stretched taller, so it fills the sheet width and shows more height.
-  const tall = window.matchMedia?.('(max-width: 767px)')?.matches ? 1.4 : 1;
+  const tall = window.matchMedia?.(NARROW)?.matches ? 1.4 : 1;
   const sy = (n: number) => Math.round(n * tall * 10) / 10;
   const y = (level: number) => sy(Math.max(12, Math.min(148, 148 - (level - 2) * 30)));
   return `<section id="observation" aria-label="Saved lightning observation">
@@ -1872,13 +1904,15 @@ function callBlocked(st: GameState, who: KeeperId): boolean {
  * interrupts his activity and replaces any call still waiting, whatever he then decides. It is said once for the
  * sheet, not under each button, and it never says the call was accepted.
  */
-function callExplanation(st: GameState, who: KeeperId): string {
+export function callExplanation(st: GameState, who: KeeperId): string {
   if (callBlocked(st, who)) return '';
   const name = NAMES[who];
   const k = keeperOf(st, who);
   const waiting =
     st.inputs.slice(st.applied).some((i) => i.at <= st.minute && i.kind === 'ask' && i.keeper === who) ||
-    !!k.pending;
+    !!k.pending ||
+    // An earlier answer of "later" still stands until a new call clears it, as in the ask handler.
+    (!!k.deferred && st.minute <= k.deferred.until);
   if (waiting)
     return `Your earlier call to ${name} is still waiting. A new call replaces it. A call interrupts what he is doing, even if he does not agree.`;
   const j = k.job;
@@ -1895,11 +1929,15 @@ function verbButtons(items: { h: Hint; label: string; insist: Hint | undefined }
     .join('')}</div>`;
 }
 
-function lastWords(st: GameState, g: Gauge): string {
+export function lastWords(st: GameState, g: Gauge): string {
   const r = st.board[g];
   if (!r) return 'Nobody has read it yet tonight.';
   const who = r.who === 'nerys' ? 'Nerys' : NAMES[r.who as KeeperId];
-  return `${who} last reported this, ${readingTime(r)}: “${esc(reportWords(st, r))}”`;
+  const said = exactWords(st, r);
+  // A quotation only when the retained words match this report; otherwise the figure and time, as written.
+  if (said === null)
+    return `${who} last reported this, ${readingTime(r)}: ${esc(printed(r, g))}. This panel cannot match an exact quote to this reading.`;
+  return `${who} last reported this, ${readingTime(r)}: “${esc(said)}”`;
 }
 
 function whereWords(id: KeeperId): string {
