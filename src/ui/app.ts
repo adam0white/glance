@@ -65,7 +65,13 @@ import {
 import { FRAMEWORK_VERSION } from '../sim/hf4.ts';
 import { KEEPERS, type KeeperId, NAMES } from '../sim/keepers.ts';
 import { type OutcomeTask, outcomeAvailable } from '../sim/outcomes.ts';
-import { type Corner, cornerSky, type PrivateAction, privateAvailable } from '../sim/private-scenes.ts';
+import {
+  type Corner,
+  cornerSky,
+  PRIVATE_PREMISE,
+  type PrivateAction,
+  privateAvailable,
+} from '../sim/private-scenes.ts';
 import {
   type ViewingAction,
   viewingAvailable,
@@ -76,6 +82,7 @@ import { CREST, LIP, TURNS } from '../sim/water.ts';
 import { CandidateValidation } from '../validation.ts';
 import { concernLines, thresholdWords } from './concern.ts';
 import { drawDawn } from './dawn.ts';
+import { gateAfterLevel } from './gate-note.ts';
 import { lab } from './lab.ts';
 import { SAMPLE_DAWN } from './opener.ts';
 import { eventStamp, playback } from './playback.ts';
@@ -1177,7 +1184,9 @@ function drawLog() {
   if (!s) return;
   const lines = s.said.filter((x) => x.at >= watchFrom(s?.night ?? 1) - 1);
   const latest = document.getElementById('latest-radio');
-  const newest = lines.at(-1);
+  // The optional-chapter premise stays in the log as a collapsed note, not above the gauges.
+  const newest = lines.findLast((x) => x.text !== PRIVATE_PREMISE);
+  if (latest && !newest) setHtml(latest, '');
   if (latest && newest) {
     const who =
       newest.who === 'nerys'
@@ -1196,8 +1205,11 @@ function drawLog() {
   const key = lines.map((x) => `${x.at}${x.text}`).join('|');
   if (el.dataset.k === key) return;
   el.dataset.k = key;
+  const noteOpen = el.querySelector<HTMLDetailsElement>('details.chapter-note')?.open ?? false;
   el.innerHTML = lines
     .map((x) => {
+      if (x.text === PRIVATE_PREMISE)
+        return `<div class="line n"><span class="t">${clock(x.at)}</span><details class="chapter-note"${noteOpen ? ' open' : ''}><summary>Optional chapter: Nerys, Bilal and Wren. Read the arrangements.</summary><span>${esc(x.text)}</span></details></div>`;
       const who =
         x.who === 'narrator' || x.who === 'radio' ? '' : x.who === 'nerys' ? 'Nerys' : CAST[x.who].name;
       const r =
@@ -1362,7 +1374,8 @@ function drawSheet() {
     const hs = opts.map((t) => deskHint(s as GameState, who, 'gate', t));
     const next = deskHint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
     head = `<b>Gate</b><span class="soft">${report ? `The last gate reading was ${reported}/${TURNS}, ${readingTime(report)}.` : 'Nobody has read the gate setting.'}</span>`;
-    body = `<details class="fore"><summary>How ${NAMES[who]} expects to feel after this job</summary><span class="hand">${next.forecast ? `“${esc(next.forecast)}”` : 'He has not said how he expects to feel.'}</span></details>
+    const firstAsk = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
+    body = `<details class="fore" ${firstAsk ? 'hidden' : ''}><summary>How ${NAMES[who]} expects to feel after this job</summary><span class="hand">${next.forecast ? `“${esc(next.forecast)}”` : 'He has not said how he expects to feel.'}</span></details>
       <div class="verbs turns">${hs
         .map(
           (h) =>
@@ -1370,7 +1383,7 @@ function drawSheet() {
         )
         .join(
           '',
-        )}</div><p class="hint">The gate opens from 0 to ${TURNS} turns. More turns lower the water behind the dam. The river through town rises later. ${seen.hold ? '' : 'Hold a button to insist.'}</p>`;
+        )}</div><p class="hint">The gate opens from 0 to ${TURNS} turns. More turns lower the water behind the dam. The river through town rises later.${riverFrom(s)} ${seen.hold || firstAsk ? '' : 'Hold a button to insist.'}</p>`;
   } else if (sheet.kind === 'gauge') {
     const job: Job = sheet.gauge === 'weir' ? 'weir' : 'level';
     const h = deskHint(s, who, job);
@@ -1379,6 +1392,7 @@ function drawSheet() {
     const firstReading = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
       ${job === 'level' ? observation(s) : ''}
+      ${job === 'level' ? gateAfterLevel(s.board.level, s.board.gate) : ''}
       <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">How ${NAMES[who]} expects to feel after this job:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'He has not said how he expects to feel.'}</span></p>
       <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every reading is what a keeper saw. It may be wrong.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
@@ -1449,7 +1463,7 @@ function drawSheet() {
 /** A personal desk note. It does not tell the keeper or reveal whether a report is right. */
 function readingNote(st: GameState, report: GameState['board'][Gauge]): string {
   if (!report) return '';
-  return `<div class="reading-note"><button id="reading-note" data-report="${st.reports.indexOf(report)}" aria-pressed="${report.doubted === true}">${report.doubted ? (st.rules ? 'Remove this doubt mark' : 'Remove the check mark') : st.rules ? 'Doubt this reading' : 'Mark this reading for another check'}</button><p class="hint">${st.rules ? `This records your doubt about this report. At dawn, compare it with the known outcome. The mark does not reveal whether it is wrong. ${catchWords(st.rules?.edition)}` : report.doubted ? 'You marked this reading for another check. Ask for a new reading when you are ready.' : 'This adds your own note. It does not say whether the reading is right.'}</p></div>`;
+  return `<div class="reading-note"><button id="reading-note" data-report="${st.reports.indexOf(report)}" aria-pressed="${report.doubted === true}">${report.doubted ? (st.rules ? 'Remove this doubt mark' : 'Remove the check mark') : st.rules ? 'Doubt this reading' : 'Mark this reading for another check'}</button><p class="hint">${st.rules ? `This records your doubt about this report. At dawn, compare it with the known outcome. The mark does not reveal whether it is wrong.` : report.doubted ? 'You marked this reading for another check. Ask for a new reading when you are ready.' : 'This adds your own note. It does not say whether the reading is right.'}</p>${st.rules ? `<details class="catch-rule"><summary>What counts as caught?</summary><p class="hint">${catchWords(st.rules.edition)}</p></details>` : ''}</div>`;
 }
 function bindReadingNote(el: HTMLElement) {
   const button = el.querySelector<HTMLButtonElement>('#reading-note');
@@ -1730,7 +1744,25 @@ function deskHint(st: GameState, who: KeeperId, job: Job, target?: number, insis
   if (st.radioOut) return { ...h, short: 'The radio is out.', minutes: 0, forecast: '' };
   if (activity === 'doze' || activity === 'nap' || (st.rules && keeperAsleep(st, who)))
     return { ...h, short: 'Call and wait for his answer.', minutes: 0, forecast: '' };
-  return h;
+  return { ...h, short: `${h.short}${callNote(st, who, job, target)}` };
+}
+
+/**
+ * What a new call does to this keeper's earlier work, from the actual input rules. Every accepted call first
+ * interrupts his activity and replaces any call still waiting, whatever he then decides. The radio, away,
+ * asleep and doze cases return before this note; the note never says the call was accepted.
+ */
+function callNote(st: GameState, who: KeeperId, job: Job, target: number | undefined): string {
+  const k = keeperOf(st, who);
+  const waiting =
+    st.inputs.slice(st.applied).some((i) => i.at <= st.minute && i.kind === 'ask' && i.keeper === who) ||
+    !!k.pending;
+  if (waiting)
+    return ' Your earlier call to him is still waiting. This call replaces it. A call interrupts what he is doing, even if he does not agree.';
+  const j = k.job;
+  if (!j || j.job === 'stove' || j.job === 'nap') return '';
+  const again = j.job === job && j.target === target;
+  return ` A call interrupts his current job, even if he does not agree.${again ? ' If he does the same job, it starts again and its report can come later.' : ' If he goes back to it afterwards, its report can come later.'}`;
 }
 
 function verbButtons(items: { h: Hint; label: string; insist: Hint | undefined }[], grid = false): string {
@@ -1823,6 +1855,15 @@ function bindHold(b: HTMLButtonElement, go: (insist: boolean) => void) {
     cancel();
     if (!fired) go(false);
   });
+}
+
+/** Night 1 has no river gauge; say when the authored plan first adds the weir and the Bridge Inn's river reports. */
+function riverFrom(st: GameState): string {
+  const plans = st.rules ? EXTENDED_PLANS : PLANS;
+  const first = plans.findIndex((plan) => plan.inn);
+  return first > st.night - 1
+    ? ` Tonight the board shows only the dam. The Bridge Inn’s river reports begin on ${plans[first]?.title}.`
+    : '';
 }
 
 function ask(who: KeeperId, job: Job, target: number | undefined, insist: boolean) {
@@ -1942,14 +1983,14 @@ function watchArrangements() {
   const d = dialog(
     'watch-arrangements',
     'Watch arrangements',
-    `<p>${esc(weatherOutlook(current))}</p><p>${current.rules?.dam === 'upper' ? 'Upper dam has a wider basin and longer paths. Releases take longer to reach town.' : 'Valley dam has the familiar basin and paths.'}</p><p>A standing request waits for a new local level reading. After reading the level again, the keeper decides whether to do the gate work you requested. He can do this while the radio is out. Repeating an old reading does not start the gate work.</p><label for="standing-keeper">Keeper</label><select id="standing-keeper">${planOf(
+    `<p>${esc(weatherOutlook(current))}</p><p>${current.rules?.dam === 'upper' ? 'Upper dam has a wider basin and longer paths. Releases take longer to reach town.' : 'Valley dam has the familiar basin and paths.'}</p><p>Choose a keeper, a level and a gate setting, then press Save this request. The choices below are only a starting point. No request exists until you save it.</p><p>The request is saved when you press the button. The keeper acts only after the watch continues and he reads the level again.</p><p>Once saved, a request waits for a new local level reading. After reading the level again, the keeper decides whether to do the gate work you requested. He can do this while the radio is out. Repeating an old reading does not start the gate work.</p><label for="standing-keeper">Keeper</label><select id="standing-keeper">${planOf(
       current,
     )
       .keepers.filter((id) => id !== 'bilal')
       .map((id) => `<option value="${id}">${NAMES[id]}</option>`)
       .join(
         '',
-      )}</select><label for="standing-threshold">When the keeper reads at least</label><select id="standing-threshold"><option value="4.5">4.5 m</option><option value="5">5.0 m</option><option value="5.5">5.5 m</option></select><label for="standing-target">Consider setting the gate to</label><select id="standing-target">${Array.from({ length: 7 }, (_, n) => `<option value="${n}">${n} turns</option>`).join('')}</select><button id="set-standing">Leave this request</button><button id="clear-standing">Cancel this keeper’s request</button><p>These are requests, not promises. Keep checking the reports.</p>${Object.entries(
+      )}</select><label for="standing-threshold">When the keeper reads at least</label><select id="standing-threshold"><option value="4.5">4.5 m</option><option value="5">5.0 m</option><option value="5.5">5.5 m</option></select><label for="standing-target">Consider setting the gate to</label><select id="standing-target">${Array.from({ length: 7 }, (_, n) => `<option value="${n}">${n} turns</option>`).join('')}</select><button id="set-standing">Save this request</button><button id="clear-standing">Cancel this keeper’s request</button><p>These are requests, not promises. Keep checking the reports.</p>${Object.entries(
       current.arrangements ?? {},
     )
       .map(

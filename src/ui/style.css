@@ -1337,11 +1337,28 @@ input[type="text"],
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(340px, 1fr);
     gap: clamp(8px, 2vw, 24px);
+    grid-template-rows: minmax(0, 1fr);
     overflow: auto;
   }
+  /* The row is exactly the height left under the header. The radio line and the gauges keep their own
+     height; the map takes what remains, down to a floor, so the gauges stay inside the stage. */
   .desk-picture {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
+    min-height: 0;
     overflow: auto;
+  }
+  .scene-zone {
+    display: contents;
+  }
+  #latest-radio {
+    order: 0;
+    flex: none;
+  }
+  .board {
+    order: 2;
+    flex: none;
   }
   .desk-context {
     min-width: 0;
@@ -1397,41 +1414,115 @@ input[type="text"],
     display: block !important;
   }
 }
+/* Phone: the header, map, gauges, sheet and Skip share one column of the remaining height. The map and the
+   notes under the header shrink first, each to a floor. The sheet keeps a floor that holds the first call.
+   Below those floors the desk scrolls as a whole, so nothing ends up behind another control. */
 @media (max-width: 767px) {
-  .desk-main {
-    overflow: hidden;
+  .watch {
+    overflow-y: auto;
   }
-  .desk-picture {
+  .desk-main,
+  .desk-picture,
+  .scene-zone,
+  .desk-context {
+    display: contents;
+  }
+  .watch > .topbar {
+    order: 1;
+    min-height: 44px;
+  }
+  .state-strip {
+    order: 2;
     flex: none;
   }
-  .desk-context {
-    min-height: 0;
+  .desk-reminder {
+    order: 3;
+    /* Keep the notes at their natural height; the map shrinks to its floor before they do. */
+    flex: 0 0 auto;
   }
-  .sheet {
-    min-height: 0;
+  #latest-radio {
+    order: 4;
+    flex: none;
+    padding-block: 2px;
+  }
+  .scene {
+    order: 5;
+    flex: 0 1 clamp(120px, 20vw, 300px);
+    height: auto;
+    min-height: 96px;
   }
   .board {
+    order: 6;
+    flex: none;
     gap: 3px;
     padding: 0 4px;
+  }
+  .gauge {
+    min-height: 5.75rem;
   }
   .gauge svg {
     width: 38px;
     height: 22px;
   }
+  .sheet {
+    order: 7;
+    flex: 1 1 0;
+    min-height: 6.5rem;
+  }
+  .first-call {
+    padding: 2px 0;
+  }
+  .first-call p {
+    margin: 2px 0;
+  }
+  #mornings {
+    order: 8;
+    flex: none;
+  }
+  #skip-bar,
+  #skip-bar:has(#skip-caption:not(:empty)),
+  #skip-bar:has(#skip-caption:empty) {
+    order: 9;
+    flex: none;
+    min-height: 0;
+    padding-block: 4px calc(4px + var(--safe-b));
+    gap: 2px;
+  }
+  #skip-caption {
+    line-height: 1.25;
+  }
+  .save-warning {
+    order: 10;
+    flex: none;
+  }
 }
 
 @media (min-width: 768px) {
   .scene {
+    order: 1;
+    flex: 0 1 auto;
     height: auto;
     aspect-ratio: 360 / 236;
+    min-height: clamp(96px, 9vw, 140px);
   }
 }
 
+/* The goal, Compare and the carry notice are notes under the header. Their height varies (a saved-history
+   notice, an opened disclosure), so they take only the room left and scroll inside their own box. */
 .desk-reminder {
-  flex: none;
+  flex: 0 1 auto;
+  min-height: 72px;
+  max-height: 30dvh;
+  overflow-y: auto;
   padding: 4px 10px;
   border-bottom: 1px solid var(--ink-soft);
   font-size: var(--small-size);
+}
+@media (max-width: 767px) {
+  .desk-reminder {
+    flex-shrink: 0;
+    padding-block: 2px;
+  }
 }
 .desk-reminder p {
   margin: 0 0 4px;
@@ -1507,4 +1598,16 @@ input[type="text"],
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Phone: keep the keeper status inside the row. It shrinks with an ellipsis and costs no height;
+   the full status is in the keeper's own sheet. */
+@media (max-width: 767px) {
+  #concern .keeper-chip {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
