@@ -1600,14 +1600,25 @@ input[type="text"],
   text-overflow: ellipsis;
 }
 
-/* Phone: keep the keeper status inside the row. It shrinks with an ellipsis and costs no height;
-   the full status is in the keeper's own sheet. */
+/* Phone: a keeper chip may wrap to two lines inside the same 44px band, so the status shows in full when
+   it is short and ends with an ellipsis only after two lines. The keeper's own sheet holds the complete
+   status, and the chip's title carries it. This is a source candidate; the phone fit is not measured. */
 @media (max-width: 767px) {
   #concern .keeper-chip {
     flex: 0 1 auto;
     min-width: 0;
-    white-space: nowrap;
+    max-width: 58%;
+    min-height: 0;
+    height: 44px;
+    padding-block: 2px;
+    line-height: 1.15;
+    text-align: left;
+    white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 }

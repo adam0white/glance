@@ -38,7 +38,7 @@ it('recognizes a new delivered line after the bounded radio log fills', () => {
 it('keeps opted-in outcome work moving during inspection without changing legacy or radio rates', () => {
   expect(playback(true, false, 1.4, false, true)).toEqual({
     rate: 0.35,
-    reason: 'Time continues slowly while this inspection is open.',
+    reason: 'Time continues slowly while this inspection is open. It does not stop.',
   });
   expect(playback(true, true, 2.4, true, true).rate).toBe(0.35);
   expect(playback(true, false, 1.4, false, false).rate).toBe(0);
