@@ -45,7 +45,17 @@ export function concernLines(s: GameState): string[] {
     }
     const request = queued.findLast((input) => input.kind === 'ask' && input.keeper === id);
     const pendingJob = request?.kind === 'ask' ? request.job : k.pending?.job;
-    if (pendingJob) words += `. Your request to ${jobs[pendingJob].request} is waiting for an answer`;
+    const pendingTarget = request?.kind === 'ask' ? request.target : k.pending?.target;
+    // A new gate request replaces the one before it, so the waiting request names the setting it asks for.
+    const pendingWords =
+      pendingJob === 'gate' && pendingTarget !== undefined
+        ? pendingTarget === 0
+          ? 'shut the gate'
+          : `set the gate to ${pendingTarget} ${pendingTarget === 1 ? 'turn' : 'turns'}`
+        : pendingJob
+          ? jobs[pendingJob].request
+          : '';
+    if (pendingJob) words += `. Your request to ${pendingWords} is waiting for an answer`;
     else if (k.deferred && s.minute <= k.deferred.until)
       words += `. Your request to ${jobs[k.deferred.job].request} is waiting for him to reconsider`;
     return `${NAMES[id]}: ${words}.`;

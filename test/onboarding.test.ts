@@ -163,7 +163,7 @@ describe('desk sheets and reading labels', () => {
     expect(document.querySelector('[data-g="gate"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(document.querySelectorAll('.turns [data-job="gate"]')).toHaveLength(6);
     expect(document.querySelector('#clock-rate')?.textContent).toBe(
-      'Time continues slowly while this inspection is open.',
+      'Time continues slowly while this inspection is open. It does not stop.',
     );
     expect(document.getElementById('skip-bar')?.hidden).toBe(true);
     const before = state(debug).inputs.length;

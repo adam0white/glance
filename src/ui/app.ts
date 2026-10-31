@@ -88,6 +88,7 @@ import { SAMPLE_DAWN } from './opener.ts';
 import { eventStamp, playback } from './playback.ts';
 import { receivedReadings } from './readings.ts';
 import { reportBody } from './report.ts';
+import { riverStairsWords, weirWords } from './river-notes.ts';
 import { drawScene, type SceneFx, sceneHit } from './scene.ts';
 import { watchStage } from './stage.ts';
 import { tallyBody } from './tally.ts';
@@ -130,6 +131,15 @@ type Sheet =
 const app = document.getElementById('app') as HTMLElement;
 let s: GameState | null = null;
 let readUntil = 0;
+/** The player's latest doubt mark and when its outcome was first seen, so the receipt shows at once and then clears. */
+// The player's last doubt mark. 'submitting' lasts until the worker answers; 'admitted' means the watch took
+// it into its queue; 'rejected' means the watch refused it. Only a known result starts the display timer.
+let doubtNote: {
+  index: number;
+  marked: boolean;
+  phase: 'submitting' | 'admitted' | 'rejected';
+  resolvedAt?: number;
+} | null = null;
 let sheet: Sheet = null;
 let sheetKey = '';
 let stage: ReturnType<typeof watchStage> | undefined;
@@ -937,6 +947,7 @@ function watch() {
   lab.screen(`night ${s.night}: watch`);
   sheet = null;
   sheetKey = '';
+  doubtNote = null;
   requestWake();
   writeSave();
   readUntil = performance.now() + 6000;
@@ -1095,13 +1106,13 @@ function drawTop() {
   if (c) c.textContent = clock(s.minute);
   const rate = document.getElementById('clock-rate');
   if (rate)
-    rate.textContent = playback(
-      sheet !== null,
-      performance.now() < readUntil,
-      selectedRate,
-      skipUntil > 0,
-      !!s.outcomes,
-    ).reason;
+    rate.textContent = [
+      doubtReceipt(performance.now()),
+      playback(sheet !== null, performance.now() < readUntil, selectedRate, skipUntil > 0, !!s.outcomes)
+        .reason,
+    ]
+      .filter(Boolean)
+      .join(' ');
   const skip = document.getElementById('skip') as HTMLButtonElement | null;
   const caption = document.getElementById('skip-caption');
   if (skip) {
@@ -1133,7 +1144,9 @@ function drawBoard() {
   const plan = planOf(s);
   const html = GAUGES.filter((g) => (g.id === 'weir' ? plan.weir : g.id === 'bridge' ? plan.inn : true))
     .map((g) => {
-      const firstLevel = g.id === 'level' && s?.night === 1 && !s.inputs.some((i) => i.kind === 'ask');
+      // Only Dai's opening greeting is held back on the first night. Any later level report, asked for or
+      // not, is a reading he gave, so the tile shows it with its time.
+      const firstLevel = g.id === 'level' && !!s && s.board.level !== null && nobodyHasRead(s);
       const r = firstLevel ? null : (s?.board[g.id] ?? null);
       const age = r && s ? s.minute - r.at : 0;
       const fade = r ? Math.max(0.35, 1 - age / 150) : 0.35;
@@ -1147,7 +1160,7 @@ function drawBoard() {
         <span class="lab">${g.label}</span>
         <span class="num">${printed(r, g.id)}</span>
         <span class="by hand">${r ? `${hand(`${who} · read ${clock(r.wrote)}`, r.who === 'nerys' ? 0 : 1 - r.clarity, r.at)}<span class="as-written"> (as written)</span>` : 'not read'}</span>
-        ${wasLine(r, g.id)}${r?.doubted ? '<span class="soft">Marked for another check</span>' : ''}
+        ${wasLine(r, g.id)}${r?.doubted ? '<span class="soft">Marked for another check</span>' : r && doubtNote?.marked && s?.reports[doubtNote.index] === r && (doubtNote.phase === 'submitting' || s.inputs.slice(s.applied).some((i) => i.kind === 'doubt' && i.marked && s?.reports[i.report] === r)) ? '<span class="soft">Doubt mark waiting</span>' : ''}
       </button>`;
     })
     .join('');
@@ -1206,8 +1219,20 @@ function drawLog() {
   if (el.dataset.k === key) return;
   el.dataset.k = key;
   const noteOpen = el.querySelector<HTMLDetailsElement>('details.chapter-note')?.open ?? false;
+  const backgroundOpen = el.querySelector<HTMLDetailsElement>('details.opening-note')?.open ?? false;
+  // The first night's opening forecast and desk notes (not the optional premise) share one folded line.
+  const isBackground = (x: (typeof lines)[number]) =>
+    s?.night === 1 &&
+    x.at === watchFrom(1) &&
+    x.text !== PRIVATE_PREMISE &&
+    (x.who === 'narrator' || x.who === 'radio');
+  const background = lines.filter(isBackground);
   el.innerHTML = lines
     .map((x) => {
+      if (isBackground(x)) {
+        if (x !== background[0]) return '';
+        return `<div class="line n"><span class="t">${clock(x.at)}</span><details class="opening-note"${backgroundOpen ? ' open' : ''}><summary>Tonight’s forecast and desk notes. Read them.</summary>${background.map((b) => `<span class="${b.who === 'radio' ? 'hand' : ''}">${esc(b.text)}</span> `).join('')}</details></div>`;
+      }
       if (x.text === PRIVATE_PREMISE)
         return `<div class="line n"><span class="t">${clock(x.at)}</span><details class="chapter-note"${noteOpen ? ' open' : ''}><summary>Optional chapter. Read the arrangements.</summary><span>${esc(x.text)}</span></details></div>`;
       const who =
@@ -1298,7 +1323,7 @@ function drawSheet() {
   const el = document.getElementById('sheet');
   if (!el || el.querySelector('.holding')) return;
   if (!sheet) {
-    const first = s.night === 1 && !s.inputs.some((i) => i.kind === 'ask');
+    const first = nobodyHasRead(s);
     const key = `log|${first}`;
     if (sheetKey !== key) {
       sheetKey = key;
@@ -1321,7 +1346,7 @@ function drawSheet() {
       <div class="verbs two">
         <button id="ring" ${ringing ? 'disabled' : ''}><span>Call Nerys</span><span class="h">${viewingInnUnavailable(s) ? 'She cannot answer while away or asleep. A call stops attendance; return remains a separate choice.' : ringing ? 'She has gone to look.' : 'Ask how high the river is.'}</span></button>
         <button id="warn" ${warned ? 'disabled' : ''}><span class="fill"></span><span>Warn Mill Lane</span><span class="h">${warned ? `The warning was sent at ${clock(s.warnedAt ?? 0)}.` : 'Hold to send the warden to warn people.'}</span></button>
-      </div>${readingNote(s, s.board.bridge)}${castConversations(['nerys', 'bilal', 'wren'])}`;
+      </div><p class="hint">${riverStairsWords()}</p>${readingNote(s, s.board.bridge)}${castConversations(['nerys', 'bilal', 'wren'])}`;
     if (!patchSheet(el, html, previousKey === structureKey)) return;
     bindConversations(el);
     bindReadingNote(el);
@@ -1366,24 +1391,27 @@ function drawSheet() {
     : '';
   let body = '';
   let head = '';
+  const callText = callExplanation(s, who);
+  // A permanent slot: its text and hidden state change, so the sheet's root children keep their positions.
+  const callNoteHtml = `<p class="hint call-note" ${callText ? '' : 'hidden'}>${esc(callText)}</p>`;
   if (sheet.kind === 'gauge' && sheet.gauge === 'gate') {
     const report = s.board.gate;
     const reported = report?.value;
     const opts: number[] = [];
     for (let t = 0; t <= TURNS; t++) if (t !== reported) opts.push(t);
     const hs = opts.map((t) => deskHint(s as GameState, who, 'gate', t));
-    const next = deskHint(s, who, 'gate', Math.min(TURNS, (reported ?? 0) + 1));
+    const nextTarget = Math.min(TURNS, (reported ?? 0) + 1);
+    const next = deskHint(s, who, 'gate', nextTarget);
     head = `<b>Gate</b><span class="soft">${report ? `The last gate reading was ${reported}/${TURNS}, ${readingTime(report)}.` : 'Nobody has read the gate setting.'}</span>`;
     const firstAsk = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
-    body = `<details class="fore" ${firstAsk ? 'hidden' : ''}><summary>How ${NAMES[who]} expects to feel after this job</summary><span class="hand">${next.forecast ? `“${esc(next.forecast)}”` : 'He has not said how he expects to feel.'}</span></details>
-      <div class="verbs turns">${hs
-        .map(
-          (h) =>
-            `<button data-job="gate" data-t="${h.target}"><span class="fill"></span><span>${h.target === 0 ? 'Shut' : `${h.target} ${h.target === 1 ? 'turn' : 'turns'}`}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)}${h.minutes ? ` · ~${h.minutes}m` : ''}</span></button>`,
-        )
-        .join(
-          '',
-        )}</div><p class="hint">The gate opens from 0 to ${TURNS} turns. More turns lower the water behind the dam. The river through town rises later.${riverFrom(s)} ${seen.hold || firstAsk ? '' : 'Hold a button to insist.'}</p>`;
+    body = `<div class="verbs turns">${hs
+      .map(
+        (h) =>
+          `<button data-job="gate" data-t="${h.target}"><span class="fill"></span><span>${h.target === 0 ? 'Shut' : `${h.target} ${h.target === 1 ? 'turn' : 'turns'}`}</span><span class="h ${h.verdict === 'refused' ? 'no' : ''}">${esc(h.short)}${h.minutes ? ` · ~${h.minutes}m` : ''}</span></button>`,
+      )
+      .join(
+        '',
+      )}</div><p class="hint">The gate opens from 0 to ${TURNS} turns. More turns lower the water behind the dam. The river through town rises later.${riverFrom(s)} ${seen.hold || firstAsk ? '' : 'Tap a button to ask. Hold it to insist. He may still refuse, and insisting can reduce his trust.'}</p>${callNoteHtml}<details class="fore" ${firstAsk ? 'hidden' : ''}><summary>How tired ${NAMES[who]} expects to be after the gate is set to ${nextTarget} ${nextTarget === 1 ? 'turn' : 'turns'}</summary><span class="hand">${next.forecast ? `“${esc(next.forecast)}”` : 'He has not said how he expects to feel.'}</span></details>`;
   } else if (sheet.kind === 'gauge') {
     const job: Job = sheet.gauge === 'weir' ? 'weir' : 'level';
     const h = deskHint(s, who, job);
@@ -1392,8 +1420,10 @@ function drawSheet() {
     const firstReading = s.night === 1 && !s.inputs.some((input) => input.kind === 'ask');
     body = `${verbButtons([{ h, label: job === 'level' ? `Ask ${NAMES[who]} to read it` : `Send ${NAMES[who]} to the weir`, insist: hi }])}
       ${job === 'level' ? observation(s) : ''}
+      ${job === 'weir' ? weirWords(s.board.weir) : ''}
+      ${callNoteHtml}
       ${job === 'level' ? gateAfterLevel(s.board.level, s.board.gate) : ''}
-      <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">How ${NAMES[who]} expects to feel after this job:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'He has not said how he expects to feel.'}</span></p>
+      <p class="fore" ${firstReading ? 'hidden' : ''}><span class="soft">How tired ${NAMES[who]} expects to be after this job:</span> <span class="hand">${h.forecast ? `“${esc(h.forecast)}”` : 'He has not said how he expects to feel.'}</span></p>
       <div class="previous-reading">${wasLine(s.board[sheet.gauge], sheet.gauge)}</div><p id="threshold" class="soft">${sheet.gauge === 'level' ? esc(thresholdWords(s)) : ''}</p><p class="hint">${firstReading ? 'Every reading is what a keeper saw. It may be wrong.' : lastWords(s, sheet.gauge)}</p>`;
   } else {
     head = `<b>${NAMES[who]}</b><span class="soft">${esc(rotaAway(s, who) || (who === 'callum' && callumAway(s)) ? whereWords(who) : (concernLines(s).find((line) => line.startsWith(`${NAMES[who]}:`)) ?? whereWords(who)))}</span>`;
@@ -1413,6 +1443,7 @@ function drawSheet() {
       })),
       true,
     );
+    body += callNoteHtml;
   }
   const activity = personOf(s, who).activity?.affordanceId;
   const callAdvice = s.radioOut
@@ -1426,7 +1457,7 @@ function drawSheet() {
     )
       .map((line) => `<p>${esc(line)}</p>`)
       .join('')}</details>`;
-    body += castConversations([who]);
+    body += talkCue(s, who) + castConversations([who]);
   }
   if (sheet.kind === 'gauge') body += readingNote(s, s.board[sheet.gauge]);
   body += `<p class="hint call-advice" ${callAdvice ? '' : 'hidden'}>${callAdvice}</p>`;
@@ -1460,22 +1491,72 @@ function drawSheet() {
   });
 }
 
+/**
+ * The real state of the player's doubt mark. It is not called refused or recorded before the watch has
+ * answered. After the answer it is waiting in the queue, recorded, or not recorded.
+ */
+function doubtReceipt(now: number): string {
+  if (!s || !doubtNote) return '';
+  const note = doubtNote;
+  if (note.phase === 'submitting')
+    return note.marked
+      ? 'Sending your doubt mark to the watch.'
+      : 'Sending your request to remove the doubt mark.';
+  if (note.phase === 'rejected') {
+    note.resolvedAt ??= now;
+    if (now - note.resolvedAt > 8000) {
+      doubtNote = null;
+      return '';
+    }
+    return 'The watch did not accept the doubt mark. Nothing changed.';
+  }
+  const queued = s.inputs
+    .slice(s.applied)
+    .some((i) => i.kind === 'doubt' && i.marked === note.marked && i.report === note.index);
+  if (queued)
+    return note.marked
+      ? 'Your doubt mark is waiting to be recorded.'
+      : 'Your request to remove the doubt mark is waiting to be recorded.';
+  note.resolvedAt ??= now;
+  if (now - note.resolvedAt > 8000) {
+    doubtNote = null;
+    return '';
+  }
+  if (s.reports[note.index]?.doubted === note.marked)
+    return note.marked
+      ? 'Recorded: this reading is marked for another check.'
+      : 'Recorded: the doubt mark is removed.';
+  return 'The doubt mark was not recorded, because that reading is no longer on the board. Mark the new reading if you still doubt it.';
+}
+
 /** A personal desk note. It does not tell the keeper or reveal whether a report is right. */
 function readingNote(st: GameState, report: GameState['board'][Gauge]): string {
   if (!report) return '';
-  return `<div class="reading-note"><button id="reading-note" data-report="${st.reports.indexOf(report)}" aria-pressed="${report.doubted === true}">${report.doubted ? (st.rules ? 'Remove this doubt mark' : 'Remove the check mark') : st.rules ? 'Doubt this reading' : 'Mark this reading for another check'}</button><p class="hint">${st.rules ? `This records your doubt about this report. At dawn, compare it with the known outcome. The mark does not reveal whether it is wrong.` : report.doubted ? 'You marked this reading for another check. Ask for a new reading when you are ready.' : 'This adds your own note. It does not say whether the reading is right.'}</p>${st.rules ? `<details class="catch-rule"><summary>What counts as caught?</summary><p class="hint">${catchWords(st.rules.edition)}</p></details>` : ''}</div>`;
+  return `<div class="reading-note"><button id="reading-note" data-report="${st.reports.indexOf(report)}" aria-pressed="${report.doubted === true}">${report.doubted ? (st.rules ? 'Remove this doubt mark' : 'Remove the check mark') : st.rules ? 'Doubt this reading' : 'Mark this reading for another check'}</button><p class="hint">${st.rules ? `This records your doubt about this report. At dawn, compare it with the known outcome. The mark does not reveal whether it is wrong.` : report.doubted ? 'You marked this reading for another check. Ask for a new reading when you are ready.' : 'This adds your own note. It does not say whether the reading is right.'}</p>${st.rules ? `<details class="catch-rule"><summary>What does “caught” mean? A wrong reading can be caught by checking it again, by lightning, or by your doubt mark. Open for the time limits.</summary><p class="hint">${catchWords(st.rules.edition)}</p></details>` : ''}</div>`;
 }
 function bindReadingNote(el: HTMLElement) {
   const button = el.querySelector<HTMLButtonElement>('#reading-note');
-  button?.addEventListener('click', () => {
-    if (!s || !button) return;
-    inputNow(s, {
-      kind: 'doubt',
-      report: Number(button.dataset.report),
-      marked: button.getAttribute('aria-pressed') !== 'true',
-    });
-    writeSave();
+  button?.addEventListener('click', async () => {
+    const state = s;
+    if (!state || !button) return;
+    const index = Number(button.dataset.report);
+    const marked = button.getAttribute('aria-pressed') !== 'true';
+    const note: NonNullable<typeof doubtNote> = { index, marked, phase: 'submitting' };
+    doubtNote = note;
     openSheet(null);
+    drawTop();
+    drawBoard();
+    // mutateNow gives true when the watch took the input, false when it could not, undefined when the
+    // run changed meanwhile. Nothing is called recorded or refused before that answer.
+    const result = await inputNow(state, { kind: 'doubt', report: index, marked });
+    if (doubtNote !== note) return;
+    if (result === undefined) {
+      doubtNote = null;
+    } else {
+      note.phase = result ? 'admitted' : 'rejected';
+    }
+    drawTop();
+    drawBoard();
   });
 }
 
@@ -1486,18 +1567,39 @@ function observation(st: GameState): string {
     return '<section id="observation"><p>The next lightning flash will leave a saved image here. Compare its water line with the keeper’s reading.</p></section>';
   const report = st.board.level;
   // This is a visual estimate on the same wall, with no extra numerical readout.
-  const y = (level: number) => Math.max(12, Math.min(148, 148 - (level - 2) * 30));
+  // On a narrow screen the same drawing is stretched taller, so it fills the sheet width and shows more height.
+  const tall = window.matchMedia?.('(max-width: 767px)')?.matches ? 1.4 : 1;
+  const sy = (n: number) => Math.round(n * tall * 10) / 10;
+  const y = (level: number) => sy(Math.max(12, Math.min(148, 148 - (level - 2) * 30)));
   return `<section id="observation" aria-label="Saved lightning observation">
     <p>Lightning at ${clock(flash.at)}: a saved image of the water against the dam wall.</p>
-    <svg viewBox="0 0 300 170" role="img" aria-label="The saved lightning water line${report ? ' beside the latest reported water line' : ''}">
-      <path d="M240 155V28H270L290 155" fill="none" stroke="currentColor"/>
-      <path d="M10 28H240" stroke="currentColor" stroke-dasharray="2 5"/><text x="12" y="22">Dam crest</text>
+    <svg viewBox="0 0 300 ${sy(170)}" role="img" aria-label="The saved lightning water line${report ? ' beside the latest reported water line' : ''}">
+      <path d="M240 ${sy(155)}V${sy(28)}H270L290 ${sy(155)}" fill="none" stroke="currentColor"/>
+      <path d="M10 ${sy(28)}H240" stroke="currentColor" stroke-dasharray="2 5"/><text x="12" y="${sy(22)}">Dam crest</text>
       <path d="M10 ${y(flash.level)}H240" stroke="var(--rope)" stroke-width="3" stroke-dasharray="6 4"/>
       ${report ? `<path d="M10 ${y(report.value)}H240" stroke="var(--sky)" stroke-width="2"/>` : ''}
     </svg>
     <p>The dashed line is the saved image. ${report ? `The solid line is ${NAMES[report.who as KeeperId] ?? 'the keeper'}’s latest reading, ${readingTime(report)}.` : 'There is no keeper reading to compare yet.'}</p>
     <p class="hint">These observations may be from different times. The water can change between them. This image does not show the water now.</p>
   </section>`;
+}
+
+/**
+ * Points to the existing optional talk without answering anything. Dai's Morgan question has no authored
+ * reply, so this says so, and says when the talk can start using the actual availability rule.
+ */
+function talkCue(st: GameState, who: KeeperId): string {
+  // A permanent slot: the paragraph always exists, so the sheet's root children keep their positions when
+  // Dai's authored question arrives while the sheet is open.
+  const asked =
+    who === 'dai' &&
+    !st.discoveries.dai &&
+    st.said.some((x) => x.who === 'dai' && x.text.includes('Where has Morgan gone'));
+  const free = asked && discoveriesFor(st).includes('dai');
+  const text = asked
+    ? `Dai asked where Morgan went. This game has no answer to that. The optional talk with Dai below does not answer it. ${free ? 'He is free to talk now.' : 'He can talk only when he is on duty and not working on a request, and only if he trusts you enough.'}`
+    : '';
+  return `<p class="hint talk-cue" ${text ? '' : 'hidden'}>${esc(text)}</p>`;
 }
 
 function castConversations(ids: CastId[]): string {
@@ -1744,25 +1846,44 @@ function deskHint(st: GameState, who: KeeperId, job: Job, target?: number, insis
   if (st.radioOut) return { ...h, short: 'The radio is out.', minutes: 0, forecast: '' };
   if (activity === 'doze' || activity === 'nap' || (st.rules && keeperAsleep(st, who)))
     return { ...h, short: 'Call and wait for his answer.', minutes: 0, forecast: '' };
-  return { ...h, short: `${h.short}${callNote(st, who, job, target)}` };
+  return h;
+}
+
+/**
+ * True until a keeper reports the level after Dai's opening greeting. A later report counts whether it was
+ * asked for, volunteered, or came from a standing request. The greeting is not treated as a field reading.
+ */
+function nobodyHasRead(st: GameState): boolean {
+  if (st.night !== 1 || st.inputs.some((i) => i.kind === 'ask')) return false;
+  const opening = st.reports.find((x) => x.gauge === 'level');
+  return !st.board.level || st.board.level === opening;
+}
+
+/** The radio, away, asleep and doze cases are described on the buttons themselves; no call sentence applies. */
+function callBlocked(st: GameState, who: KeeperId): boolean {
+  if (rotaAway(st, who) || st.radioOut) return true;
+  if ((who === 'callum' && callumAway(st)) || (who === 'dai' && daiAway(st))) return true;
+  const activity = personOf(st, who).activity?.affordanceId;
+  return activity === 'doze' || activity === 'nap' || (!!st.rules && keeperAsleep(st, who));
 }
 
 /**
  * What a new call does to this keeper's earlier work, from the actual input rules. Every accepted call first
- * interrupts his activity and replaces any call still waiting, whatever he then decides. The radio, away,
- * asleep and doze cases return before this note; the note never says the call was accepted.
+ * interrupts his activity and replaces any call still waiting, whatever he then decides. It is said once for the
+ * sheet, not under each button, and it never says the call was accepted.
  */
-function callNote(st: GameState, who: KeeperId, job: Job, target: number | undefined): string {
+function callExplanation(st: GameState, who: KeeperId): string {
+  if (callBlocked(st, who)) return '';
+  const name = NAMES[who];
   const k = keeperOf(st, who);
   const waiting =
     st.inputs.slice(st.applied).some((i) => i.at <= st.minute && i.kind === 'ask' && i.keeper === who) ||
     !!k.pending;
   if (waiting)
-    return ' Your earlier call to him is still waiting. This call replaces it. A call interrupts what he is doing, even if he does not agree.';
+    return `Your earlier call to ${name} is still waiting. A new call replaces it. A call interrupts what he is doing, even if he does not agree.`;
   const j = k.job;
   if (!j || j.job === 'stove' || j.job === 'nap') return '';
-  const again = j.job === job && j.target === target;
-  return ` A call interrupts his current job, even if he does not agree.${again ? ' If he does the same job, it starts again and its report can come later.' : ' If he goes back to it afterwards, its report can come later.'}`;
+  return `A call interrupts what ${name} is doing now, even if he does not agree. If he takes up that job again afterwards, it starts again and its report can come later.`;
 }
 
 function verbButtons(items: { h: Hint; label: string; insist: Hint | undefined }[], grid = false): string {

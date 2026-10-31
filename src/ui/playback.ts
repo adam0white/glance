@@ -9,7 +9,7 @@ export function playback(
   outcomes = false,
 ) {
   if (inspecting && outcomes)
-    return { rate: 0.35, reason: 'Time continues slowly while this inspection is open.' };
+    return { rate: 0.35, reason: 'Time continues slowly while this inspection is open. It does not stop.' };
   if (inspecting) return { rate: 0, reason: 'Time stops while you look.' };
   if (skipping) return { rate: 6, reason: 'Time speeds up until the next report.' };
   if (reading) return { rate: 0.35, reason: 'Time slows while you read the radio report.' };
