@@ -162,6 +162,8 @@ Owner preferences, owner: Adam, target 2026-11-10. Reason: each changes difficul
 - **F-2201** more to decide each night. No forced difficulty change.
 - **F-2207** variety. First-night evidence cannot establish later nights.
 - **F-2346** more first-hour decisions OR a truthful cue. "Nothing needs deciding until the level rises" is not provably true, so it is not said. A supported cue is Nov 3 work.
+  - **2026-10-31 source candidate, not accepted:** the existing first-call panel now points to the Gate request and says Dai may refuse or ask to wait. Its existing public retirement condition stays unchanged. The pointer is hidden while the chapter is paused and returns after public resume. This does not promise a meaningful decision or establish player satisfaction; more decisions remain player taste. Independent review, exact future Opus review, normal lane and technical delivery, four-size Chromium/WebKit, fonts and phone touch remain. Two completed iterations stay finished; no new panel.
+
 - **F-2347** the gate's effect apart from rain. No hidden quantitative attribution. Whether an explained comparison with stated uncertainty is wanted is the owner's call.
 - **F-2351** waiting preference. The thirty-second waits were intentional driver operations, not a stall.
 - **F-2352** more decisions per night. Same as F-2201.

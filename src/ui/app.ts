@@ -1341,10 +1341,10 @@ function drawSheet() {
   if (!el || el.querySelector('.holding')) return;
   if (!sheet) {
     const first = nobodyHasRead(s);
-    const key = `log|${first}`;
+    const key = `log|${first}|${s.chapterPaused}`;
     if (sheetKey !== key) {
       sheetKey = key;
-      el.innerHTML = `${first ? `<div class="first-call"><p>Nobody has read the level tonight.</p>${verbButtons([{ h: deskHint(s, 'dai', 'level'), label: 'Ask Dai to read the level', insist: deskHint(s, 'dai', 'level', undefined, true) }])}</div>` : ''}<div class="log" id="log" aria-live="polite"></div>`;
+      el.innerHTML = `${first ? `<div class="first-call"><p>Nobody has read the level tonight.</p>${s.chapterPaused ? '' : '<p>You can also tap Gate to ask Dai to change its setting. He may refuse or ask you to wait.</p>'}${verbButtons([{ h: deskHint(s, 'dai', 'level'), label: 'Ask Dai to read the level', insist: deskHint(s, 'dai', 'level', undefined, true) }])}</div>` : ''}<div class="log" id="log" aria-live="polite"></div>`;
       const firstButton = el.querySelector<HTMLButtonElement>('[data-job]');
       if (firstButton) bindHold(firstButton, (insist) => ask('dai', 'level', undefined, insist));
     }
