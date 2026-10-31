@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Report } from '../src/sim/dam.ts';
 import { clock, exportRun, keeperOf, newGame, queueInput, replay, step } from '../src/sim/dam.ts';
 import { PRIVATE_PREMISE } from '../src/sim/private-scenes.ts';
+import { exportCurrent, importCurrent } from '../src/sim/run.ts';
 import { concernLines } from '../src/ui/concern.ts';
 import { gateAfterLevel } from '../src/ui/gate-note.ts';
 import { exactWords } from '../src/ui/report-words.ts';
@@ -792,6 +793,58 @@ describe('RT7 first-call instruction after a volunteered level report', () => {
     expect(document.querySelector('[data-g="level"]')?.textContent).not.toContain('not read');
     expect(document.querySelector('.first-call')).toBeNull();
     expect(document.getElementById('sheet')?.textContent).not.toContain('Nobody has read the level tonight');
+  });
+  it('hides the gate pointer in a restored paused watch and shows it after public resume', async () => {
+    const original = newGame(7);
+    queueInput(original, { kind: 'pause' });
+    step(original);
+    expect(original.chapterPaused).toBe(true);
+    const saved = exportCurrent(original);
+    expect(importCurrent(saved).chapterPaused).toBe(true);
+    localStorage['glance-cast-local-v3'] = JSON.stringify({
+      run: saved,
+      runId: 'paused-control',
+      heads: [],
+      fileOrigin: false,
+      sources: [],
+    });
+    const debug = await boot();
+    await click('cont');
+    const cue = 'You can also tap Gate to ask Dai to change its setting. He may refuse or ask you to wait.';
+    expect(debug.state?.chapterPaused).toBe(true);
+    expect(document.querySelector('.first-call [data-job="level"]')).not.toBeNull();
+    expect(document.querySelector('.first-call')?.textContent).not.toContain(cue);
+    await click('menu');
+    await click('dialog-back');
+    expect(debug.state?.chapterPaused).toBe(false);
+    expect(document.querySelector('.first-call')?.textContent).toContain(cue);
+    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
+    const gate = document.querySelector<HTMLElement>('#sheet [data-job="gate"]');
+    expect(gate).not.toBeNull();
+    const target = Number(gate?.dataset.t);
+    const saidBefore = debug.state?.said.length ?? 0;
+    await tap(gate as HTMLElement);
+    expect(debug.state?.inputs.at(-1)).toMatchObject({ kind: 'ask', keeper: 'dai', job: 'gate', target });
+    await debug.step(1);
+    expect(debug.state?.applied).toBe(debug.state?.inputs.length);
+    expect(debug.state?.said.length).toBeGreaterThan(saidBefore);
+    expect(document.querySelector('.first-call')).toBeNull();
+  });
+  it('points to the live gate choices until the first call', async () => {
+    await boot();
+    await click('new');
+    const first = document.querySelector('.first-call') as HTMLElement;
+    expect(first.querySelector('[data-job="level"]')).not.toBeNull();
+    (document.querySelector('[data-g="gate"]') as HTMLElement).click();
+    const choices = document.querySelectorAll<HTMLElement>('#sheet [data-job="gate"]');
+    expect(choices.length).toBeGreaterThan(0);
+    expect(choices[0]?.querySelector('.h')?.textContent?.trim()).toBeTruthy();
+    await click('x');
+    expect(document.querySelector('.first-call')?.textContent).toContain(
+      'You can also tap Gate to ask Dai to change its setting. He may refuse or ask you to wait.',
+    );
+    await tap(document.querySelector('.first-call [data-job="level"]') as HTMLElement);
+    expect(document.querySelector('.first-call')).toBeNull();
   });
   it('a new game still shows the staged first call', async () => {
     await boot();

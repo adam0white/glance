@@ -110,6 +110,7 @@ it.each([false, true])(
     expect(debug.state?.phase).toBe('watch');
     expect(debug.state?.night).toBe(2);
     expect(document.querySelector('.watch')).not.toBeNull();
+    expect(document.querySelector('.first-call')).toBeNull();
     expect(document.querySelector('.dawn')).toBeNull();
     expect(raf.mock.calls.length).toBeGreaterThan(before);
   },
