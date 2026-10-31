@@ -82,7 +82,7 @@ describe('F-2198 optional chapter copy on the first screen', () => {
     const note = document.querySelector<HTMLDetailsElement>('#log details.chapter-note');
     expect(note).not.toBeNull();
     expect(note?.open).toBe(false);
-    expect(note?.querySelector('summary')?.textContent).toMatch(/Nerys/);
+    expect(note?.querySelector('summary')?.textContent).toBe('Optional chapter. Read the arrangements.');
     // Disclosure stays complete and word for word inside the collapsed note.
     expect(note?.textContent).toContain(PRIVATE_PREMISE);
     expect(note?.textContent).toContain('Neither channel sends anything outside this game.');

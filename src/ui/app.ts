@@ -1209,7 +1209,7 @@ function drawLog() {
   el.innerHTML = lines
     .map((x) => {
       if (x.text === PRIVATE_PREMISE)
-        return `<div class="line n"><span class="t">${clock(x.at)}</span><details class="chapter-note"${noteOpen ? ' open' : ''}><summary>Optional chapter: Nerys, Bilal and Wren. Read the arrangements.</summary><span>${esc(x.text)}</span></details></div>`;
+        return `<div class="line n"><span class="t">${clock(x.at)}</span><details class="chapter-note"${noteOpen ? ' open' : ''}><summary>Optional chapter. Read the arrangements.</summary><span>${esc(x.text)}</span></details></div>`;
       const who =
         x.who === 'narrator' || x.who === 'radio' ? '' : x.who === 'nerys' ? 'Nerys' : CAST[x.who].name;
       const r =
@@ -1503,7 +1503,7 @@ function observation(st: GameState): string {
 function castConversations(ids: CastId[]): string {
   if (!s) return '';
   const available = discoveriesFor(s);
-  return `<details class="fore"><summary>People on this shift</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. ${s?.outcomes ? 'The shift continues slowly while this inspection is open.' : 'Close this inspection to let the shift continue.'} Dam requests still go to the keepers.</p>${rotaRecord(ids)}${outcomeRecord(ids)}${keeperFamilyRecord(ids)}${privateRecord(ids)}</details>`;
+  return `<details class="fore"><summary>${ids.length === 1 && ids[0] ? `Talk with ${CAST[ids[0]].name} · optional` : 'Optional talks'}</summary>${ids.map((id) => `<p><b>${CAST[id].name}, ${CAST[id].age}</b>. ${esc(CAST[id].role)}</p>${s?.discoveries[id] ? `<p class="hand">${esc(rememberedConversation(s as GameState, id) ?? '')}</p>` : `<button data-talk="${id}" ${available.includes(id) ? '' : 'disabled'}>${s?.conversations[id] === undefined ? 'Ask if there is time to talk' : 'Ask to continue the conversation'} · ${CAST[id].name}</button>`}`).join('')}<p class="soft">A private conversation can wait. ${s?.outcomes ? 'The shift continues slowly while this inspection is open.' : 'Close this inspection to let the shift continue.'} Dam requests still go to the keepers.</p>${rotaRecord(ids)}${outcomeRecord(ids)}${keeperFamilyRecord(ids)}${privateRecord(ids)}</details>`;
 }
 function rotaRecord(ids: CastId[]): string {
   if (!s?.outcomes) return '';

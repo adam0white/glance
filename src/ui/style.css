@@ -1441,18 +1441,18 @@ input[type="text"],
     flex: 0 0 auto;
   }
   #latest-radio {
-    order: 4;
+    order: 6;
     flex: none;
     padding-block: 2px;
   }
   .scene {
-    order: 5;
+    order: 4;
     flex: 0 1 clamp(120px, 20vw, 300px);
     height: auto;
     min-height: 96px;
   }
   .board {
-    order: 6;
+    order: 5;
     flex: none;
     gap: 3px;
     padding: 0 4px;
